@@ -101,6 +101,10 @@ dist
 # vite-plugin-pwa dev output
 dev-dist/
 
+# Editor / OS
+.idea/
+.DS_Store
+
 # vitepress build output
 **/.vitepress/dist
 
