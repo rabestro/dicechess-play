@@ -41,6 +41,12 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # Public URL of the ingest gateway, baked into the bundle at build time.
+          # Set it as a repo VARIABLE (Settings → Secrets and variables → Actions →
+          # Variables → VITE_INGEST_GATEWAY_URL). Empty = recording disabled (games
+          # stay in IndexedDB). Changing it requires a rebuild + redeploy.
+          VITE_INGEST_GATEWAY_URL: ${{ vars.VITE_INGEST_GATEWAY_URL }}
 
       # wrangler pages deploy does not auto-create the project; create it once
       # (no-op / harmless error if it already exists, hence `|| true`).
