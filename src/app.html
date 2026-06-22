@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta id="theme-color-meta" name="theme-color" content="#020617" />
+		<title>Dice Chess — Play</title>
+		<script>
+			(function () {
+				try {
+					var allowed = [
+						'dark',
+						'light',
+						'dracula',
+						'nord',
+						'solarized-dark',
+						'tokyo-night',
+						'gruvbox',
+					];
+					var storedTheme = localStorage.getItem('dicechess-theme');
+					var systemTheme = window.matchMedia('(prefers-color-scheme: light)').matches
+						? 'light'
+						: 'dark';
+					var theme =
+						storedTheme && allowed.indexOf(storedTheme) !== -1 ? storedTheme : systemTheme;
+					document.documentElement.setAttribute('data-theme', theme);
+					var metaColors = {
+						dark: '#020617',
+						light: '#f8fafc',
+						dracula: '#282a36',
+						nord: '#2e3440',
+						'solarized-dark': '#002b36',
+						'tokyo-night': '#1a1b26',
+						gruvbox: '#282828',
+					};
+					var metaTag = document.getElementById('theme-color-meta');
+					if (metaTag && metaColors[theme]) {
+						metaTag.setAttribute('content', metaColors[theme]);
+					}
+				} catch (e) {}
+			})();
+		</script>
+		%sveltekit.head%
+	</head>
+	<body class="bg-background text-content min-h-screen">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
