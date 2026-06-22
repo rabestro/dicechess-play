@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  packages: read # GITHUB_TOKEN needs this to install @rabestro/dicechess-engine
 
 concurrency:
   group: deploy-${{ github.ref }}
