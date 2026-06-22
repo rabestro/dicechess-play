@@ -22,9 +22,7 @@
 
 	const inLobby = $derived(store.gameStatus === 'idle');
 	const isOver = $derived(
-		store.gameStatus === 'victory' ||
-			store.gameStatus === 'defeat' ||
-			store.gameStatus === 'draw',
+		store.gameStatus === 'victory' || store.gameStatus === 'defeat' || store.gameStatus === 'draw',
 	);
 
 	// Flush finished games to the ingest gateway exactly once per game. `flushed` is a
@@ -54,7 +52,7 @@
 
 		<div class="flex flex-col gap-2">
 			<span class="text-sm font-bold text-content-muted">Opponent</span>
-			{#each BOTS as bot}
+			{#each BOTS as bot (bot.id)}
 				<button
 					type="button"
 					onclick={() => (selectedAlgo = bot.id)}
@@ -72,7 +70,7 @@
 		<div class="flex flex-col gap-2">
 			<span class="text-sm font-bold text-content-muted">Your color</span>
 			<div class="flex gap-2">
-				{#each COLORS as color}
+				{#each COLORS as color (color)}
 					<button
 						type="button"
 						onclick={() => (selectedColor = color)}
@@ -113,7 +111,7 @@
 
 			<div class="flex items-center gap-4 min-h-12">
 				<div class="flex gap-1 text-3xl" aria-label="Dice">
-					{#each store.availableDiceValues as v}
+					{#each store.availableDiceValues as v, i (i)}
 						<span>{DICE_FACE[v] ?? '🎲'}</span>
 					{/each}
 				</div>

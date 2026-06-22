@@ -1,5 +1,6 @@
 <script lang="ts">
 	// Landing page — anonymous visitor lands here and jumps straight into a game.
+	import { resolve } from '$app/paths';
 </script>
 
 <section class="flex flex-col items-center text-center gap-8 py-12">
@@ -12,7 +13,7 @@
 	</div>
 
 	<a
-		href="/play"
+		href={resolve('/play')}
 		class="px-8 py-3 rounded-xl bg-primary text-primary-content font-bold text-lg shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors"
 	>
 		Play vs a bot →

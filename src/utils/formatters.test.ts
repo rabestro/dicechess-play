@@ -11,7 +11,7 @@ describe('formatters', () => {
 			[undefined, ''],
 			[2, ''],
 			[-2, ''],
-			[999, '']
+			[999, ''],
 		])('formats %s as %s', (result, expected) => {
 			expect(formatGameResult(result)).toBe(expected);
 		});

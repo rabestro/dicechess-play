@@ -121,7 +121,7 @@ class Logger {
 			return {
 				name: payload.name,
 				message: payload.message,
-				stack: payload.stack
+				stack: payload.stack,
 			};
 		}
 		return payload;

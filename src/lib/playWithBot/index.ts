@@ -3,7 +3,16 @@
 
 // Entry point for the playWithBot module, exporting the store and test utilities.
 
-export { PlayWithBotStore, playWithBotStore, setDiceChessInstance, resetDiceChessInstance } from './playWithBotStore.svelte';
+export {
+	PlayWithBotStore,
+	playWithBotStore,
+	setDiceChessInstance,
+	resetDiceChessInstance,
+} from './playWithBotStore.svelte';
 export { PlayWithBotHistory, type BotMoveHistoryState } from './playWithBotHistory.svelte';
 export { PlayWithBotDice } from './playWithBotDice.svelte';
-export { PlayWithBotBot, setBotDiceChessInstance, resetBotDiceChessInstance } from './playWithBotBot';
+export {
+	PlayWithBotBot,
+	setBotDiceChessInstance,
+	resetBotDiceChessInstance,
+} from './playWithBotBot';

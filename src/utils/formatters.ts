@@ -4,20 +4,20 @@
  * @returns Formatted date string or "Unknown Date" if parsing fails.
  */
 export function formatDate(dateString?: string | null): string {
-	if (!dateString) return "Unknown Date";
+	if (!dateString) return 'Unknown Date';
 	try {
 		const date = new Date(dateString);
-		if (isNaN(date.getTime())) return "Unknown Date";
+		if (isNaN(date.getTime())) return 'Unknown Date';
 
-		return new Intl.DateTimeFormat("en-GB", {
-			day: "numeric",
-			month: "short",
-			year: "numeric",
-			hour: "2-digit",
-			minute: "2-digit"
+		return new Intl.DateTimeFormat('en-GB', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
 		}).format(date);
 	} catch {
-		return "Unknown Date";
+		return 'Unknown Date';
 	}
 }
 
