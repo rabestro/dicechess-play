@@ -23,7 +23,7 @@
 		"uuid": "^14.0.1"
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.22.0",
+		"@eslint/js": "^10.0.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.65.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
