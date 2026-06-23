@@ -178,7 +178,7 @@
 			{/if}
 		</div>
 
-		<aside class="w-full lg:w-80 shrink-0">
+		<aside class="w-full lg:w-80 shrink-0 lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]">
 			<MoveHistory
 				historyBlocks={store.historyBlocks}
 				currentMoveIndex={store.currentMoveIndex}

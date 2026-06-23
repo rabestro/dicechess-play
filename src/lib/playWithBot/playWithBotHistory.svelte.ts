@@ -140,6 +140,8 @@ export class PlayWithBotHistory {
 				if (isNewTurn) {
 					currentTurnBlock = {
 						turnNumber: blocks.length + 1,
+						whiteDice: null,
+						blackDice: null,
 						whiteMoves: [],
 						blackMoves: [],
 						events: [],
@@ -170,8 +172,20 @@ export class PlayWithBotHistory {
 
 					if (currentTurnBlock) {
 						if (activeColor === 'w') {
+							if (!currentTurnBlock.whiteDice && state.dices.length > 0) {
+								currentTurnBlock.whiteDice = {
+									index: i,
+									diceChars: state.dices.map((d) => d.value),
+								};
+							}
 							currentTurnBlock.whiteMoves.push(moveData);
 						} else {
+							if (!currentTurnBlock.blackDice && state.dices.length > 0) {
+								currentTurnBlock.blackDice = {
+									index: i,
+									diceChars: state.dices.map((d) => d.value),
+								};
+							}
 							currentTurnBlock.blackMoves.push(moveData);
 						}
 					}
