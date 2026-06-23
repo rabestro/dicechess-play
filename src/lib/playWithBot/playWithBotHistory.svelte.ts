@@ -165,6 +165,7 @@ export class PlayWithBotHistory {
 						index: i,
 						text,
 						pieceIcon: pieceIcon || '',
+						pieceChar: pieceChar ?? null,
 					};
 
 					if (currentTurnBlock) {

@@ -5,6 +5,7 @@
 	import MoveHistory from '../../components/MoveHistory.svelte';
 	import PawnPromotionSelector from '../../components/PawnPromotionSelector.svelte';
 	import { flushOutbox } from '$lib/ingest/outbox';
+	import { getPieceImage } from '$lib/utils/getPieceImage';
 
 	// The five playable bots (ADR: hardcoded — do not trust engine getAvailableBots()).
 	const BOTS = [
@@ -15,7 +16,6 @@
 		{ id: 'monte-carlo', label: 'Monte-Carlo', level: 6 },
 	];
 	const COLORS = ['white', 'black', 'random'] as const;
-	const DICE_FACE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 
 	let selectedAlgo = $state('greedy');
 	let selectedColor = $state<(typeof COLORS)[number]>('white');
@@ -109,12 +109,35 @@
 				{/if}
 			</div>
 
-			<div class="flex items-center gap-4 min-h-12">
-				<div class="flex gap-1 text-3xl" aria-label="Dice">
-					{#each store.availableDiceValues as v, i (i)}
-						<span>{DICE_FACE[v] ?? '🎲'}</span>
-					{/each}
-				</div>
+			<div class="flex items-center gap-3 min-h-14">
+				{#if store.currentDice.length > 0}
+					<div class="flex items-center gap-2" aria-label="Dice">
+						{#each store.currentDice as d, i (i)}
+							<div
+								class="relative w-10 h-10 rounded-xl bg-dice-surface border border-border flex items-center justify-center transition-all duration-300
+									{d.used
+									? 'opacity-30 grayscale scale-95'
+									: 'scale-100 shadow-md ring-1 ring-border-strong'}"
+							>
+								<img
+									src={getPieceImage(d.value)}
+									alt={d.value}
+									class="w-7 h-7 drop-shadow-md select-none pointer-events-none"
+								/>
+							</div>
+						{/each}
+					</div>
+				{:else if store.canUserRoll}
+					<div class="flex items-center gap-2" aria-label="Dice">
+						{#each Array(3) as _, i (i)}
+							<div
+								class="w-10 h-10 rounded-xl border border-border flex items-center justify-center opacity-30"
+							>
+								<span class="text-content-muted font-sans text-sm">-</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
 
 				{#if store.canUserRoll}
 					<button
@@ -122,12 +145,12 @@
 						onclick={() => store.rollDice()}
 						class="px-5 py-2 rounded-lg bg-primary text-primary-content font-bold hover:bg-primary-hover transition-colors"
 					>
-						🎲 Roll
+						Roll
 					</button>
 				{/if}
 
 				{#if store.gameStatus === 'bot_thinking'}
-					<span class="text-sm text-content-muted">Bot is thinking…</span>
+					<span class="text-sm text-content-muted italic">Bot is thinking…</span>
 				{/if}
 			</div>
 

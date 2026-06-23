@@ -65,8 +65,8 @@ export type GameData = {
 
 export type TurnBlock = {
 	turnNumber: number;
-	whiteMoves: { index: number; text: string; pieceIcon: string }[];
-	blackMoves: { index: number; text: string; pieceIcon: string }[];
+	whiteMoves: { index: number; text: string; pieceIcon: string; pieceChar: string | null }[];
+	blackMoves: { index: number; text: string; pieceIcon: string; pieceChar: string | null }[];
 	events: { index: number; text: string }[];
 };
 
