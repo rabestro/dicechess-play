@@ -1,8 +1,18 @@
 {
 	"name": "dicechess-play",
-	"private": true,
 	"version": "0.0.0",
+	"private": true,
 	"type": "module",
+	"description": "Public Dice Chess play site — anonymous play vs bots, no sign-up required",
+	"author": {
+		"name": "Jegors Čemisovs",
+		"url": "https://jc.id.lv"
+	},
+	"license": "AGPL-3.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/rabestro/dicechess-play.git"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
