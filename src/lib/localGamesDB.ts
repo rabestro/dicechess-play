@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-export type SyncStatus = 'pending' | 'synced';
+export type SyncStatus = 'pending' | 'synced' | 'quarantined';
 export type PlayerColor = 'WHITE' | 'BLACK';
 
 export interface DiceChessTurnHistory {
@@ -77,13 +77,22 @@ export async function getAllLocalGames(): Promise<LocalGameRecord[]> {
 	return games.reverse();
 }
 
-export async function markGameAsSynced(id: string): Promise<void> {
+async function setSyncStatus(id: string, status: SyncStatus): Promise<void> {
 	const db = await getDB();
 	const tx = db.transaction('local_games', 'readwrite');
 	const game = await tx.store.get(id);
 	if (game) {
-		game.sync_status = 'synced';
+		game.sync_status = status;
 		await tx.store.put(game);
 	}
 	await tx.done;
+}
+
+export async function markGameAsSynced(id: string): Promise<void> {
+	await setSyncStatus(id, 'synced');
+}
+
+/** A permanently-rejected game (400/422): kept for inspection, never retried. */
+export async function markGameAsQuarantined(id: string): Promise<void> {
+	await setSyncStatus(id, 'quarantined');
 }

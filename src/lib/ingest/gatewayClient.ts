@@ -23,7 +23,9 @@ const GATEWAY_URL: string = import.meta.env.VITE_INGEST_GATEWAY_URL ?? '';
 function classify(status: number): IngestOutcome {
 	if (status === 201) return 'created';
 	if (status === 200) return 'exists'; // first-writer-wins: already ingested
-	if (status === 422) return 'rejected'; // engine replay / validation reject
+	// 422 = engine replay reject; 400 = malformed/contract-invalid body. Both are permanent —
+	// retrying re-fails, so the outbox quarantines them instead of looping.
+	if (status === 422 || status === 400) return 'rejected';
 	return 'error';
 }
 

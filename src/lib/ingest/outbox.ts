@@ -8,7 +8,7 @@
 // TODO(phase-1): backoff + a dedicated 'quarantined' state for 422 rejects so a bad
 // record is surfaced for review instead of retried forever.
 
-import { getPendingGames, markGameAsSynced } from '$lib/localGamesDB';
+import { getPendingGames, markGameAsSynced, markGameAsQuarantined } from '$lib/localGamesDB';
 import { getGuestId } from './guestIdentity';
 import { toGameIngest } from './mapper';
 import { postGame } from './gatewayClient';
@@ -31,7 +31,11 @@ export async function flushOutbox(): Promise<FlushSummary> {
 		summary[res.outcome]++;
 		if (res.outcome === 'created' || res.outcome === 'exists') {
 			await markGameAsSynced(record.id);
+		} else if (res.outcome === 'rejected') {
+			// Permanent reject (400/422) — quarantine so it is not retried forever.
+			await markGameAsQuarantined(record.id);
 		}
+		// 'error' (network / 5xx): leave pending for the next flush.
 	}
 	return summary;
 }
