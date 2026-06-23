@@ -8,12 +8,11 @@ name: 'Ops: Deploy (Cloudflare Pages)'
 #   CLOUDFLARE_API_TOKEN  — token with the "Cloudflare Pages: Edit" permission
 #   CLOUDFLARE_ACCOUNT_ID — your Cloudflare account id
 #
-# Manual-only for now. Once the secrets exist and a deploy looks good, enable continuous
-# deploy by uncommenting the `push` trigger below.
+# Auto-deploys on every push to main; also runnable manually.
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   contents: read
