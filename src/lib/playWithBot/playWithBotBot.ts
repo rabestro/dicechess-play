@@ -41,11 +41,13 @@ export interface BotMove {
 	promotion: string | null;
 }
 
+type ClockOptions = { remainingMs: number; incrementMs: number };
+
 type WorkerRequest = {
 	type: 'getBestMove';
 	payload: {
 		dfen: string;
-		options: { algorithm: string; timeBudgetMs?: number };
+		options: { algorithm: string; clock?: ClockOptions; timeBudgetMs?: number };
 	};
 };
 
@@ -105,31 +107,41 @@ export class PlayWithBotBot {
 	 * @param fen The current board FEN position.
 	 * @param diceValues The available rolled dice values in the active turn.
 	 * @param algorithm The AI strategy to use ('greedy' or 'random').
+	 * @param clock Live game clock for time-budgeted bots; omit for casual (untimed) games.
 	 * @returns A promise resolving to an array of recommended BotMoves.
 	 */
-	async selectBestMove(fen: string, diceValues: number[], algorithm: string): Promise<BotMove[]> {
+	async selectBestMove(
+		fen: string,
+		diceValues: number[],
+		algorithm: string,
+		clock?: ClockOptions,
+	): Promise<BotMove[]> {
 		const dfen = buildDfen(fen, diceValues);
 
 		if (this.worker) {
-			return this.selectBestMoveWithWorker(dfen, algorithm);
+			return this.selectBestMoveWithWorker(dfen, algorithm, clock);
 		}
 
-		return this.selectBestMoveFallback(dfen, algorithm);
+		return this.selectBestMoveFallback(dfen, algorithm, clock);
 	}
 
-	private async selectBestMoveWithWorker(dfen: string, algorithm: string): Promise<BotMove[]> {
+	private async selectBestMoveWithWorker(
+		dfen: string,
+		algorithm: string,
+		clock?: ClockOptions,
+	): Promise<BotMove[]> {
 		return new Promise((resolve) => {
 			if (!this.worker) {
 				resolve([]);
 				return;
 			}
 
+			const options = clock
+				? { algorithm, clock }
+				: { algorithm, timeBudgetMs: BOT_TIME_BUDGET_MS };
 			const request: WorkerRequest = {
 				type: 'getBestMove',
-				payload: {
-					dfen,
-					options: { algorithm, timeBudgetMs: BOT_TIME_BUDGET_MS },
-				},
+				payload: { dfen, options },
 			};
 
 			const messageHandler = (event: MessageEvent<WorkerMessage>) => {
@@ -150,9 +162,16 @@ export class PlayWithBotBot {
 		});
 	}
 
-	private async selectBestMoveFallback(dfen: string, algorithm: string): Promise<BotMove[]> {
+	private async selectBestMoveFallback(
+		dfen: string,
+		algorithm: string,
+		clock?: ClockOptions,
+	): Promise<BotMove[]> {
 		try {
-			const result = DiceChess.getBestMove(dfen, { algorithm, timeBudgetMs: BOT_TIME_BUDGET_MS });
+			const options = clock
+				? { algorithm, clock }
+				: { algorithm, timeBudgetMs: BOT_TIME_BUDGET_MS };
+			const result = DiceChess.getBestMove(dfen, options);
 			return result?.moves || [];
 		} catch (e) {
 			logger.error(`Error getting bot moves with algorithm: ${algorithm}`, e as Error);

@@ -1,5 +1,7 @@
 [tools]
 node = "26"
+lefthook = "latest"
+betterleaks = "latest"
 
 [env]
 # Engine + chessground come from GitHub Packages. Export a PAT with read:packages as
@@ -32,3 +34,11 @@ run = "npm run format"
 [tasks.test]
 description = "🧪 Run unit tests"
 run = "npm run test"
+
+[tasks."hook:install"]
+description = "🪝 Register Git hooks via lefthook"
+run = "lefthook install"
+
+[tasks."hook:run"]
+description = "🏃 Run all pre-commit hook jobs manually"
+run = "lefthook run pre-commit --all-files"

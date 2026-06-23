@@ -115,9 +115,7 @@
 						{#each store.currentDice as d, i (i)}
 							<div
 								class="relative w-10 h-10 rounded-xl bg-dice-surface border border-border flex items-center justify-center transition-all duration-300
-									{d.used
-									? 'opacity-30 grayscale scale-95'
-									: 'scale-100 shadow-md ring-1 ring-border-strong'}"
+									{d.used ? 'opacity-30 grayscale scale-95' : 'scale-100 shadow-md ring-1 ring-border-strong'}"
 							>
 								<img
 									src={getPieceImage(d.value)}

@@ -11,6 +11,7 @@
 Please do not report security vulnerabilities through public GitHub issues or public pull requests.
 
 Use the **GitHub Private Vulnerability Reporting** feature:
+
 1. On GitHub, navigate to the main page of the repository.
 2. Under the repository name, click **Security**.
 3. In the left sidebar, click **Advisories**.
