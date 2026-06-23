@@ -60,10 +60,10 @@
 									type="button"
 									data-current={currentMoveIndex === turn.whiteDice.index}
 									onclick={() => onSetMove(turn.whiteDice!.index)}
-									class="w-full bg-dice-surface px-2 py-1 rounded border border-border hover:bg-border transition shadow-inner flex justify-center items-center gap-1 {currentMoveIndex ===
+									class="w-full px-2 py-1 rounded border border-border hover:bg-border transition shadow-inner flex justify-center items-center gap-1 {currentMoveIndex ===
 									turn.whiteDice.index
 										? 'bg-primary/20 ring-1 ring-primary shadow-md'
-										: ''}"
+										: 'bg-dice-surface'}"
 								>
 									{#each turn.whiteDice.diceChars as char}
 										<img
@@ -107,10 +107,10 @@
 									type="button"
 									data-current={currentMoveIndex === turn.blackDice.index}
 									onclick={() => onSetMove(turn.blackDice!.index)}
-									class="w-full bg-dice-surface px-2 py-1 rounded border border-border hover:bg-border transition shadow-inner flex justify-center items-center gap-1 {currentMoveIndex ===
+									class="w-full px-2 py-1 rounded border border-border hover:bg-border transition shadow-inner flex justify-center items-center gap-1 {currentMoveIndex ===
 									turn.blackDice.index
 										? 'bg-primary/20 ring-1 ring-primary shadow-md'
-										: ''}"
+										: 'bg-dice-surface'}"
 								>
 									{#each turn.blackDice.diceChars as char}
 										<img

@@ -149,6 +149,20 @@ export class PlayWithBotHistory {
 					blocks.push(currentTurnBlock);
 				}
 
+				if (currentTurnBlock && state.dices.length > 0) {
+					if (activeColor === 'w' && !currentTurnBlock.whiteDice) {
+						currentTurnBlock.whiteDice = {
+							index: i,
+							diceChars: state.dices.map((d) => d.value),
+						};
+					} else if (activeColor === 'b' && !currentTurnBlock.blackDice) {
+						currentTurnBlock.blackDice = {
+							index: i,
+							diceChars: state.dices.map((d) => d.value),
+						};
+					}
+				}
+
 				if (state.gameMoveHistoryMove) {
 					const fen = prevState?.fen ?? state.fen;
 					const from = state.gameMoveHistoryMove.from;
@@ -172,20 +186,8 @@ export class PlayWithBotHistory {
 
 					if (currentTurnBlock) {
 						if (activeColor === 'w') {
-							if (!currentTurnBlock.whiteDice && state.dices.length > 0) {
-								currentTurnBlock.whiteDice = {
-									index: i,
-									diceChars: state.dices.map((d) => d.value),
-								};
-							}
 							currentTurnBlock.whiteMoves.push(moveData);
 						} else {
-							if (!currentTurnBlock.blackDice && state.dices.length > 0) {
-								currentTurnBlock.blackDice = {
-									index: i,
-									diceChars: state.dices.map((d) => d.value),
-								};
-							}
 							currentTurnBlock.blackMoves.push(moveData);
 						}
 					}
