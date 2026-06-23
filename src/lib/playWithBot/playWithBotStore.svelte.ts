@@ -889,10 +889,15 @@ export class PlayWithBotStore {
 
 		// Race bot thinking against timeout using Promise.race
 		// Check timeout every 500ms during bot thinking
+		const clock =
+			this.timeLimit !== null
+				? { remainingMs: this.botTimeLeft, incrementMs: (this.timeBonus ?? 0) * 1000 }
+				: undefined;
 		const botMovePromise = this.bot.selectBestMove(
 			this.currentBoardFen,
 			availableDice,
 			this.botAlgorithm,
+			clock,
 		);
 
 		let checkInterval: ReturnType<typeof setInterval> | null = null;

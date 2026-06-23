@@ -4,11 +4,13 @@ import * as DiceChessEngine from '@rabestro/dicechess-engine';
 
 const DiceChess = (DiceChessEngine as any).DiceChess;
 
+type ClockOptions = { remainingMs: number; incrementMs: number };
+
 export type WorkerRequest = {
 	type: 'getBestMove';
 	payload: {
 		dfen: string;
-		options: { algorithm: string; timeBudgetMs?: number };
+		options: { algorithm: string; clock?: ClockOptions; timeBudgetMs?: number };
 	};
 };
 
