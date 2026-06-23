@@ -140,11 +140,27 @@ export class PlayWithBotHistory {
 				if (isNewTurn) {
 					currentTurnBlock = {
 						turnNumber: blocks.length + 1,
+						whiteDice: null,
+						blackDice: null,
 						whiteMoves: [],
 						blackMoves: [],
 						events: [],
 					};
 					blocks.push(currentTurnBlock);
+				}
+
+				if (currentTurnBlock && state.dices.length > 0) {
+					if (activeColor === 'w' && !currentTurnBlock.whiteDice) {
+						currentTurnBlock.whiteDice = {
+							index: i,
+							diceChars: state.dices.map((d) => d.value),
+						};
+					} else if (activeColor === 'b' && !currentTurnBlock.blackDice) {
+						currentTurnBlock.blackDice = {
+							index: i,
+							diceChars: state.dices.map((d) => d.value),
+						};
+					}
 				}
 
 				if (state.gameMoveHistoryMove) {

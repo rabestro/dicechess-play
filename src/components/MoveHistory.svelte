@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { TurnBlock } from '../lib/types';
-	import { getPieceImage } from '../lib/utils/getPieceImage';
+	import type { TurnBlock } from '$lib/types';
+	import { getPieceImage } from '$lib/utils/getPieceImage';
 
 	interface Props {
 		historyBlocks: TurnBlock[];
@@ -55,6 +55,25 @@
 					<div class="p-2 flex gap-2">
 						<!-- White Column -->
 						<div class="flex-1 flex flex-col gap-1 border-r border-border pr-2">
+							{#if turn.whiteDice}
+								<button
+									type="button"
+									data-current={currentMoveIndex === turn.whiteDice.index}
+									onclick={() => onSetMove(turn.whiteDice!.index)}
+									class="w-full px-2 py-1 rounded border border-border hover:bg-border transition shadow-inner flex justify-center items-center gap-1 {currentMoveIndex ===
+									turn.whiteDice.index
+										? 'bg-primary/20 ring-1 ring-primary shadow-md'
+										: 'bg-dice-surface'}"
+								>
+									{#each turn.whiteDice.diceChars as char}
+										<img
+											src={getPieceImage(char)}
+											alt={char}
+											class="w-[18px] h-[18px] pointer-events-none drop-shadow-md"
+										/>
+									{/each}
+								</button>
+							{/if}
 							{#each turn.whiteMoves as m (m.index)}
 								<button
 									type="button"
@@ -83,6 +102,25 @@
 
 						<!-- Black Column -->
 						<div class="flex-1 flex flex-col gap-1 pl-2">
+							{#if turn.blackDice}
+								<button
+									type="button"
+									data-current={currentMoveIndex === turn.blackDice.index}
+									onclick={() => onSetMove(turn.blackDice!.index)}
+									class="w-full px-2 py-1 rounded border border-border hover:bg-border transition shadow-inner flex justify-center items-center gap-1 {currentMoveIndex ===
+									turn.blackDice.index
+										? 'bg-primary/20 ring-1 ring-primary shadow-md'
+										: 'bg-dice-surface'}"
+								>
+									{#each turn.blackDice.diceChars as char}
+										<img
+											src={getPieceImage(char)}
+											alt={char}
+											class="w-[18px] h-[18px] pointer-events-none drop-shadow-md"
+										/>
+									{/each}
+								</button>
+							{/if}
 							{#each turn.blackMoves as m (m.index)}
 								<button
 									type="button"
