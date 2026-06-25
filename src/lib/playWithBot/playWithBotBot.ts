@@ -3,6 +3,7 @@
 import { buildDfen } from '../../utils/fenUtils';
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
 import { logger } from '../utils/logger';
+import openingBook from './opening_book.json';
 
 /**
  * Wall-clock budget (ms) sent to the engine per bot move. Honoured by
@@ -13,6 +14,22 @@ import { logger } from '../utils/logger';
 export const BOT_TIME_BUDGET_MS = 2500;
 
 let DiceChess = (DiceChessEngine as any).DiceChess;
+
+try {
+	const openingBookJson = JSON.stringify(openingBook);
+	if (
+		!DiceChess.registerOpeningBookBot(
+			openingBookJson,
+			'aggressive',
+			'aggressive-book',
+			'Aggressive + Book',
+		)
+	) {
+		logger.error("Failed to register opening-book bot 'aggressive-book'");
+	}
+} catch (e) {
+	logger.error('Failed to register opening-book bot', e as Error);
+}
 
 /**
  * Statically injects a mock DiceChess instance for unit testing.

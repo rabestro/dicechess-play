@@ -1,8 +1,25 @@
 // src/lib/playWithBot/playWithBot.worker.ts
 
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
+import openingBook from './opening_book.json';
 
 const DiceChess = (DiceChessEngine as any).DiceChess;
+
+try {
+	const openingBookJson = JSON.stringify(openingBook);
+	if (
+		!DiceChess.registerOpeningBookBot(
+			openingBookJson,
+			'aggressive',
+			'aggressive-book',
+			'Aggressive + Book',
+		)
+	) {
+		console.error("[Worker] Failed to register opening-book bot 'aggressive-book'");
+	}
+} catch (e) {
+	console.error('[Worker] Failed to register opening-book bot:', e);
+}
 
 type ClockOptions = { remainingMs: number; incrementMs: number };
 

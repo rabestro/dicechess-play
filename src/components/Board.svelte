@@ -17,7 +17,7 @@
 	);
 </script>
 
-<div class="relative w-full max-w-[560px] mx-auto">
+<div class="relative w-full max-w-[560px] lg:max-w-[min(560px,calc(100dvh-280px))] mx-auto">
 	<Chessground
 		class="rounded-xl overflow-hidden shadow-lg"
 		fen={store.currentBoardFen}
