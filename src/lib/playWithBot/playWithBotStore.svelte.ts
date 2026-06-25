@@ -462,8 +462,10 @@ export class PlayWithBotStore {
 			rolled = this.dice.generateRandomDice(this.activeColor);
 		}
 
+		const gameId = this.startTime;
 		this.currentDice = rolled;
-		await new Promise((resolve) => setTimeout(resolve, 1000));
+		await new Promise((resolve) => setTimeout(resolve, 600));
+		if (this.startTime !== gameId) return;
 		this.isAnimatingRoll = false;
 
 		if (this.gameStatus !== 'rolling' || this.activeColor !== this.playerColor) return;
@@ -825,8 +827,10 @@ export class PlayWithBotStore {
 			rolled = this.dice.generateRandomDice(this.activeColor);
 		}
 
+		const gameId = this.startTime;
 		this.currentDice = rolled;
-		await new Promise((resolve) => setTimeout(resolve, 1000));
+		await new Promise((resolve) => setTimeout(resolve, 600));
+		if (this.startTime !== gameId) return;
 		this.isAnimatingRoll = false;
 
 		// Ensure timer is running after dice animation

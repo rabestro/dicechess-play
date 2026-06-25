@@ -7,12 +7,13 @@
 	import { flushOutbox } from '$lib/ingest/outbox';
 	import { getPieceImage } from '$lib/utils/getPieceImage';
 
-	// The five playable bots (ADR: hardcoded — do not trust engine getAvailableBots()).
+	// The six playable bots (ADR: hardcoded — do not trust engine getAvailableBots()).
 	const BOTS = [
 		{ id: 'random', label: 'Random', level: 1 },
 		{ id: 'checkmate-aware', label: 'Checkmate-aware', level: 2 },
 		{ id: 'greedy', label: 'Greedy', level: 3 },
 		{ id: 'aggressive', label: 'Aggressive', level: 5 },
+		{ id: 'aggressive-book', label: 'Aggressive + Book', level: 5 },
 		{ id: 'monte-carlo', label: 'Monte-Carlo', level: 6 },
 	];
 	const COLORS = ['white', 'black', 'random'] as const;
@@ -109,27 +110,28 @@
 				{/if}
 			</div>
 
-			<div class="flex items-center gap-3 min-h-14">
+			<div class="flex items-center gap-3 min-h-20">
 				{#if store.currentDice.length > 0}
-					<div class="flex items-center gap-2" aria-label="Dice">
+					<div class="flex items-center gap-2.5" aria-label="Dice">
 						{#each store.currentDice as d, i (i)}
 							<div
-								class="relative w-10 h-10 rounded-xl bg-dice-surface border border-border flex items-center justify-center transition-all duration-300
-									{d.used ? 'opacity-30 grayscale scale-95' : 'scale-100 shadow-md ring-1 ring-border-strong'}"
+								class="relative w-14 h-14 md:w-16 md:h-16 rounded-xl bg-dice-surface border border-border flex items-center justify-center transition-all duration-300
+									{d.used ? 'opacity-30 grayscale scale-95' : 'scale-100 shadow-md ring-1 ring-border-strong'}
+									{store.isAnimatingRoll ? 'animate-[spin_0.3s_linear_infinite] opacity-80' : ''}"
 							>
 								<img
 									src={getPieceImage(d.value)}
 									alt={d.value}
-									class="w-7 h-7 drop-shadow-md select-none pointer-events-none"
+									class="w-10 h-10 md:w-12 md:h-12 drop-shadow-md select-none pointer-events-none"
 								/>
 							</div>
 						{/each}
 					</div>
 				{:else if store.canUserRoll}
-					<div class="flex items-center gap-2" aria-label="Dice">
+					<div class="flex items-center gap-2.5" aria-label="Dice">
 						{#each Array(3) as _, i (i)}
 							<div
-								class="w-10 h-10 rounded-xl border border-border flex items-center justify-center opacity-30"
+								class="w-14 h-14 md:w-16 md:h-16 rounded-xl border border-border flex items-center justify-center opacity-30"
 							>
 								<span class="text-content-muted font-sans text-sm">-</span>
 							</div>
@@ -178,7 +180,7 @@
 			{/if}
 		</div>
 
-		<aside class="w-full lg:w-80 shrink-0 lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]">
+		<aside class="w-full lg:w-80 shrink-0 lg:sticky lg:top-24 lg:h-[calc(100dvh_-_8rem)]">
 			<MoveHistory
 				historyBlocks={store.historyBlocks}
 				currentMoveIndex={store.currentMoveIndex}
