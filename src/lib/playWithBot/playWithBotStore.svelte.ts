@@ -260,9 +260,11 @@ export class PlayWithBotStore {
 		// Setup Time Limits
 		this.timeLimit = preferencesStore.timeLimit;
 		this.timeBonus = preferencesStore.timeBonus;
-		this.bet = preferencesStore.botLobbyBet;
-		this.baseBet = preferencesStore.botLobbyBet;
-		this.mode = preferencesStore.botLobbyMode;
+		// For now in dicechess-play, games are played without stakes (always 0 bet).
+		// In the future, stakes might be introduced for registered users.
+		this.bet = 0;
+		this.baseBet = 0;
+		this.mode = 'classic';
 
 		if (this.bet > 0) {
 			if (authStore.user && authStore.user.balance < this.bet) {

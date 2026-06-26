@@ -18,7 +18,14 @@
 		const container = scrollContainer;
 		if (!container || container.clientHeight === 0) return;
 		const active = container.querySelector<HTMLElement>('[data-current="true"]');
-		active?.scrollIntoView({ block: 'nearest' });
+		if (active) {
+			const containerRect = container.getBoundingClientRect();
+			const activeRect = active.getBoundingClientRect();
+			if (activeRect.top < containerRect.top || activeRect.bottom > containerRect.bottom) {
+				container.scrollTop +=
+					activeRect.top - containerRect.top - container.clientHeight / 2 + active.clientHeight / 2;
+			}
+		}
 	});
 </script>
 
