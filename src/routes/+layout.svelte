@@ -5,8 +5,12 @@
 	import type { Theme } from '$lib/stores/themeStore.svelte';
 	import ToastContainer from '../components/ToastContainer.svelte';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 
 	let { children }: { children: Snippet } = $props();
+
+	const isActive = (path: string) =>
+		page.url.pathname === path || page.url.pathname.startsWith(`${path}/`);
 
 	const themes: { value: Theme; label: string }[] = [
 		{ value: 'dark', label: 'Dark' },
@@ -22,17 +26,38 @@
 <div class="min-h-screen flex flex-col bg-background text-content transition-colors duration-300">
 	<header class="w-full border-b border-border bg-surface/80 backdrop-blur-md sticky top-0 z-40">
 		<div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-			<a href={resolve('/')} class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-				<div
-					class="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20"
-				>
-					<span class="text-base">🎲</span>
-				</div>
-				<div class="flex flex-col gap-0.5">
-					<h1 class="text-md font-bold tracking-wider text-content uppercase">Dice Chess</h1>
-					<span class="text-[9px] text-primary font-bold tracking-widest uppercase">Play</span>
-				</div>
-			</a>
+			<div class="flex items-center gap-4 sm:gap-6 min-w-0">
+				<a href={resolve('/')} class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+					<div
+						class="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20"
+					>
+						<span class="text-base">🎲</span>
+					</div>
+					<div class="hidden sm:flex flex-col gap-0.5">
+						<h1 class="text-md font-bold tracking-wider text-content uppercase">Dice Chess</h1>
+						<span class="text-[9px] text-primary font-bold tracking-widest uppercase">Play</span>
+					</div>
+				</a>
+
+				<nav class="flex items-center gap-1">
+					<a
+						href={resolve('/play')}
+						class="px-3 py-1.5 rounded-lg text-sm font-bold transition-colors {isActive('/play')
+							? 'bg-surface text-content'
+							: 'text-content-muted hover:text-content'}"
+					>
+						Play
+					</a>
+					<a
+						href={resolve('/games')}
+						class="px-3 py-1.5 rounded-lg text-sm font-bold transition-colors {isActive('/games')
+							? 'bg-surface text-content'
+							: 'text-content-muted hover:text-content'}"
+					>
+						Games
+					</a>
+				</nav>
+			</div>
 
 			<select
 				aria-label="Select theme"

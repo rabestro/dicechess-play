@@ -6,16 +6,8 @@
 	import PawnPromotionSelector from '../../components/PawnPromotionSelector.svelte';
 	import { flushOutbox } from '$lib/ingest/outbox';
 	import { getPieceImage } from '$lib/utils/getPieceImage';
+	import { BOTS } from '$lib/bots';
 
-	// The six playable bots (ADR: hardcoded — do not trust engine getAvailableBots()).
-	const BOTS = [
-		{ id: 'random', label: 'Random', level: 1 },
-		{ id: 'checkmate-aware', label: 'Checkmate-aware', level: 2 },
-		{ id: 'greedy', label: 'Greedy', level: 3 },
-		{ id: 'aggressive', label: 'Aggressive', level: 5 },
-		{ id: 'aggressive-book', label: 'Aggressive + Book', level: 5 },
-		{ id: 'monte-carlo', label: 'Monte-Carlo', level: 6 },
-	];
 	const COLORS = ['white', 'black', 'random'] as const;
 
 	let selectedAlgo = $state('greedy');
