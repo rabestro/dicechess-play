@@ -47,6 +47,12 @@ describe('toGameIngest termination', () => {
 		captured.moves_history[0].end_dfen = NO_BLACK_KING;
 		expect(toGameIngest(captured, GUEST).termination).toBe('king_captured');
 	});
+
+	it('falls back to the heuristic for an unexpected end_reason from storage', () => {
+		const corrupt = record({ result: 0 });
+		(corrupt as { end_reason: unknown }).end_reason = 'bogus';
+		expect(toGameIngest(corrupt as LocalGameRecord, GUEST).termination).toBe('draw_agreement');
+	});
 });
 
 describe('toGameIngest basics', () => {

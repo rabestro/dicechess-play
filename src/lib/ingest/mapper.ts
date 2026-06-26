@@ -108,9 +108,11 @@ export function toGameIngest(record: LocalGameRecord, guestExternalId: string): 
 		source: 'playsite',
 		mode: record.mode ?? 'classic',
 		result: record.result, // already white-POV (1/-1/0)
-		termination: record.end_reason
-			? END_REASON_TO_TERMINATION[record.end_reason]
-			: deriveTermination(finalFen, record.result),
+		// Trust end_reason when present and known; fall back to the board heuristic
+		// for legacy records and any unexpected value from IndexedDB.
+		termination:
+			(record.end_reason && END_REASON_TO_TERMINATION[record.end_reason]) ??
+			deriveTermination(finalFen, record.result),
 		started_at: record.start_time,
 		time_initial_sec: record.time_limit ?? null,
 		time_increment_sec: record.time_bonus ?? null,
