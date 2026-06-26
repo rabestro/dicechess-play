@@ -46,7 +46,12 @@ export function resetDiceChessInstance() {
 
 import { botStatsStore } from '../botStatsStore.svelte';
 import { preferencesStore } from '../preferencesStore.svelte';
-import { saveLocalGame, type DiceChessTurnHistory, type LocalGameRecord } from '../localGamesDB';
+import {
+	saveLocalGame,
+	type DiceChessTurnHistory,
+	type GameEndReason,
+	type LocalGameRecord,
+} from '../localGamesDB';
 import { PlayWithBotHistory, type BotMoveHistoryState } from './playWithBotHistory.svelte';
 import { PlayWithBotDice, type DieState } from './playWithBotDice.svelte';
 
@@ -61,7 +66,7 @@ export type GameStatus =
 
 export class PlayWithBotStore {
 	gameStatus = $state<GameStatus>('idle');
-	gameEndReason = $state<'mate' | 'timeout' | 'resign' | 'agreement' | null>(null);
+	gameEndReason = $state<GameEndReason | null>(null);
 	currentBoardFen = $state<string>('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
 	activeColor = $state<'w' | 'b'>('w');
 	playerColor = $state<'w' | 'b'>('w');
@@ -1350,6 +1355,7 @@ export class PlayWithBotStore {
 				start_time: this.startTime,
 				sync_status: 'pending',
 				moves_history: $state.snapshot(this.turnHistory),
+				end_reason: this.gameEndReason,
 				time_limit: this.timeLimit,
 				time_bonus: this.timeBonus,
 				bet: this.bet,

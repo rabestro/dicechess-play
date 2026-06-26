@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import type { LocalGameRecord } from '$lib/localGamesDB';
 	import { botLabel } from '$lib/bots';
-	import { playerOutcome, outcomeLabel, type GameOutcome } from '$lib/gameOutcome';
+	import { playerOutcome, outcomeLabel, endReasonLabel, type GameOutcome } from '$lib/gameOutcome';
 	import { formatDate } from '../utils/formatters';
 
 	interface Props {
@@ -15,6 +15,7 @@
 	const outcome = $derived(playerOutcome(game.result, game.player_color));
 	const playedColor = $derived(game.player_color === 'WHITE' ? 'White' : 'Black');
 	const turns = $derived(game.moves_history?.length ?? 0);
+	const endReason = $derived(endReasonLabel(game.end_reason));
 
 	const outcomeClass: Record<GameOutcome, string> = {
 		win: 'bg-primary/15 text-primary border-primary/30',
@@ -64,7 +65,7 @@
 	<div
 		class="mt-auto flex justify-between items-center pt-3 border-t border-border-strong/40 text-xs font-semibold text-content-muted"
 	>
-		<span>Turns: {turns}</span>
+		<span>Turns: {turns}{endReason ? ` · ${endReason}` : ''}</span>
 		{#if game.sync_status !== 'synced'}
 			<span
 				class="flex items-center gap-1.5"

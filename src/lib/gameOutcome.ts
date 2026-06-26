@@ -1,4 +1,4 @@
-import type { PlayerColor } from './localGamesDB';
+import type { GameEndReason, PlayerColor } from './localGamesDB';
 
 export type GameOutcome = 'win' | 'loss' | 'draw';
 
@@ -26,5 +26,21 @@ export function outcomeLabel(outcome: GameOutcome): string {
 			return 'Lost';
 		case 'draw':
 			return 'Draw';
+	}
+}
+
+/** Short human label for how a game ended; empty for legacy records with no reason. */
+export function endReasonLabel(reason: GameEndReason | null | undefined): string {
+	switch (reason) {
+		case 'mate':
+			return 'King captured';
+		case 'timeout':
+			return 'On time';
+		case 'resign':
+			return 'Resigned';
+		case 'agreement':
+			return 'Draw agreed';
+		default:
+			return '';
 	}
 }

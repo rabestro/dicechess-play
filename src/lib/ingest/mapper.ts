@@ -8,12 +8,20 @@
 // extension, disambiguated by source). Free games keep all stake fields NULL.
 
 import { v5 as uuidv5 } from 'uuid';
-import type { LocalGameRecord, DiceChessTurnHistory } from '$lib/localGamesDB';
+import type { LocalGameRecord, DiceChessTurnHistory, GameEndReason } from '$lib/localGamesDB';
 import type { Color, GameIngestWire, PlayerInputWire, TurnInputWire } from './types';
 
 // RFC 4122 URL namespace — same namespace beturanga uses for deterministic game ids.
 const URL_NAMESPACE = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+// Store end-reason → analytics `game_termination_enum` member.
+const END_REASON_TO_TERMINATION: Record<GameEndReason, string> = {
+	mate: 'king_captured',
+	timeout: 'timeout',
+	resign: 'resign',
+	agreement: 'draw_agreement',
+};
 
 // Dice piece-letter (from the DFEN 7th field) → contract number (1=pawn .. 6=king).
 const DICE_LETTER_TO_NUM: Record<string, number> = { p: 1, n: 2, b: 3, r: 4, q: 5, k: 6 };
@@ -68,12 +76,11 @@ function countKings(fen: string): [number, number] {
 }
 
 /**
- * Derive termination from the terminal position (engine truth, not a UI guess).
+ * Best-effort termination for legacy records that predate `end_reason`.
  *
- * TODO(phase-1): persist the store's `gameEndReason` ('mate'|'timeout'|'resign'|
- * 'agreement') onto LocalGameRecord and consume it here instead of inferring. King
- * capture is unambiguous from the board; timeout/draw/resign cannot be distinguished
- * from the final FEN alone, so this is a best-effort fallback.
+ * King capture is unambiguous from the board; timeout/draw/resign cannot be
+ * distinguished from the final FEN alone. Records saved after the play store
+ * started persisting `gameEndReason` use that instead (see toGameIngest).
  */
 function deriveTermination(finalFen: string, result: number): string {
 	const [wk, bk] = countKings(finalFen);
@@ -101,7 +108,11 @@ export function toGameIngest(record: LocalGameRecord, guestExternalId: string): 
 		source: 'playsite',
 		mode: record.mode ?? 'classic',
 		result: record.result, // already white-POV (1/-1/0)
-		termination: deriveTermination(finalFen, record.result),
+		// Trust end_reason when present and known; fall back to the board heuristic
+		// for legacy records and any unexpected value from IndexedDB.
+		termination:
+			(record.end_reason && END_REASON_TO_TERMINATION[record.end_reason]) ??
+			deriveTermination(finalFen, record.result),
 		started_at: record.start_time,
 		time_initial_sec: record.time_limit ?? null,
 		time_increment_sec: record.time_bonus ?? null,
