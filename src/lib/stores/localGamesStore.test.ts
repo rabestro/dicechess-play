@@ -52,4 +52,17 @@ describe('localGamesStore', () => {
 		expect(localGamesStore.loaded).toBe(true);
 		expect(localGamesStore.error).toBeNull();
 	});
+
+	it('ignores a concurrent load while one is in flight', async () => {
+		await saveLocalGame(game('a', '2023-10-01T12:00:00Z'));
+
+		// The first call flips `loading` synchronously before its first await; the
+		// second must short-circuit on the guard rather than run a parallel read.
+		const first = localGamesStore.load();
+		const second = localGamesStore.load();
+		await Promise.all([first, second]);
+
+		expect(localGamesStore.games.map((g) => g.id)).toEqual(['a']);
+		expect(localGamesStore.loading).toBe(false);
+	});
 });

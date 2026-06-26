@@ -14,6 +14,7 @@ class LocalGamesStore {
 	error = $state<string | null>(null);
 
 	async load(): Promise<void> {
+		if (this.loading) return;
 		this.loading = true;
 		this.error = null;
 		try {

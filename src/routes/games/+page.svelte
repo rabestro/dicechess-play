@@ -15,13 +15,13 @@
 		<p class="text-sm text-content-muted">Every game you've played on this device.</p>
 	</div>
 
-	{#if localGamesStore.loading && !localGamesStore.loaded}
+	{#if !localGamesStore.loaded && !localGamesStore.error}
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-busy="true">
-			{#each Array(4) as _, i (i)}
+			{#each Array.from({ length: 4 }) as _, i (i)}
 				<div class="h-40 rounded-2xl bg-surface/40 border border-border animate-pulse"></div>
 			{/each}
 		</div>
-	{:else if localGamesStore.error}
+	{:else if localGamesStore.error && localGamesStore.games.length === 0}
 		<div class="rounded-2xl border border-danger/30 bg-danger/10 p-6 text-center text-danger">
 			Couldn't load your games: {localGamesStore.error}
 		</div>
@@ -36,6 +36,13 @@
 			</a>
 		</div>
 	{:else}
+		{#if localGamesStore.error}
+			<div
+				class="rounded-xl border border-danger/30 bg-danger/10 p-3 text-center text-xs text-danger"
+			>
+				Couldn't refresh your games: {localGamesStore.error}
+			</div>
+		{/if}
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 			{#each localGamesStore.games as game (game.id)}
 				<GameHistoryCard {game} />

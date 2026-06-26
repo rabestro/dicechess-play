@@ -13,7 +13,7 @@
 	const opponent = $derived(botLabel(game.bot_id));
 	const outcome = $derived(playerOutcome(game.result, game.player_color));
 	const playedColor = $derived(game.player_color === 'WHITE' ? 'White' : 'Black');
-	const turns = $derived(game.moves_history.length);
+	const turns = $derived(game.moves_history?.length ?? 0);
 
 	const outcomeClass: Record<GameOutcome, string> = {
 		win: 'bg-primary/15 text-primary border-primary/30',
