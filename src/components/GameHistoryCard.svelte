@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import type { LocalGameRecord } from '$lib/localGamesDB';
 	import { botLabel } from '$lib/bots';
 	import { playerOutcome, outcomeLabel, type GameOutcome } from '$lib/gameOutcome';
@@ -22,8 +23,9 @@
 	};
 </script>
 
-<article
-	class="bg-surface/60 border border-border rounded-2xl p-5 flex flex-col gap-4 transition-colors"
+<a
+	href={resolve('/games/[id]', { id: game.id })}
+	class="group bg-surface/60 hover:bg-surface-hover/80 border border-border hover:border-primary/50 rounded-2xl p-5 flex flex-col gap-4 transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
 >
 	<div class="flex justify-between items-center gap-2">
 		{#if game.mode === 'x2'}
@@ -79,4 +81,4 @@
 			</span>
 		{/if}
 	</div>
-</article>
+</a>
