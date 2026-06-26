@@ -176,7 +176,7 @@
 								</div>
 							{/each}
 						</div>
-					{:else if store.canUserRoll}
+					{:else}
 						<div class="flex items-center gap-2.5" aria-label="Dice">
 							{#each Array(3) as _, i (i)}
 								<div
@@ -265,7 +265,7 @@
 							/>
 						</div>
 					{/each}
-				{:else if store.canUserRoll}
+				{:else}
 					{#each Array(3) as _, i (i)}
 						<div
 							class="w-16 h-16 rounded-2xl border border-border flex items-center justify-center opacity-30"
@@ -273,8 +273,6 @@
 							<span class="text-content-muted font-sans text-sm">-</span>
 						</div>
 					{/each}
-				{:else}
-					<div class="text-content-muted text-xs italic text-center font-mono">No dice rolled</div>
 				{/if}
 			</div>
 
