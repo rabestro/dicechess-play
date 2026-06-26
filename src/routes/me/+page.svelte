@@ -16,6 +16,13 @@
 	let restoreInput = $state('');
 	let confirmingReset = $state(false);
 	let copied = $state(false);
+	let cancelButton = $state<HTMLButtonElement | null>(null);
+
+	// Move focus to the safe Cancel action when the reset confirmation appears, so
+	// keyboard / screen-reader focus isn't lost when "Start fresh" unmounts.
+	$effect(() => {
+		if (confirmingReset) cancelButton?.focus();
+	});
 
 	onMount(() => {
 		guestId = getGuestId();
@@ -158,7 +165,13 @@
 				<label for="restore-code" class="text-xs font-bold text-content-muted">
 					Use a code from another device
 				</label>
-				<div class="flex items-center gap-2">
+				<form
+					onsubmit={(e) => {
+						e.preventDefault();
+						restore();
+					}}
+					class="flex items-center gap-2"
+				>
 					<input
 						id="restore-code"
 						bind:value={restoreInput}
@@ -168,14 +181,13 @@
 						class="flex-1 min-w-0 font-mono text-sm bg-surface border border-border rounded-lg px-3 py-2 text-content outline-none focus:border-primary transition-colors"
 					/>
 					<button
-						type="button"
-						onclick={restore}
+						type="submit"
 						disabled={!restoreInput.trim()}
 						class="shrink-0 px-4 py-2 rounded-lg bg-surface border border-border text-content font-bold text-sm hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 					>
 						Restore
 					</button>
-				</div>
+				</form>
 			</div>
 
 			<div class="pt-1 border-t border-border">
@@ -195,6 +207,7 @@
 							</button>
 							<button
 								type="button"
+								bind:this={cancelButton}
 								onclick={() => (confirmingReset = false)}
 								class="px-4 py-2 rounded-lg bg-surface border border-border text-content-muted font-bold text-sm hover:text-content transition-colors"
 							>
