@@ -70,7 +70,8 @@ export function buildPlayerRecord(games: LocalGameRecord[]): PlayerRecord {
 
 	const perBot: BotOutcomeCounts[] = [...byBot.entries()]
 		.map(([algorithm, counts]) => ({ algorithm, label: botLabel(algorithm), ...counts }))
-		.sort((a, b) => totalGames(b) - totalGames(a));
+		// Most-played first; break ties alphabetically for a stable order.
+		.sort((a, b) => totalGames(b) - totalGames(a) || a.label.localeCompare(b.label));
 
 	return { overall, perBot };
 }

@@ -58,6 +58,11 @@ describe('buildPlayerRecord', () => {
 		expect(buildPlayerRecord(games).perBot.map((b) => b.algorithm)).toEqual(['greedy', 'random']);
 	});
 
+	it('breaks ties on game count alphabetically by label', () => {
+		const games = [game('bot:random', 'WHITE', 1), game('bot:aggressive', 'WHITE', 1)];
+		expect(buildPlayerRecord(games).perBot.map((b) => b.label)).toEqual(['Aggressive', 'Random']);
+	});
+
 	it('returns an empty record for no games', () => {
 		expect(buildPlayerRecord([])).toEqual({ overall: emptyCounts(), perBot: [] });
 	});

@@ -80,10 +80,10 @@
 			{#each record.perBot as bot (bot.algorithm)}
 				<div class="rounded-xl border border-border bg-surface/40 p-4 flex flex-col gap-2">
 					<div class="flex items-center justify-between gap-3">
-						<span class="font-bold text-content truncate">{bot.label}</span>
+						<span class="font-bold text-content truncate min-w-0">{bot.label}</span>
 						<div class="flex items-center gap-3 shrink-0">
 							{@render counts(bot)}
-							<span class="font-mono text-sm font-bold text-content tabular-nums w-10 text-right">
+							<span class="font-mono text-sm font-bold text-content tabular-nums w-12 text-right">
 								{Math.round(winRate(bot) * 100)}%
 							</span>
 						</div>
