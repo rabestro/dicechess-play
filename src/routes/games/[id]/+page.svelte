@@ -5,7 +5,7 @@
 	import { reconstructHistoryMap } from '$lib/history/reconstructHistory';
 	import { buildTurnBlocks } from '$lib/playWithBot/turnBlocks';
 	import { botLabel } from '$lib/bots';
-	import { playerOutcome, outcomeLabel, type GameOutcome } from '$lib/gameOutcome';
+	import { playerOutcome, outcomeLabel, endReasonLabel, type GameOutcome } from '$lib/gameOutcome';
 	import { formatDate } from '../../../utils/formatters';
 	import MoveHistory from '../../../components/MoveHistory.svelte';
 	import Chessground from '../../../components/lib/Chessground.svelte';
@@ -64,6 +64,7 @@
 	const outcome = $derived<GameOutcome | null>(
 		record ? playerOutcome(record.result, record.player_color) : null,
 	);
+	const endReason = $derived(record ? endReasonLabel(record.end_reason) : '');
 	const hasReplay = $derived(maxMoveIndex > 0);
 
 	const outcomeClass: Record<GameOutcome, string> = {
@@ -143,7 +144,9 @@
 					<h2 class="text-xl font-bold text-content truncate">{opponent}</h2>
 				</div>
 				<span class="text-xs text-content-muted">
-					You played {playedColor} · {formatDate(record.start_time)}
+					You played {playedColor} · {formatDate(record.start_time)}{endReason
+						? ` · ${endReason}`
+						: ''}
 				</span>
 			</div>
 			{#if outcome}

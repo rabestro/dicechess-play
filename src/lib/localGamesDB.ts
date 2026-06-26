@@ -3,6 +3,9 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 export type SyncStatus = 'pending' | 'synced' | 'quarantined';
 export type PlayerColor = 'WHITE' | 'BLACK';
 
+/** Why a game ended, as known by the play store (not inferred from the board). */
+export type GameEndReason = 'mate' | 'timeout' | 'resign' | 'agreement';
+
 export interface DiceChessTurnHistory {
 	turn_number: number;
 	active_color: PlayerColor;
@@ -19,6 +22,7 @@ export interface LocalGameRecord {
 	start_time: string; // ISO-8601 Timestamp
 	sync_status: SyncStatus; // 'pending' or 'synced'
 	moves_history: DiceChessTurnHistory[]; // Array of turns
+	end_reason?: GameEndReason | null; // why the game ended (absent on legacy records)
 	time_limit?: number | null;
 	time_bonus?: number | null;
 	bet?: number;
