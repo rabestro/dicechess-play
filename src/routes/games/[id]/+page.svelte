@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { getLocalGame, type LocalGameRecord } from '$lib/localGamesDB';
@@ -19,10 +18,29 @@
 	let record = $state<LocalGameRecord | null>(null);
 	let currentMoveIndex = $state(0);
 
-	onMount(async () => {
+	// Re-fetch when the id changes: SvelteKit reuses this component instance when
+	// navigating between two /games/[id] pages, so onMount would leave stale data.
+	$effect(() => {
 		const id = page.params.id;
-		record = id ? ((await getLocalGame(id)) ?? null) : null;
-		loading = false;
+		if (!id) {
+			record = null;
+			loading = false;
+			currentMoveIndex = 0;
+			return;
+		}
+
+		let active = true;
+		loading = true;
+		getLocalGame(id).then((rec) => {
+			if (!active) return;
+			record = rec ?? null;
+			loading = false;
+			currentMoveIndex = 0;
+		});
+
+		return () => {
+			active = false;
+		};
 	});
 
 	const reconstructed = $derived(record ? reconstructHistoryMap(record.moves_history ?? []) : null);
@@ -59,6 +77,19 @@
 	}
 
 	function onKeydown(event: KeyboardEvent) {
+		// Don't hijack arrow/Home/End keys while the user is in a form control
+		// (e.g. the theme <select> in the header).
+		const el = document.activeElement;
+		if (
+			el &&
+			(el.tagName === 'INPUT' ||
+				el.tagName === 'TEXTAREA' ||
+				el.tagName === 'SELECT' ||
+				el.hasAttribute('contenteditable'))
+		) {
+			return;
+		}
+
 		switch (event.key) {
 			case 'ArrowLeft':
 				setMove(currentMoveIndex - 1);

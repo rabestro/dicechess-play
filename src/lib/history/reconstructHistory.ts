@@ -19,6 +19,11 @@ function diceFromDfen(dfen: string): BotMoveHistoryState['dices'] {
 }
 
 function parseUci(uci: string): { from: string; to: string; promotion: string } {
+	// Guard against malformed/non-move strings (e.g. a pass): empty squares are
+	// rendered as a PASS downstream rather than producing bogus coordinates.
+	if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(uci)) {
+		return { from: '', to: '', promotion: '' };
+	}
 	return { from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci.slice(4) };
 }
 

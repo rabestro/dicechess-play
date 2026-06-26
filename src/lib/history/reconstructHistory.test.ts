@@ -75,6 +75,23 @@ describe('reconstructHistoryMap', () => {
 		});
 	});
 
+	it('treats a malformed uci as a pass (empty squares)', () => {
+		const malformed: DiceChessTurnHistory[] = [
+			{
+				turn_number: 1,
+				active_color: 'WHITE',
+				start_dfen: `${START} P`,
+				moves: [{ uci: 'pass', piece: '', is_capture: false, fen_after: AFTER_E4 }],
+				end_dfen: AFTER_E4,
+			},
+		];
+		expect(reconstructHistoryMap(malformed).historyMap['1'].gameMoveHistoryMove).toEqual({
+			from: '',
+			to: '',
+			promotion: '',
+		});
+	});
+
 	it('falls back to the turn end fen when a move has no fen_after', () => {
 		const noFen: DiceChessTurnHistory[] = [
 			{
