@@ -56,6 +56,14 @@
 					>
 						Games
 					</a>
+					<a
+						href={resolve('/me')}
+						class="px-3 py-1.5 rounded-lg text-sm font-bold transition-colors {isActive('/me')
+							? 'bg-surface text-content'
+							: 'text-content-muted hover:text-content'}"
+					>
+						Profile
+					</a>
 				</nav>
 			</div>
 
