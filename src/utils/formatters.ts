@@ -26,7 +26,7 @@ export type GameResult = -1 | 0 | 1;
 /**
  * Formats a completed game's result into a standard chess result string.
  * @param result - Backend result value where 1 is white win, -1 is black win, 0 is draw.
- * @returns Human-readable result text or an empty string when result is absent/invalid.
+ * @returns Human-readable result text or an empty string when a result is absent/invalid.
  */
 export function formatGameResult(result?: GameResult | number | null): string {
 	switch (result) {
