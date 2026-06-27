@@ -1,0 +1,99 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { LiveClient } from './liveClient';
+import type { ServerEvent } from './liveTypes';
+
+class MockWebSocket {
+	static readonly OPEN = 1;
+	static last: MockWebSocket | null = null;
+	onopen: (() => void) | null = null;
+	onclose: (() => void) | null = null;
+	onerror: (() => void) | null = null;
+	onmessage: ((event: { data: unknown }) => void) | null = null;
+	sent: string[] = [];
+	closed = false;
+	readyState = MockWebSocket.OPEN;
+	constructor(public url: string) {
+		MockWebSocket.last = this;
+	}
+	send(data: string) {
+		this.sent.push(data);
+	}
+	close() {
+		this.closed = true;
+		this.onclose?.();
+	}
+}
+
+describe('LiveClient', () => {
+	beforeEach(() => {
+		vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+		MockWebSocket.last = null;
+	});
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('reports status and delivers parsed events', () => {
+		const statuses: string[] = [];
+		const events: ServerEvent[] = [];
+		const client = new LiveClient('ws://x/games/g/ws?token=t');
+		client.onStatus((s) => statuses.push(s));
+		client.onEvent((e) => events.push(e));
+		client.connect();
+
+		expect(statuses).toContain('connecting');
+		const ws = MockWebSocket.last!;
+		expect(ws.url).toBe('ws://x/games/g/ws?token=t');
+
+		ws.onopen!();
+		expect(statuses).toContain('open');
+
+		const event: ServerEvent = {
+			DiceRolled: { v: 1, seat: 'White', dice: [2, 3, 6], dfen: 'fen' },
+		};
+		ws.onmessage!({ data: JSON.stringify(event) });
+		expect(events).toEqual([event]);
+	});
+
+	it('sends commands as JSON', () => {
+		const client = new LiveClient('ws://x');
+		client.connect();
+		client.send({ Resign: {} });
+		expect(MockWebSocket.last!.sent).toEqual(['{"Resign":{}}']);
+	});
+
+	it('ignores non-JSON frames', () => {
+		const events: ServerEvent[] = [];
+		const client = new LiveClient('ws://x');
+		client.onEvent((e) => events.push(e));
+		client.connect();
+		MockWebSocket.last!.onmessage!({ data: 'ping' });
+		expect(events).toEqual([]);
+	});
+
+	it('drops a command when the socket is not open', () => {
+		const client = new LiveClient('ws://x');
+		client.connect();
+		MockWebSocket.last!.readyState = 0; // CONNECTING
+		client.send({ Resign: {} });
+		expect(MockWebSocket.last!.sent).toEqual([]);
+	});
+
+	it('closing detaches handlers so no status fires afterwards', () => {
+		const statuses: string[] = [];
+		const client = new LiveClient('ws://x');
+		client.onStatus((s) => statuses.push(s));
+		client.connect();
+		const ws = MockWebSocket.last!;
+		client.close();
+		expect(ws.closed).toBe(true);
+		expect(statuses).not.toContain('closed'); // onclose was detached before close()
+	});
+
+	it('reconnecting closes the previous socket', () => {
+		const client = new LiveClient('ws://x');
+		client.connect();
+		const first = MockWebSocket.last!;
+		client.connect();
+		expect(first.closed).toBe(true);
+		expect(MockWebSocket.last).not.toBe(first);
+	});
+});
