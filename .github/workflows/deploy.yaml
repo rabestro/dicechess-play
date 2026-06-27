@@ -46,6 +46,10 @@ jobs:
           # Variables → VITE_INGEST_GATEWAY_URL). Empty = recording disabled (games
           # stay in IndexedDB). Changing it requires a rebuild + redeploy.
           VITE_INGEST_GATEWAY_URL: ${{ vars.VITE_INGEST_GATEWAY_URL }}
+          # Public URL of the play-api (live HvH). Baked in here because the bundle is built in
+          # Actions and Direct-Uploaded — a Cloudflare Pages *dashboard* variable would never reach
+          # vite build. Override via a repo VARIABLE (vars.VITE_PLAY_API_URL); empty = /live disabled.
+          VITE_PLAY_API_URL: ${{ vars.VITE_PLAY_API_URL || 'https://play-api.jc.id.lv' }}
 
       # wrangler pages deploy does not auto-create the project; create it once
       # (no-op / harmless error if it already exists, hence `|| true`).
