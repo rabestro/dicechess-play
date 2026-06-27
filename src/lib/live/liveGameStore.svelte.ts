@@ -80,6 +80,7 @@ export class LiveGameStore {
 
 	// ── lifecycle ─────────────────────────────────────────────────────────────
 	connect(id: string, token: string | null, as: 'white' | 'black' | null): void {
+		this.dispose(); // close any prior socket so a re-connect can't leak it
 		this.playerColor = as === 'black' ? 'b' : 'w';
 		this.mySeat = as === 'white' ? 'White' : as === 'black' ? 'Black' : null;
 		const client = new LiveClient(wsUrl(id, token));
@@ -122,6 +123,7 @@ export class LiveGameStore {
 			return;
 		}
 		if ('GameEnded' in ev) {
+			if (ev.GameEnded.v <= this.version) return;
 			this.version = ev.GameEnded.v;
 			this.endGame(ev.GameEnded.over);
 			return;
