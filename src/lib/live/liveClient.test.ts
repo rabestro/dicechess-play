@@ -123,6 +123,24 @@ describe('LiveClient', () => {
 		}
 	});
 
+	it('a fresh connect() cancels a pending reconnect timer (no duplicate socket)', () => {
+		vi.useFakeTimers();
+		try {
+			const client = new LiveClient('ws://x');
+			client.connect();
+			const first = MockWebSocket.last!;
+			first.onopen!();
+			first.onclose!(); // schedules a backoff reconnect
+			client.connect(); // a fresh connect must cancel that pending timer
+			const reconnected = MockWebSocket.last!;
+			expect(reconnected).not.toBe(first);
+			vi.advanceTimersByTime(10_000); // the stale timer must not open another socket
+			expect(MockWebSocket.last).toBe(reconnected);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('stops reconnecting after an intentional close', () => {
 		vi.useFakeTimers();
 		try {

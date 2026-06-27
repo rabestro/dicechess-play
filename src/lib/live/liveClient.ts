@@ -40,6 +40,11 @@ export class LiveClient {
 	}
 
 	private open(): void {
+		// Cancel any pending backoff timer so a stale reconnect can't fire after a fresh connect()/open().
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = null;
+		}
 		this.teardownSocket(); // idempotent: tear down any existing socket before (re)connecting
 		this.statusCb?.('connecting');
 		const socket = new WebSocket(this.url);
