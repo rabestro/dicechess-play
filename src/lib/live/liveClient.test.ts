@@ -3,6 +3,7 @@ import { LiveClient } from './liveClient';
 import type { ServerEvent } from './liveTypes';
 
 class MockWebSocket {
+	static readonly OPEN = 1;
 	static last: MockWebSocket | null = null;
 	onopen: (() => void) | null = null;
 	onclose: (() => void) | null = null;
@@ -10,6 +11,7 @@ class MockWebSocket {
 	onmessage: ((event: { data: unknown }) => void) | null = null;
 	sent: string[] = [];
 	closed = false;
+	readyState = MockWebSocket.OPEN;
 	constructor(public url: string) {
 		MockWebSocket.last = this;
 	}
@@ -65,5 +67,33 @@ describe('LiveClient', () => {
 		client.connect();
 		MockWebSocket.last!.onmessage!({ data: 'ping' });
 		expect(events).toEqual([]);
+	});
+
+	it('drops a command when the socket is not open', () => {
+		const client = new LiveClient('ws://x');
+		client.connect();
+		MockWebSocket.last!.readyState = 0; // CONNECTING
+		client.send({ Resign: {} });
+		expect(MockWebSocket.last!.sent).toEqual([]);
+	});
+
+	it('closing detaches handlers so no status fires afterwards', () => {
+		const statuses: string[] = [];
+		const client = new LiveClient('ws://x');
+		client.onStatus((s) => statuses.push(s));
+		client.connect();
+		const ws = MockWebSocket.last!;
+		client.close();
+		expect(ws.closed).toBe(true);
+		expect(statuses).not.toContain('closed'); // onclose was detached before close()
+	});
+
+	it('reconnecting closes the previous socket', () => {
+		const client = new LiveClient('ws://x');
+		client.connect();
+		const first = MockWebSocket.last!;
+		client.connect();
+		expect(first.closed).toBe(true);
+		expect(MockWebSocket.last).not.toBe(first);
 	});
 });

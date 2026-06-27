@@ -5,8 +5,11 @@ import type { Seat } from './liveTypes';
 // the credential; the colour is advisory — the server validates every move regardless.
 
 export function buildJoinUrl(origin: string, gameId: string, token: string, seat: Seat): string {
-	const as = seat === 'White' ? 'white' : 'black';
-	return `${origin}/live/${gameId}?seat=${encodeURIComponent(token)}&as=${as}`;
+	// Use the URL API so origin edge cases (trailing slash) and encoding are handled correctly.
+	const url = new URL(`/live/${gameId}`, origin);
+	url.searchParams.set('seat', token);
+	url.searchParams.set('as', seat === 'White' ? 'white' : 'black');
+	return url.toString();
 }
 
 export interface ParsedSeat {

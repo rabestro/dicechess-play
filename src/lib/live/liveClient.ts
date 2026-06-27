@@ -21,6 +21,7 @@ export class LiveClient {
 	}
 
 	connect(): void {
+		this.close(); // idempotent: tear down any existing socket before (re)connecting
 		this.statusCb?.('connecting');
 		const socket = new WebSocket(this.url);
 		this.socket = socket;
@@ -38,11 +39,21 @@ export class LiveClient {
 	}
 
 	send(command: ClientCommand): void {
-		this.socket?.send(JSON.stringify(command));
+		// Drop commands when not connected — the WebSocket throws if it isn't OPEN.
+		if (this.socket?.readyState === WebSocket.OPEN) {
+			this.socket.send(JSON.stringify(command));
+		}
 	}
 
 	close(): void {
-		this.socket?.close();
+		const socket = this.socket;
+		if (!socket) return;
+		// Detach handlers so a pending close/error after teardown can't fire callbacks.
+		socket.onopen = null;
+		socket.onclose = null;
+		socket.onerror = null;
+		socket.onmessage = null;
+		socket.close();
 		this.socket = null;
 	}
 }
