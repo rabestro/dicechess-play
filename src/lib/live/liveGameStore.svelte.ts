@@ -81,6 +81,7 @@ export class LiveGameStore {
 	// ── lifecycle ─────────────────────────────────────────────────────────────
 	connect(id: string, token: string | null, as: 'white' | 'black' | null): void {
 		this.dispose(); // close any prior socket so a re-connect can't leak it
+		this.reset(); // clear stale state when the instance is reused for a different game/seat
 		this.playerColor = as === 'black' ? 'b' : 'w';
 		this.mySeat = as === 'white' ? 'White' : as === 'black' ? 'Black' : null;
 		const client = new LiveClient(wsUrl(id, token));
@@ -88,6 +89,22 @@ export class LiveGameStore {
 		client.onStatus((s) => (this.connection = s));
 		client.onEvent((ev) => this.applyEvent(ev));
 		client.connect();
+	}
+
+	/** Clear per-game state (the same instance is reused across /live/[id] navigations). */
+	private reset(): void {
+		this.version = -1;
+		this.currentBoardFen = START_FEN;
+		this.activeColor = 'w';
+		this.currentDice = [];
+		this.pendingPromotion = null;
+		this.pendingMoves = [];
+		this.confirmedFen = START_FEN;
+		this.confirmedDice = [];
+		this.outcome = null;
+		this.winner = null;
+		this.termination = null;
+		this.gameStatus = 'connecting';
 	}
 
 	dispose(): void {
@@ -183,6 +200,9 @@ export class LiveGameStore {
 	// ── move handling (mirrors the vs-bot store, but submits the turn to the server) ──
 	handleBoardMove(orig: string, dest: string): void {
 		if (this.gameStatus !== 'playing' || this.activeColor !== this.playerColor) return;
+		// Don't move optimistically while disconnected — the SubmitTurn would be dropped and the
+		// local board would diverge from the server.
+		if (this.connection !== 'open') return;
 		const piece = getPieceFromFen(this.currentBoardFen, orig);
 		if (!piece) return;
 

@@ -20,7 +20,7 @@
 			const black = res.tokens.find((t) => t.seat === 'Black');
 			if (!white || !black) throw new Error('Server did not return both seat tokens');
 			shareUrl = buildJoinUrl(location.origin, res.gameId, black.token, 'Black');
-			boardUrl = `${resolve('/live/[id]', { id: res.gameId })}?seat=${white.token}&as=white`;
+			boardUrl = `${resolve('/live/[id]', { id: res.gameId })}?seat=${encodeURIComponent(white.token)}&as=white`;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to create game';
 		} finally {
@@ -29,10 +29,14 @@
 	}
 
 	async function copy() {
-		if (!shareUrl) return;
-		await navigator.clipboard?.writeText(shareUrl);
-		copied = true;
-		setTimeout(() => (copied = false), 1500);
+		if (!shareUrl || !navigator.clipboard) return;
+		try {
+			await navigator.clipboard.writeText(shareUrl);
+			copied = true;
+			setTimeout(() => (copied = false), 1500);
+		} catch {
+			// Clipboard write was blocked/rejected; the link stays selectable for manual copy.
+		}
 	}
 </script>
 

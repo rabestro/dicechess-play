@@ -19,9 +19,11 @@
 	});
 
 	const statusText = $derived.by(() => {
+		// A dropped connection should show through whatever the last game status was (until it's over).
+		if (live.connection === 'closed' && live.gameStatus !== 'over') return 'Disconnected.';
 		switch (live.gameStatus) {
 			case 'connecting':
-				return live.connection === 'closed' ? 'Disconnected.' : 'Connecting…';
+				return 'Connecting…';
 			case 'playing':
 				return 'Your turn.';
 			case 'waiting':
