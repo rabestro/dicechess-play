@@ -181,6 +181,9 @@ export class LiveGameStore {
 		this.termination = over.termination;
 		this.currentDice = [];
 		this.pendingMoves = [];
+		// The game is terminal and the room is about to be evicted: stop reconnecting (a no-op otherwise
+		// retries against a gone game). The outcome shows via gameStatus, not the connection status.
+		this.client?.close();
 		if ('Draw' in over.result) {
 			this.outcome = 'draw';
 			this.winner = null;

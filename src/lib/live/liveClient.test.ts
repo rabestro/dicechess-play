@@ -96,4 +96,81 @@ describe('LiveClient', () => {
 		expect(first.closed).toBe(true);
 		expect(MockWebSocket.last).not.toBe(first);
 	});
+
+	it('reconnects with backoff after an unexpected drop, staying in connecting', () => {
+		vi.useFakeTimers();
+		try {
+			const statuses: string[] = [];
+			const client = new LiveClient('ws://x/games/g/ws?token=t');
+			client.onStatus((s) => statuses.push(s));
+			client.connect();
+			const first = MockWebSocket.last!;
+			first.onopen!();
+			expect(statuses).toContain('open');
+
+			first.onclose!(); // unexpected drop
+			// It schedules a retry rather than giving up: 'connecting' again, never 'closed'.
+			expect(statuses).not.toContain('closed');
+			expect(statuses.filter((s) => s === 'connecting').length).toBeGreaterThanOrEqual(2);
+
+			vi.advanceTimersByTime(400); // past the first backoff (250ms + jitter)
+			const second = MockWebSocket.last!;
+			expect(second).not.toBe(first);
+			second.onopen!();
+			expect(statuses[statuses.length - 1]).toBe('open');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('a fresh connect() cancels a pending reconnect timer (no duplicate socket)', () => {
+		vi.useFakeTimers();
+		try {
+			const client = new LiveClient('ws://x');
+			client.connect();
+			const first = MockWebSocket.last!;
+			first.onopen!();
+			first.onclose!(); // schedules a backoff reconnect
+			client.connect(); // a fresh connect must cancel that pending timer
+			const reconnected = MockWebSocket.last!;
+			expect(reconnected).not.toBe(first);
+			vi.advanceTimersByTime(10_000); // the stale timer must not open another socket
+			expect(MockWebSocket.last).toBe(reconnected);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('stops reconnecting after an intentional close', () => {
+		vi.useFakeTimers();
+		try {
+			const client = new LiveClient('ws://x');
+			client.connect();
+			const ws = MockWebSocket.last!;
+			ws.onopen!();
+			client.close();
+			vi.advanceTimersByTime(60_000);
+			expect(MockWebSocket.last).toBe(ws); // no new socket was opened
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('gives up and reports closed after exhausting reconnect attempts', () => {
+		vi.useFakeTimers();
+		try {
+			const statuses: string[] = [];
+			const client = new LiveClient('ws://x');
+			client.onStatus((s) => statuses.push(s));
+			client.connect();
+			// Every attempt fails immediately; advance past the capped backoff each round until it gives up.
+			for (let i = 0; i < 15 && !statuses.includes('closed'); i++) {
+				MockWebSocket.last!.onclose?.();
+				vi.advanceTimersByTime(6_000);
+			}
+			expect(statuses).toContain('closed');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });

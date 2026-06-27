@@ -21,6 +21,13 @@
 	const statusText = $derived.by(() => {
 		// A dropped connection should show through whatever the last game status was (until it's over).
 		if (live.connection === 'closed' && live.gameStatus !== 'over') return 'Disconnected.';
+		// Mid-game 'connecting' means a reconnect is in flight (the initial connect still says "Connecting…").
+		if (
+			live.connection === 'connecting' &&
+			live.gameStatus !== 'connecting' &&
+			live.gameStatus !== 'over'
+		)
+			return 'Reconnecting…';
 		switch (live.gameStatus) {
 			case 'connecting':
 				return 'Connecting…';
