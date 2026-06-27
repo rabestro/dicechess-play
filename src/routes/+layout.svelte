@@ -49,6 +49,14 @@
 						Play
 					</a>
 					<a
+						href={resolve('/live')}
+						class="px-3 py-1.5 rounded-lg text-sm font-bold transition-colors {isActive('/live')
+							? 'bg-surface text-content'
+							: 'text-content-muted hover:text-content'}"
+					>
+						Live
+					</a>
+					<a
 						href={resolve('/games')}
 						class="px-3 py-1.5 rounded-lg text-sm font-bold transition-colors {isActive('/games')
 							? 'bg-surface text-content'

@@ -137,7 +137,7 @@
 				<div
 					class="relative w-full max-w-[560px] lg:max-w-[min(560px,calc(100dvh_-_240px))] mx-auto aspect-square"
 				>
-					<Board />
+					<Board {store} />
 					{#if store.pendingPromotion}
 						<PawnPromotionSelector
 							color={store.pendingPromotion.color}
