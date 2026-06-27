@@ -1,7 +1,7 @@
 # dicechess-play
 
 Public site to **play Dice Chess against our bots** — anonymous, no sign-up. Phase 1 of
-the play-site roadmap: a visitor plays a full game in the browser and the finished game
+the play-site roadmap: a visitor plays a full game in the browser, and the finished game
 is recorded to `dicechess-analytics` as a new source, `playsite`.
 
 > Private repo. Decisions and roadmap live in the `dicechess-docs` wiki under
