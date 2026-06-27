@@ -1,14 +1,15 @@
 <script lang="ts">
-	// Thin, store-driven board for the play site. Wraps the low-level Chessground
-	// component and binds it to playWithBotStore (fen / legal dests / move callback).
-	// Deliberately does NOT reuse lab's ChessgroundBoard, which couples to the trainer
-	// and active-game-viewer stores (activeGameStore / trainerStore).
+	// Thin, store-driven board for the play site. Wraps the low-level Chessground component and binds
+	// it to a BoardStore (fen / legal dests / move callback). The store is a prop, so the same board
+	// serves both vs-bot (playWithBotStore) and live human-vs-human (liveGameStore).
 	import Chessground from './lib/Chessground.svelte';
 	import '@lichess-org/chessground/assets/chessground.base.css';
 	import '@lichess-org/chessground/assets/chessground.brown.css';
 	import '@lichess-org/chessground/assets/chessground.cburnett.css';
 	import type { Key } from '@lichess-org/chessground/types';
-	import { playWithBotStore as store } from '$lib/playWithBot';
+	import type { BoardStore } from '$lib/boardStore';
+
+	let { store }: { store: BoardStore } = $props();
 
 	const toCg = (c: 'w' | 'b'): 'white' | 'black' => (c === 'w' ? 'white' : 'black');
 
