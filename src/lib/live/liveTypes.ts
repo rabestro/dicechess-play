@@ -20,6 +20,14 @@ export interface Clocks {
 	black: number;
 }
 
+// A game's time control, chosen at creation (mirrors the server's TimeControl ADT). Omitting it on
+// create means Unlimited.
+export type TimeControl =
+	| { Unlimited: Record<string, never> }
+	| { SuddenDeath: { initialSeconds: number } }
+	| { Fischer: { initialSeconds: number; incrementSeconds: number } }
+	| { PerMove: { secondsPerMove: number } };
+
 export interface PublicGameState {
 	version: number;
 	dfen: string;

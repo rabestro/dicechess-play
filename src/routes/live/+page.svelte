@@ -3,19 +3,33 @@
 	import { createGame, isLiveEnabled } from '$lib/live/liveApi';
 	import { buildJoinUrl } from '$lib/live/seatLink';
 	import { getGuestId } from '$lib/ingest/guestIdentity';
+	import type { TimeControl } from '$lib/live/liveTypes';
+
+	// Time-control presets; `null` means Unlimited (no clock — the field is omitted on create).
+	const presets: { label: string; value: TimeControl | null }[] = [
+		{ label: 'Unlimited', value: null },
+		{ label: '5 min', value: { SuddenDeath: { initialSeconds: 300 } } },
+		{ label: '10 min', value: { SuddenDeath: { initialSeconds: 600 } } },
+		{ label: '5 + 3', value: { Fischer: { initialSeconds: 300, incrementSeconds: 3 } } },
+		{ label: '30s / move', value: { PerMove: { secondsPerMove: 30 } } },
+	];
 
 	let creating = $state(false);
 	let error = $state<string | null>(null);
 	let shareUrl = $state<string | null>(null);
 	let boardUrl = $state<string | null>(null);
 	let copied = $state(false);
+	let selected = $state(0); // index into presets
+	let chosenLabel = $state('Unlimited'); // the control the created game actually used
 
 	async function create() {
 		creating = true;
 		error = null;
 		try {
 			const guest = getGuestId();
-			const res = await createGame(guest, guest);
+			const preset = presets[selected];
+			const res = await createGame(guest, guest, preset.value);
+			chosenLabel = preset.label;
 			const white = res.tokens.find((t) => t.seat === 'White');
 			const black = res.tokens.find((t) => t.seat === 'Black');
 			if (!white || !black) throw new Error('Server did not return both seat tokens');
@@ -51,6 +65,25 @@
 		<p class="text-content-muted">
 			Create a game, send the link to your opponent, and open your board. You play White.
 		</p>
+		<div class="flex flex-col gap-2">
+			<span class="text-sm font-bold text-content-muted">Time control</span>
+			<div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Time control">
+				{#each presets as p, i (p.label)}
+					<button
+						type="button"
+						role="radio"
+						aria-checked={selected === i}
+						onclick={() => (selected = i)}
+						class="px-3 py-1.5 rounded-lg border text-sm font-bold transition-colors
+							{selected === i
+							? 'border-primary bg-primary text-primary-content'
+							: 'border-border bg-surface text-content-muted hover:text-content'}"
+					>
+						{p.label}
+					</button>
+				{/each}
+			</div>
+		</div>
 		<button
 			type="button"
 			onclick={create}
@@ -61,6 +94,9 @@
 		</button>
 		{#if error}<p class="text-sm text-red-500">{error}</p>{/if}
 	{:else}
+		<p class="text-sm text-content-muted">
+			Time control: <span class="text-content font-bold">{chosenLabel}</span>
+		</p>
 		<div class="flex flex-col gap-2">
 			<span class="text-sm font-bold text-content-muted"
 				>Send this link to your opponent (Black):</span
