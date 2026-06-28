@@ -4,7 +4,7 @@ import type { CreateGameResponse, PublicGameState, TimeControl } from './liveTyp
 // (mirroring VITE_INGEST_GATEWAY_URL); when empty, live play is disabled. Read at call time so it
 // is easy to stub in tests.
 
-function apiBase(): string {
+export function apiBase(): string {
 	return (import.meta.env.VITE_PLAY_API_URL as string | undefined) ?? '';
 }
 

@@ -59,3 +59,30 @@ export interface CreateGameResponse {
 	commit: string;
 	tokens: SeatToken[];
 }
+
+// ── Lobby / open seeks (mirror the play-api lobby DTOs) ───────────────────────
+
+/** A public open seek in the lobby. */
+export interface Seek {
+	id: string;
+	timeControl: TimeControl;
+}
+
+/** Posting a seek returns its id plus the creator's capability secret (to poll status / cancel). */
+export interface CreatedSeek {
+	seekId: string;
+	secret: string;
+}
+
+/** A creator's status poll: `matched` is false while open; once matched it carries the game + the creator's seat token. */
+export interface SeekState {
+	matched: boolean;
+	gameId: string | null;
+	token: string | null;
+}
+
+/** The accept response: the seated game id plus the accepter's seat token. */
+export interface SeekMatch {
+	gameId: string;
+	token: string;
+}

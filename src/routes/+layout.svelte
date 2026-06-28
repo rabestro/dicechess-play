@@ -57,6 +57,14 @@
 						Live
 					</a>
 					<a
+						href={resolve('/lobby')}
+						class="px-3 py-1.5 rounded-lg text-sm font-bold transition-colors {isActive('/lobby')
+							? 'bg-surface text-content'
+							: 'text-content-muted hover:text-content'}"
+					>
+						Lobby
+					</a>
+					<a
 						href={resolve('/games')}
 						class="px-3 py-1.5 rounded-lg text-sm font-bold transition-colors {isActive('/games')
 							? 'bg-surface text-content'
