@@ -2,7 +2,7 @@
 	import { timeControlPresets } from '$lib/live/timeControls';
 
 	// Bound to the selected preset index. Native radios in a fieldset give keyboard nav + focus for free.
-	let { selected = $bindable() }: { selected: number } = $props();
+	let { selected = $bindable(0) }: { selected?: number } = $props();
 </script>
 
 <fieldset class="flex flex-col gap-2">

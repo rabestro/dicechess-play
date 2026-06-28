@@ -14,8 +14,10 @@ export const timeControlPresets: TimeControlPreset[] = [
 	{ label: '30s / move', value: { PerMove: { secondsPerMove: 30 } } },
 ];
 
-/** A short human label for any time control (e.g. to show a seek's control in the lobby list). */
-export function timeControlLabel(tc: TimeControl): string {
+/** A short human label for any time control (e.g. to show a seek's control in the lobby list). Tolerates a
+ * missing control (treated as Unlimited) so a malformed response can never throw. */
+export function timeControlLabel(tc: TimeControl | null | undefined): string {
+	if (!tc) return 'Unlimited';
 	if ('SuddenDeath' in tc) return `${Math.round(tc.SuddenDeath.initialSeconds / 60)} min`;
 	if ('Fischer' in tc)
 		return `${Math.round(tc.Fischer.initialSeconds / 60)} + ${tc.Fischer.incrementSeconds}`;

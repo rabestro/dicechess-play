@@ -16,15 +16,17 @@
 	let error = $state<string | null>(null);
 	// When set, we created a seek and are waiting for an opponent (no list shown).
 	let waiting = $state<{ id: string; secret: string; label: string } | null>(null);
+	let creating = $state(false);
+	let accepting = $state(false);
 
 	function goToBoard(gameId: string, token: string, seat: 'White' | 'Black') {
 		// Full navigation: the board page connects fresh from the seat token in the URL.
 		window.location.href = buildJoinUrl(location.origin, gameId, token, seat);
 	}
 
-	// Browse: poll the open-seek list while not waiting.
+	// Browse: poll the open-seek list while not waiting (and only when live play is configured).
 	$effect(() => {
-		if (waiting) return;
+		if (waiting || !isLiveEnabled()) return;
 		let alive = true;
 		const tick = async () => {
 			try {
@@ -55,6 +57,7 @@
 				/* transient — keep waiting */
 			}
 		};
+		tick(); // check immediately so a match that already happened redirects without a poll-interval delay
 		const timer = setInterval(tick, STATUS_POLL_MS);
 		return () => {
 			alive = false;
@@ -63,6 +66,7 @@
 	});
 
 	async function create() {
+		creating = true;
 		error = null;
 		try {
 			const preset = timeControlPresets[selected];
@@ -70,6 +74,8 @@
 			waiting = { id: created.seekId, secret: created.secret, label: preset.label };
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to create seek';
+		} finally {
+			creating = false;
 		}
 	}
 
@@ -85,6 +91,8 @@
 	}
 
 	async function accept(seek: Seek) {
+		if (accepting) return;
+		accepting = true;
 		error = null;
 		try {
 			const match = await acceptSeek(seek.id, getGuestId());
@@ -97,6 +105,8 @@
 			} catch {
 				/* ignore */
 			}
+		} finally {
+			accepting = false;
 		}
 	}
 </script>
@@ -125,9 +135,10 @@
 			<button
 				type="button"
 				onclick={create}
-				class="px-6 py-3 rounded-xl bg-primary text-primary-content font-bold text-lg shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors"
+				disabled={creating}
+				class="px-6 py-3 rounded-xl bg-primary text-primary-content font-bold text-lg shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors disabled:opacity-60"
 			>
-				Create a seek
+				{creating ? 'Creating…' : 'Create a seek'}
 			</button>
 		</div>
 
@@ -145,7 +156,8 @@
 							<button
 								type="button"
 								onclick={() => accept(seek)}
-								class="px-4 py-1.5 rounded-lg bg-primary text-primary-content font-bold hover:bg-primary-hover transition-colors"
+								disabled={accepting}
+								class="px-4 py-1.5 rounded-lg bg-primary text-primary-content font-bold hover:bg-primary-hover transition-colors disabled:opacity-60"
 							>
 								Accept
 							</button>
