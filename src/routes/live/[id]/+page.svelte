@@ -2,12 +2,24 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Board from '../../../components/Board.svelte';
+	import LiveClock from '../../../components/LiveClock.svelte';
 	import PawnPromotionSelector from '../../../components/PawnPromotionSelector.svelte';
 	import { getPieceImage } from '$lib/utils/getPieceImage';
 	import { LiveGameStore } from '$lib/live/liveGameStore.svelte';
 	import { parseSeat } from '$lib/live/seatLink';
+	import type { Seat } from '$lib/live/liveTypes';
 
 	const live = new LiveGameStore();
+
+	// Board is shown from the player's side (white for spectators), so the opponent's clock sits on top.
+	const bottomSeat = $derived<Seat>(live.playerColor === 'b' ? 'Black' : 'White');
+	const topSeat = $derived<Seat>(bottomSeat === 'White' ? 'Black' : 'White');
+	const activeSeat = $derived<Seat>(live.activeColor === 'b' ? 'Black' : 'White');
+	const clockMs = (seat: Seat): number =>
+		seat === 'White' ? live.whiteClockMs : live.blackClockMs;
+	const isTicking = (seat: Seat): boolean => activeSeat === seat && live.gameStatus !== 'over';
+	const clockLabel = (seat: Seat): string =>
+		live.spectator ? seat : seat === bottomSeat ? 'You' : 'Opponent';
 
 	// (Re)connect when the game id changes; tear the socket down on teardown/navigation.
 	$effect(() => {
@@ -45,6 +57,10 @@
 </script>
 
 <section class="flex flex-col items-center gap-4 w-full max-w-[560px] mx-auto">
+	{#if live.hasClocks}
+		<LiveClock ms={clockMs(topSeat)} active={isTicking(topSeat)} label={clockLabel(topSeat)} />
+	{/if}
+
 	<!-- Relative wrapper so the promotion overlay covers the board. -->
 	<div class="relative w-full aspect-square">
 		<Board store={live} />
@@ -57,6 +73,14 @@
 			/>
 		{/if}
 	</div>
+
+	{#if live.hasClocks}
+		<LiveClock
+			ms={clockMs(bottomSeat)}
+			active={isTicking(bottomSeat)}
+			label={clockLabel(bottomSeat)}
+		/>
+	{/if}
 
 	<!-- Dice bar -->
 	<div
