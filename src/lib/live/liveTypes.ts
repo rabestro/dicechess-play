@@ -14,19 +14,26 @@ export interface Over {
 
 export type GameStatusWire = { Active: Record<string, never> } | { Ended: { over: Over } };
 
+// Remaining time per side, in milliseconds, as of the carrying event. `null` for an unlimited game.
+export interface Clocks {
+	white: number;
+	black: number;
+}
+
 export interface PublicGameState {
 	version: number;
 	dfen: string;
 	activeSeat: Seat;
 	dicePending: boolean;
 	status: GameStatusWire;
+	clocks: Clocks | null;
 }
 
 // Server -> client events on the game WebSocket, discriminated by the (single) case-name key,
 // each carrying a monotonic version `v`.
 export type ServerEvent =
 	| { Snapshot: { v: number; state: PublicGameState } }
-	| { DiceRolled: { v: number; seat: Seat; dice: number[]; dfen: string } }
+	| { DiceRolled: { v: number; seat: Seat; dice: number[]; dfen: string; clocks: Clocks | null } }
 	| { TurnPlayed: { v: number; seat: Seat; moves: string[]; fenAfter: string } }
 	| { GameEnded: { v: number; over: Over } }
 	| { Rejected: { v: number; seat: Seat; reason: string } };

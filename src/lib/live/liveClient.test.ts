@@ -47,7 +47,7 @@ describe('LiveClient', () => {
 		expect(statuses).toContain('open');
 
 		const event: ServerEvent = {
-			DiceRolled: { v: 1, seat: 'White', dice: [2, 3, 6], dfen: 'fen' },
+			DiceRolled: { v: 1, seat: 'White', dice: [2, 3, 6], dfen: 'fen', clocks: null },
 		};
 		ws.onmessage!({ data: JSON.stringify(event) });
 		expect(events).toEqual([event]);

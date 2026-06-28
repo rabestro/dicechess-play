@@ -9,7 +9,7 @@ import type { DieState } from '../playWithBot/playWithBotDice.svelte';
 import { LiveClient, type ConnStatus } from './liveClient';
 import { wsUrl } from './liveApi';
 import { splitDfen, stripDfen } from './dfenUtils';
-import type { Over, PublicGameState, Seat, ServerEvent } from './liveTypes';
+import type { Clocks, Over, PublicGameState, Seat, ServerEvent } from './liveTypes';
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,6 +57,13 @@ export class LiveGameStore {
 	private confirmedFen = START_FEN; // last server-confirmed position, for rollback
 	private confirmedDice: DieState[] = [];
 
+	// ── clocks ─────────────────────────────────────────────────────────────────
+	private tick = $state(0); // bumped by a timer so the ticking clock re-renders between server events
+	private clockBaseMs: Clocks | null = null; // remaining per side as of `clockSince`; null = unlimited
+	private clockSince = 0; // Date.now() when clockBaseMs was captured
+	private tickingSeat: Seat | null = null; // the side running down now (none between turns / when over)
+	private clockTimer: ReturnType<typeof setInterval> | null = null;
+
 	/** True while a player (not a spectator) is in a live game. */
 	get canResign(): boolean {
 		return this.mySeat !== null && this.gameStatus !== 'over';
@@ -64,6 +71,40 @@ export class LiveGameStore {
 
 	get availableDiceValues(): number[] {
 		return this.currentDice.filter((d) => d.allowed && !d.used).map((d) => getDieValue(d));
+	}
+
+	/** True for a timed game (clocks present); false for an unlimited one. */
+	get hasClocks(): boolean {
+		return this.clockBaseMs !== null;
+	}
+
+	/** True when watching rather than playing. */
+	get spectator(): boolean {
+		return this.mySeat === null;
+	}
+
+	/** The side whose clock is currently running down, or null when paused (between turns / over / unlimited). */
+	get tickingClockSeat(): Seat | null {
+		return this.tickingSeat;
+	}
+
+	get whiteClockMs(): number {
+		return this.liveMs('White');
+	}
+
+	get blackClockMs(): number {
+		return this.liveMs('Black');
+	}
+
+	/** Remaining ms for `seat`, counting the active side down locally between server updates. */
+	private liveMs(seat: Seat): number {
+		if (!this.clockBaseMs) return 0;
+		const base = seat === 'White' ? this.clockBaseMs.white : this.clockBaseMs.black;
+		if (this.tickingSeat === seat && this.gameStatus !== 'over') {
+			void this.tick; // re-read each tick so the countdown stays reactive
+			return Math.max(0, base - (Date.now() - this.clockSince));
+		}
+		return Math.max(0, base);
 	}
 
 	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
@@ -105,9 +146,13 @@ export class LiveGameStore {
 		this.winner = null;
 		this.termination = null;
 		this.gameStatus = 'connecting';
+		this.clockBaseMs = null;
+		this.clockSince = 0;
+		this.tickingSeat = null;
 	}
 
 	dispose(): void {
+		this.stopClockTimer();
 		this.client?.close();
 		this.client = null;
 	}
@@ -127,6 +172,7 @@ export class LiveGameStore {
 			if (ev.DiceRolled.v <= this.version) return;
 			this.version = ev.DiceRolled.v;
 			this.syncTurn(ev.DiceRolled.dfen, ev.DiceRolled.seat);
+			this.setClocks(ev.DiceRolled.clocks, ev.DiceRolled.seat);
 			return;
 		}
 		if ('TurnPlayed' in ev) {
@@ -137,6 +183,7 @@ export class LiveGameStore {
 			this.pendingMoves = [];
 			this.currentDice = [];
 			this.gameStatus = 'waiting';
+			this.freezeClocks(); // hold the clocks until the next DiceRolled brings authoritative values
 			return;
 		}
 		if ('GameEnded' in ev) {
@@ -156,10 +203,13 @@ export class LiveGameStore {
 	private syncState(state: PublicGameState): void {
 		if ('Ended' in state.status) {
 			this.currentBoardFen = stripDfen(state.dfen);
+			// The server's final clocks are already settled in the snapshot; adopt them without re-zeroing.
+			this.setClocks(state.clocks, null);
 			this.endGame(state.status.Ended.over);
 			return;
 		}
 		this.syncTurn(state.dfen, state.activeSeat, state.dicePending);
+		this.setClocks(state.clocks, state.dicePending ? state.activeSeat : null);
 	}
 
 	/** Adopt the authoritative position + dice for the side to move. */
@@ -181,6 +231,7 @@ export class LiveGameStore {
 		this.termination = over.termination;
 		this.currentDice = [];
 		this.pendingMoves = [];
+		this.settleClocks(over.termination);
 		// The game is terminal and the room is about to be evicted: stop reconnecting (a no-op otherwise
 		// retries against a gone game). The outcome shows via gameStatus, not the connection status.
 		this.client?.close();
@@ -198,6 +249,52 @@ export class LiveGameStore {
 		this.currentDice = this.confirmedDice.map((d) => ({ ...d }));
 		this.pendingMoves = [];
 		this.gameStatus = this.activeColor === this.playerColor ? 'playing' : 'waiting';
+	}
+
+	// ── clocks ──────────────────────────────────────────────────────────────────
+	/** Adopt authoritative per-side clocks from an event and tick `ticking` down (or no side). */
+	private setClocks(clocks: Clocks | null, ticking: Seat | null): void {
+		this.clockBaseMs = clocks;
+		this.clockSince = Date.now();
+		this.tickingSeat = clocks ? ticking : null;
+		// Only run the timer while a side is actually counting down; idle/frozen needs no ticks.
+		if (this.tickingSeat && this.gameStatus !== 'over') this.startClockTimer();
+		else this.stopClockTimer();
+	}
+
+	/** Pin both clocks to their current live values and stop ticking — between a completed turn and the next roll. */
+	private freezeClocks(): void {
+		if (!this.clockBaseMs) return;
+		this.clockBaseMs = { white: this.whiteClockMs, black: this.blackClockMs };
+		this.clockSince = Date.now();
+		this.tickingSeat = null;
+		this.stopClockTimer();
+	}
+
+	/** Settle clocks at game end: on a flag-fall zero the side that ran out, otherwise pin the live values. */
+	private settleClocks(termination: string): void {
+		this.stopClockTimer();
+		if (!this.clockBaseMs || !this.tickingSeat) return;
+		const key = this.tickingSeat === 'White' ? 'white' : 'black';
+		const settled = { ...this.clockBaseMs };
+		settled[key] =
+			termination === 'Timeout'
+				? 0
+				: Math.max(0, this.clockBaseMs[key] - (Date.now() - this.clockSince));
+		this.clockBaseMs = settled;
+		this.tickingSeat = null;
+	}
+
+	private startClockTimer(): void {
+		if (this.clockTimer !== null) return;
+		// 100ms so the sub-10s tenths display counts down smoothly.
+		this.clockTimer = setInterval(() => (this.tick += 1), 100);
+	}
+
+	private stopClockTimer(): void {
+		if (this.clockTimer === null) return;
+		clearInterval(this.clockTimer);
+		this.clockTimer = null;
 	}
 
 	// ── move handling (mirrors the vs-bot store, but submits the turn to the server) ──
