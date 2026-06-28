@@ -65,25 +65,28 @@
 		<p class="text-content-muted">
 			Create a game, send the link to your opponent, and open your board. You play White.
 		</p>
-		<div class="flex flex-col gap-2">
-			<span class="text-sm font-bold text-content-muted">Time control</span>
-			<div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Time control">
+		<fieldset class="flex flex-col gap-2">
+			<legend class="text-sm font-bold text-content-muted">Time control</legend>
+			<div class="flex flex-wrap gap-2">
 				{#each presets as p, i (p.label)}
-					<button
-						type="button"
-						role="radio"
-						aria-checked={selected === i}
-						onclick={() => (selected = i)}
-						class="px-3 py-1.5 rounded-lg border text-sm font-bold transition-colors
+					<label
+						class="px-3 py-1.5 rounded-lg border text-sm font-bold transition-colors cursor-pointer focus-within:ring-2 focus-within:ring-primary/50
 							{selected === i
 							? 'border-primary bg-primary text-primary-content'
 							: 'border-border bg-surface text-content-muted hover:text-content'}"
 					>
+						<input
+							type="radio"
+							name="timeControl"
+							value={i}
+							bind:group={selected}
+							class="sr-only"
+						/>
 						{p.label}
-					</button>
+					</label>
 				{/each}
 			</div>
-		</div>
+		</fieldset>
 		<button
 			type="button"
 			onclick={create}
