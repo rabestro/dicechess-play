@@ -34,6 +34,34 @@ describe('liveApi', () => {
 		expect(JSON.parse(init.body as string)).toEqual({ white: 'alice', black: 'bob' });
 	});
 
+	it('createGame includes the time control when given', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ gameId: 'g', commit: 'c', tokens: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await createGame('a', 'b', { Fischer: { initialSeconds: 300, incrementSeconds: 3 } });
+		const init = fetchMock.mock.calls[0][1] as RequestInit;
+		expect(JSON.parse(init.body as string)).toEqual({
+			white: 'a',
+			black: 'b',
+			timeControl: { Fischer: { initialSeconds: 300, incrementSeconds: 3 } },
+		});
+	});
+
+	it('createGame omits the time control when null (unlimited)', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ gameId: 'g', commit: 'c', tokens: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await createGame('a', 'b', null);
+		const init = fetchMock.mock.calls[0][1] as RequestInit;
+		expect(JSON.parse(init.body as string)).toEqual({ white: 'a', black: 'b' });
+	});
+
 	it('getState throws on a non-ok response', async () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
 		await expect(getState('nope')).rejects.toThrow('404');
