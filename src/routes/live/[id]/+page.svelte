@@ -14,10 +14,9 @@
 	// Board is shown from the player's side (white for spectators), so the opponent's clock sits on top.
 	const bottomSeat = $derived<Seat>(live.playerColor === 'b' ? 'Black' : 'White');
 	const topSeat = $derived<Seat>(bottomSeat === 'White' ? 'Black' : 'White');
-	const activeSeat = $derived<Seat>(live.activeColor === 'b' ? 'Black' : 'White');
 	const clockMs = (seat: Seat): number =>
 		seat === 'White' ? live.whiteClockMs : live.blackClockMs;
-	const isTicking = (seat: Seat): boolean => activeSeat === seat && live.gameStatus !== 'over';
+	const isTicking = (seat: Seat): boolean => live.tickingClockSeat === seat;
 	const clockLabel = (seat: Seat): string =>
 		live.spectator ? seat : seat === bottomSeat ? 'You' : 'Opponent';
 

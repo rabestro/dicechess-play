@@ -89,6 +89,26 @@ describe('LiveGameStore clocks', () => {
 		expect(live.blackClockMs).toBeGreaterThan(57_000);
 	});
 
+	it('stops ticking between a completed turn and the next roll', () => {
+		deliver(activeSnapshot({ white: 60_000, black: 60_000 }));
+		expect(live.tickingClockSeat).toBe('White');
+
+		vi.advanceTimersByTime(1_000);
+		deliver({
+			TurnPlayed: {
+				v: 1,
+				seat: 'White',
+				moves: ['e2e4'],
+				fenAfter: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+			},
+		});
+
+		expect(live.tickingClockSeat).toBeNull();
+		const frozen = live.whiteClockMs;
+		vi.advanceTimersByTime(2_000);
+		expect(live.whiteClockMs).toBe(frozen); // frozen until the next authoritative roll
+	});
+
 	it('zeroes the flagged side on a timeout', () => {
 		deliver(activeSnapshot({ white: 1_000, black: 60_000 }));
 		deliver({

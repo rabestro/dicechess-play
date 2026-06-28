@@ -13,6 +13,11 @@ describe('formatClock', () => {
 		expect(formatClock(500)).toBe('0.5');
 	});
 
+	it('floors tenths so it never rounds up to 10.0', () => {
+		expect(formatClock(9_990)).toBe('9.9');
+		expect(formatClock(9_950)).toBe('9.9');
+	});
+
 	it('clamps negatives to zero', () => {
 		expect(formatClock(-1_000)).toBe('0.0');
 		expect(formatClock(0)).toBe('0.0');

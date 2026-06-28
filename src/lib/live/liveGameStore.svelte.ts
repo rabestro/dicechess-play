@@ -83,6 +83,11 @@ export class LiveGameStore {
 		return this.mySeat === null;
 	}
 
+	/** The side whose clock is currently running down, or null when paused (between turns / over / unlimited). */
+	get tickingClockSeat(): Seat | null {
+		return this.tickingSeat;
+	}
+
 	get whiteClockMs(): number {
 		return this.liveMs('White');
 	}
@@ -252,7 +257,9 @@ export class LiveGameStore {
 		this.clockBaseMs = clocks;
 		this.clockSince = Date.now();
 		this.tickingSeat = clocks ? ticking : null;
-		if (clocks && this.gameStatus !== 'over') this.startClockTimer();
+		// Only run the timer while a side is actually counting down; idle/frozen needs no ticks.
+		if (this.tickingSeat && this.gameStatus !== 'over') this.startClockTimer();
+		else this.stopClockTimer();
 	}
 
 	/** Pin both clocks to their current live values and stop ticking — between a completed turn and the next roll. */
@@ -261,6 +268,7 @@ export class LiveGameStore {
 		this.clockBaseMs = { white: this.whiteClockMs, black: this.blackClockMs };
 		this.clockSince = Date.now();
 		this.tickingSeat = null;
+		this.stopClockTimer();
 	}
 
 	/** Settle clocks at game end: on a flag-fall zero the side that ran out, otherwise pin the live values. */
@@ -279,7 +287,8 @@ export class LiveGameStore {
 
 	private startClockTimer(): void {
 		if (this.clockTimer !== null) return;
-		this.clockTimer = setInterval(() => (this.tick += 1), 250);
+		// 100ms so the sub-10s tenths display counts down smoothly.
+		this.clockTimer = setInterval(() => (this.tick += 1), 100);
 	}
 
 	private stopClockTimer(): void {
