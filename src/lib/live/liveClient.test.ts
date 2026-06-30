@@ -163,7 +163,7 @@ describe('LiveClient', () => {
 
 	it('sends no hello when none is given', () => {
 		const client = new LiveClient('ws://x');
-		client.connect();
+		client.connect(null); // the spectator wiring passes null explicitly
 		MockWebSocket.last!.onopen!();
 		expect(MockWebSocket.last!.sent).toEqual([]);
 	});
