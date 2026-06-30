@@ -6,10 +6,10 @@ import {
 	getDieValue,
 } from '../../utils/fenUtils';
 import type { DieState } from '../playWithBot/playWithBotDice.svelte';
-import { LiveClient, type ConnStatus } from './liveClient';
+import { LiveClient, randomClientSeed, type ConnStatus } from './liveClient';
 import { wsUrl } from './liveApi';
 import { splitDfen, stripDfen } from './dfenUtils';
-import type { Clocks, Over, PublicGameState, Seat, ServerEvent } from './liveTypes';
+import type { ClientCommand, Clocks, Over, PublicGameState, Seat, ServerEvent } from './liveTypes';
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,7 +129,12 @@ export class LiveGameStore {
 		this.client = client;
 		client.onStatus((s) => (this.connection = s));
 		client.onEvent((ev) => this.applyEvent(ev));
-		client.connect();
+		// A seated player contributes post-commit dice entropy so the server's opening-roll gate opens
+		// promptly; spectators send nothing. LiveClient re-announces it on each reconnect (the server
+		// ignores a duplicate or post-roll seed).
+		const hello: ClientCommand | null =
+			this.mySeat !== null ? { SubmitSeed: { seed: randomClientSeed() } } : null;
+		client.connect(hello);
 	}
 
 	/** Clear per-game state (the same instance is reused across /live/[id] navigations). */
