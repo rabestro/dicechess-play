@@ -2,6 +2,13 @@ import type { ClientCommand, ServerEvent } from './liveTypes';
 
 export type ConnStatus = 'connecting' | 'open' | 'closed';
 
+/** A fresh 16-byte (128-bit) client dice seed, hex-encoded — the player's post-commit entropy contribution. */
+export function randomClientSeed(): string {
+	const bytes = new Uint8Array(16);
+	crypto.getRandomValues(bytes);
+	return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Thin WebSocket transport to a play-api game socket: parses each text frame into a ServerEvent and
 // sends ClientCommands as JSON. No Svelte/runes here (pure + unit-testable).
 //
@@ -18,6 +25,9 @@ export class LiveClient {
 	private shouldReconnect = false;
 	private attempts = 0;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	// A command (re)sent on every successful open — used for the dice seed, so a reconnect before the
+	// opening roll re-announces it (the server ignores a duplicate or post-roll seed).
+	private hello: ClientCommand | null = null;
 
 	// Backoff schedule (ms); the last entry repeats. ~33s over MAX_ATTEMPTS covers the server grace.
 	private static readonly BACKOFF = [250, 500, 1000, 2000, 4000, 5000];
@@ -33,7 +43,9 @@ export class LiveClient {
 		this.statusCb = cb;
 	}
 
-	connect(): void {
+	/** Open the socket. `hello`, if given, is (re)sent on every successful open (e.g. the dice seed). */
+	connect(hello: ClientCommand | null = null): void {
+		this.hello = hello;
 		this.shouldReconnect = true;
 		this.attempts = 0;
 		this.open();
@@ -52,6 +64,7 @@ export class LiveClient {
 		socket.onopen = () => {
 			this.attempts = 0; // a successful connection resets the backoff
 			this.statusCb?.('open');
+			if (this.hello) this.send(this.hello); // (re)announce on every open, e.g. the dice seed
 		};
 		socket.onclose = () => this.handleDrop();
 		socket.onerror = () => this.handleDrop();

@@ -47,7 +47,10 @@ export type ServerEvent =
 	| { Rejected: { v: number; seat: Seat; reason: string } };
 
 // Client -> server commands.
-export type ClientCommand = { SubmitTurn: { moves: string[] } } | { Resign: Record<string, never> };
+export type ClientCommand =
+	| { SubmitTurn: { moves: string[] } }
+	| { SubmitSeed: { seed: string } } // post-commit dice entropy, sent on join (see Provably-Fair Dice)
+	| { Resign: Record<string, never> };
 
 export interface SeatToken {
 	seat: Seat;

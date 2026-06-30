@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LiveClient } from './liveClient';
+import { LiveClient, randomClientSeed } from './liveClient';
 import type { ServerEvent } from './liveTypes';
 
 class MockWebSocket {
@@ -139,6 +139,39 @@ describe('LiveClient', () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	it('sends the hello command on open and re-announces it on reconnect', () => {
+		vi.useFakeTimers();
+		try {
+			const client = new LiveClient('ws://x');
+			client.connect({ SubmitSeed: { seed: 'abcd' } });
+			const first = MockWebSocket.last!;
+			first.onopen!();
+			expect(first.sent).toEqual(['{"SubmitSeed":{"seed":"abcd"}}']);
+
+			first.onclose!(); // unexpected drop → backoff reconnect
+			vi.advanceTimersByTime(400);
+			const second = MockWebSocket.last!;
+			expect(second).not.toBe(first);
+			second.onopen!();
+			expect(second.sent).toEqual(['{"SubmitSeed":{"seed":"abcd"}}']); // re-announced on the new socket
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('sends no hello when none is given', () => {
+		const client = new LiveClient('ws://x');
+		client.connect(null); // the spectator wiring passes null explicitly
+		MockWebSocket.last!.onopen!();
+		expect(MockWebSocket.last!.sent).toEqual([]);
+	});
+
+	it('randomClientSeed is 32 lowercase hex characters, fresh each call', () => {
+		const seed = randomClientSeed();
+		expect(seed).toMatch(/^[0-9a-f]{32}$/);
+		expect(randomClientSeed()).not.toBe(seed);
 	});
 
 	it('stops reconnecting after an intentional close', () => {
