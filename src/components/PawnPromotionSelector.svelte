@@ -33,9 +33,9 @@
 	class="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-sm md:rounded-xl"
 >
 	<div
-		class="bg-[#1e293b] border border-gray-700 rounded-xl shadow-2xl p-6 flex flex-col items-center gap-6 max-w-sm w-[90%] md:w-auto"
+		class="bg-surface border border-border-strong rounded-xl shadow-2xl p-6 flex flex-col items-center gap-6 max-w-sm w-[90%] md:w-auto"
 	>
-		<h3 class="text-xl font-semibold text-white">Promote to:</h3>
+		<h3 class="text-xl font-semibold text-content">Promote to:</h3>
 
 		<!-- Provide a cg-board context so the piece classes load SVGs correctly -->
 		<div class="flex flex-wrap justify-center gap-4 cg-wrap cg-board-wrap is2d">
@@ -43,7 +43,7 @@
 				{#each piecesToRender as p}
 					<button
 						onclick={() => onSelect(p)}
-						class="w-16 h-16 md:w-20 md:h-20 hover:scale-110 hover:bg-slate-700 transition-all duration-200 rounded-lg flex items-center justify-center relative cursor-pointer outline-none focus:ring-2 focus:ring-blue-500"
+						class="w-16 h-16 md:w-20 md:h-20 hover:scale-110 hover:bg-surface-hover transition-all duration-200 rounded-lg flex items-center justify-center relative cursor-pointer outline-none focus:ring-2 focus:ring-primary/60"
 						aria-label="Promote to {pieceMap[p.toLowerCase()]}"
 					>
 						<piece class="{getPieceClass(p)} {colorClass} !static !w-full !h-full"></piece>
@@ -54,7 +54,7 @@
 
 		<button
 			onclick={onCancel}
-			class="mt-2 px-6 py-2 text-sm font-medium text-gray-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors border border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+			class="mt-2 px-6 py-2 text-sm font-medium text-content-muted hover:text-content bg-surface-hover hover:bg-border rounded-lg transition-colors border border-border-strong focus:outline-none focus:ring-2 focus:ring-primary/50"
 		>
 			Cancel
 		</button>

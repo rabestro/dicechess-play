@@ -1,23 +1,48 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { playWithBotStore as store } from '$lib/playWithBot';
 	import Board from '../../components/Board.svelte';
 	import MoveHistory from '../../components/MoveHistory.svelte';
 	import PawnPromotionSelector from '../../components/PawnPromotionSelector.svelte';
+	import PlayerStrip from '../../components/PlayerStrip.svelte';
+	import DicePanel from '../../components/DicePanel.svelte';
+	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { flushOutbox } from '$lib/ingest/outbox';
-	import { getPieceImage } from '$lib/utils/getPieceImage';
 	import { BOTS } from '$lib/bots';
 
 	const COLORS = ['white', 'black', 'random'] as const;
 
 	let selectedAlgo = $state('greedy');
 	let selectedColor = $state<(typeof COLORS)[number]>('white');
-	let activeMobileTab = $state<'board' | 'history'>('board');
+	let showHistory = $state(false);
+	let confirmResign = $state(false);
 
 	const inLobby = $derived(store.gameStatus === 'idle');
 	const isOver = $derived(
 		store.gameStatus === 'victory' || store.gameStatus === 'defeat' || store.gameStatus === 'draw',
 	);
+	const bot = $derived(BOTS.find((b) => b.id === selectedAlgo));
+	const yourColorName = $derived(store.playerColor === 'w' ? 'white' : 'black');
+	const botColorName = $derived(store.playerColor === 'w' ? 'black' : 'white');
+	const botActive = $derived(!isOver && store.activeColor !== store.playerColor);
+	const youActive = $derived(!isOver && store.activeColor === store.playerColor);
+
+	// The board is the primary element: hide the app chrome while a game is on screen.
+	$effect(() => {
+		chromeStore.zen = !inLobby;
+		return () => {
+			chromeStore.zen = false;
+		};
+	});
+
+	// Reset transient panel state whenever a new game starts.
+	$effect(() => {
+		if (inLobby) {
+			showHistory = false;
+			confirmResign = false;
+		}
+	});
 
 	// Flush finished games to the ingest gateway exactly once per game. `flushed` is a
 	// plain (non-reactive) flag so this effect depends only on gameStatus.
@@ -38,7 +63,50 @@
 		// Retry games left pending from a previous session.
 		void flushOutbox();
 	});
+
+	function resign() {
+		if (!confirmResign) {
+			confirmResign = true;
+			setTimeout(() => (confirmResign = false), 3000);
+			return;
+		}
+		confirmResign = false;
+		store.resignGame();
+	}
 </script>
+
+{#snippet iconBtn(kind: 'back' | 'list' | 'flag')}
+	<svg
+		viewBox="0 0 24 24"
+		class="h-[17px] w-[17px]"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.8"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
+	>
+		{#if kind === 'back'}
+			<path d="M19 12H6M11 6l-6 6 6 6" />
+		{:else if kind === 'list'}
+			<path d="M9 6h11M9 12h11M9 18h11" /><circle
+				cx="5"
+				cy="6"
+				r="1.2"
+				fill="currentColor"
+				stroke="none"
+			/><circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none" /><circle
+				cx="5"
+				cy="18"
+				r="1.2"
+				fill="currentColor"
+				stroke="none"
+			/>
+		{:else}
+			<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
+		{/if}
+	</svg>
+{/snippet}
 
 {#if inLobby}
 	<section class="max-w-md mx-auto flex flex-col gap-6">
@@ -46,17 +114,17 @@
 
 		<div class="flex flex-col gap-2">
 			<span class="text-sm font-bold text-content-muted">Opponent</span>
-			{#each BOTS as bot (bot.id)}
+			{#each BOTS as b (b.id)}
 				<button
 					type="button"
-					onclick={() => (selectedAlgo = bot.id)}
+					onclick={() => (selectedAlgo = b.id)}
 					class="flex items-center justify-between px-4 py-3 rounded-lg border transition-colors {selectedAlgo ===
-					bot.id
+					b.id
 						? 'border-primary bg-primary/10 text-content'
 						: 'border-border bg-surface text-content-muted hover:text-content'}"
 				>
-					<span class="font-bold">{bot.label}</span>
-					<span class="text-xs text-content-muted">Level {bot.level}</span>
+					<span class="font-bold">{b.label}</span>
+					<span class="text-xs text-content-muted">Level {b.level}</span>
 				</button>
 			{/each}
 		</div>
@@ -88,54 +156,33 @@
 		</button>
 	</section>
 {:else}
-	<section
-		class="flex flex-col lg:flex-row gap-6 items-center lg:items-start justify-center w-full"
-	>
-		<!-- Left Column: History (Desktop Only) -->
-		<aside
-			class="hidden lg:block w-72 shrink-0 lg:sticky lg:top-24 h-[calc(100dvh_-_240px)] max-h-[560px]"
+	<section class="w-full">
+		<div
+			class="flex flex-col gap-2.5 lg:grid lg:items-start lg:gap-4 {showHistory
+				? 'lg:grid-cols-[240px_minmax(0,1fr)_280px]'
+				: 'lg:grid-cols-[minmax(0,1fr)_280px]'}"
 		>
-			<MoveHistory
-				historyBlocks={store.historyBlocks}
-				currentMoveIndex={store.currentMoveIndex}
-				maxMoveIndex={store.maxMoveIndex}
-				onSetMove={(i) => store.setMoveIndex(i)}
-			/>
-		</aside>
+			{#if showHistory}
+				<aside
+					class="order-6 h-[320px] lg:sticky lg:top-4 lg:order-none lg:col-start-1 lg:row-start-1 lg:h-[calc(100dvh-2rem)] lg:max-h-[720px]"
+				>
+					<MoveHistory
+						historyBlocks={store.historyBlocks}
+						currentMoveIndex={store.currentMoveIndex}
+						maxMoveIndex={store.maxMoveIndex}
+						onSetMove={(i) => store.setMoveIndex(i)}
+					/>
+				</aside>
+			{/if}
 
-		<!-- Center Column: Board + Mobile Dice + Controls -->
-		<div class="flex-1 w-full max-w-[560px] flex flex-col gap-4 items-center">
-			<!-- Mobile tab switcher -->
+			<!-- Board — the hero. Relative wrapper so the promotion overlay covers it. -->
 			<div
-				class="flex lg:hidden w-full bg-surface border border-border rounded-xl p-1 gap-1 shadow-md"
+				class="order-2 flex min-w-0 justify-center lg:order-none lg:row-start-1 {showHistory
+					? 'lg:col-start-2'
+					: 'lg:col-start-1'}"
 			>
-				<button
-					type="button"
-					onclick={() => (activeMobileTab = 'board')}
-					class="flex-1 py-2 rounded-lg font-bold text-sm transition-colors {activeMobileTab ===
-					'board'
-						? 'bg-primary text-primary-content shadow'
-						: 'text-content-muted hover:text-content'}"
-				>
-					Board
-				</button>
-				<button
-					type="button"
-					onclick={() => (activeMobileTab = 'history')}
-					class="flex-1 py-2 rounded-lg font-bold text-sm transition-colors {activeMobileTab ===
-					'history'
-						? 'bg-primary text-primary-content shadow'
-						: 'text-content-muted hover:text-content'}"
-				>
-					History ({store.currentMoveIndex}/{store.maxMoveIndex})
-				</button>
-			</div>
-
-			<!-- Main Board or Mobile History -->
-			{#if activeMobileTab === 'board'}
-				<!-- Relative wrapper so the promotion overlay covers the board perfectly. -->
 				<div
-					class="relative w-full max-w-[560px] lg:max-w-[min(560px,calc(100dvh_-_240px))] mx-auto aspect-square"
+					class="relative w-full max-w-[560px] lg:max-w-[min(640px,calc(100dvh-7rem))] aspect-square"
 				>
 					<Board {store} />
 					{#if store.pendingPromotion}
@@ -147,58 +194,70 @@
 						/>
 					{/if}
 				</div>
+			</div>
 
-				<!-- Mobile Dice Bar (hidden on lg) -->
-				<div
-					class="flex lg:hidden items-center justify-center gap-3 w-full min-h-20 bg-surface/50 border border-border rounded-2xl p-3 shadow-lg"
-				>
-					{#if store.currentDice.length > 0}
-						<div class="flex items-center gap-2.5" aria-label="Dice">
-							{#each store.currentDice as d, i (i)}
-								<div
-									class="relative w-14 h-14 md:w-16 md:h-16 rounded-xl bg-dice-surface border border-border flex items-center justify-center transition-all duration-300
-										{d.used ? 'opacity-30 grayscale scale-95' : 'scale-100 shadow-md ring-1 ring-border-strong'}
-										{store.isAnimatingRoll ? 'animate-[spin_0.3s_linear_infinite] opacity-80' : ''}"
-								>
-									<img
-										src={getPieceImage(d.value)}
-										alt={d.value}
-										class="w-10 h-10 md:w-12 md:h-12 drop-shadow-md select-none pointer-events-none"
-									/>
-								</div>
-							{/each}
-						</div>
-					{:else}
-						<div class="flex items-center gap-2.5" aria-label="Dice">
-							{#each Array(3) as _, i (i)}
-								<div
-									class="w-14 h-14 md:w-16 md:h-16 rounded-xl border border-border flex items-center justify-center opacity-30"
-								>
-									<span class="text-content-muted font-sans text-sm">-</span>
-								</div>
-							{/each}
-						</div>
-					{/if}
-
-					{#if store.canUserRoll}
+			<!-- Rail: actions, players, dice. On mobile its children interleave around the board. -->
+			<div
+				class="contents lg:sticky lg:top-4 lg:row-start-1 lg:flex lg:flex-col lg:gap-2.5 lg:self-stretch lg:[max-height:calc(100dvh-2rem)] {showHistory
+					? 'lg:col-start-3'
+					: 'lg:col-start-2'}"
+			>
+				<div class="order-1 flex items-center gap-1.5 lg:order-none">
+					<a
+						href={resolve('/')}
+						aria-label="Leave game"
+						title="Leave"
+						class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-content-muted transition-colors hover:border-border-strong hover:text-content"
+					>
+						{@render iconBtn('back')}
+					</a>
+					<button
+						type="button"
+						onclick={() => (showHistory = !showHistory)}
+						aria-label="Move history"
+						aria-pressed={showHistory}
+						title="Moves"
+						class="flex h-8 w-8 items-center justify-center rounded-lg border transition-colors {showHistory
+							? 'border-primary bg-primary/10 text-content'
+							: 'border-border bg-surface text-content-muted hover:border-border-strong hover:text-content'}"
+					>
+						{@render iconBtn('list')}
+					</button>
+					{#if !isOver}
 						<button
 							type="button"
-							onclick={() => store.rollDice()}
-							class="px-5 py-2 rounded-lg bg-primary text-primary-content font-bold hover:bg-primary-hover transition-colors shadow-md hover:scale-105 active:scale-95"
+							onclick={resign}
+							aria-label="Resign"
+							title="Resign"
+							class="flex h-8 items-center justify-center gap-1.5 rounded-lg border transition-colors {confirmResign
+								? 'border-danger/50 bg-danger/15 px-2.5 text-xs font-bold text-danger'
+								: 'w-8 border-border bg-surface text-content-muted hover:border-danger/50 hover:text-danger'}"
 						>
-							Roll
+							{@render iconBtn('flag')}
+							{#if confirmResign}Resign?{/if}
 						</button>
 					{/if}
-
-					{#if store.gameStatus === 'bot_thinking'}
-						<span class="text-sm text-content-muted italic">Bot is thinking…</span>
-					{/if}
+					<span
+						class="ml-auto rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-bold text-content-muted"
+					>
+						{bot?.label ?? 'Bot'} · lvl {bot?.level ?? '?'}
+					</span>
 				</div>
 
-				<!-- Status / Game Controls -->
+				<div class="order-1 lg:order-none">
+					<PlayerStrip
+						name={bot?.label ?? 'Bot'}
+						sub="bot · {botColorName}"
+						active={botActive}
+						thinking={store.gameStatus === 'bot_thinking'}
+					/>
+				</div>
+
 				{#if isOver}
-					<div class="flex flex-col items-center gap-3 py-2">
-						<p class="text-xl font-bold text-content">
+					<div
+						class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 lg:order-none lg:flex-1 lg:justify-center"
+					>
+						<p class="text-lg font-bold text-content">
 							{#if store.gameStatus === 'victory'}You won! 🎉
 							{:else if store.gameStatus === 'defeat'}You lost.
 							{:else}Draw.{/if}
@@ -206,84 +265,33 @@
 						<button
 							type="button"
 							onclick={() => store.startNewGame(selectedColor, selectedAlgo)}
-							class="px-5 py-2 rounded-lg bg-primary text-primary-content font-bold hover:bg-primary-hover transition-colors shadow-md"
+							class="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
 						>
 							New game
 						</button>
+						<button
+							type="button"
+							onclick={() => store.endSession()}
+							class="text-sm text-content-muted underline transition-colors hover:text-content"
+						>
+							Change opponent
+						</button>
 					</div>
 				{:else}
-					<button
-						type="button"
-						onclick={() => store.resignGame()}
-						class="text-sm text-content-muted hover:text-content underline py-1"
-					>
-						Resign
-					</button>
+					<div class="order-4 lg:order-none lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+						<DicePanel
+							dice={store.currentDice}
+							animating={store.isAnimatingRoll}
+							canRoll={store.canUserRoll}
+							onRoll={() => store.rollDice()}
+						/>
+					</div>
 				{/if}
-			{:else}
-				<!-- Mobile History Tab -->
-				<div class="w-full h-[500px] max-h-[70dvh]">
-					<MoveHistory
-						historyBlocks={store.historyBlocks}
-						currentMoveIndex={store.currentMoveIndex}
-						maxMoveIndex={store.maxMoveIndex}
-						onSetMove={(i) => store.setMoveIndex(i)}
-					/>
+
+				<div class="order-3 lg:order-none">
+					<PlayerStrip name="You" sub="guest · {yourColorName}" active={youActive} />
 				</div>
-			{/if}
+			</div>
 		</div>
-
-		<!-- Right Column: Dice Box (Desktop Only) -->
-		<aside
-			class="hidden lg:flex flex-col items-center justify-between w-40 bg-surface border border-border rounded-2xl p-5 shadow-2xl shrink-0 lg:sticky lg:top-24 h-[calc(100dvh_-_240px)] max-h-[560px]"
-		>
-			<div class="flex flex-col items-center gap-1 w-full pb-3 border-b border-border text-center">
-				<h3 class="text-content font-extrabold uppercase tracking-[0.2em] text-sm">Active Dice</h3>
-				<p class="text-[10px] text-content-muted font-mono">Roll & move</p>
-			</div>
-
-			<div class="flex-1 flex flex-col items-center justify-center gap-5 my-4 w-full">
-				{#if store.currentDice.length > 0}
-					{#each store.currentDice as d, i (i)}
-						<div
-							class="relative w-16 h-16 rounded-2xl bg-dice-surface border border-border flex items-center justify-center transition-all duration-300
-								{d.used ? 'opacity-30 grayscale scale-95' : 'scale-100 shadow-xl ring-2 ring-primary/40'}
-								{store.isAnimatingRoll ? 'animate-[spin_0.3s_linear_infinite] opacity-80' : ''}"
-						>
-							<img
-								src={getPieceImage(d.value)}
-								alt={d.value}
-								class="w-12 h-12 drop-shadow-lg select-none pointer-events-none"
-							/>
-						</div>
-					{/each}
-				{:else}
-					{#each Array(3) as _, i (i)}
-						<div
-							class="w-16 h-16 rounded-2xl border border-border flex items-center justify-center opacity-30"
-						>
-							<span class="text-content-muted font-sans text-sm">-</span>
-						</div>
-					{/each}
-				{/if}
-			</div>
-
-			<div class="w-full pt-3 border-t border-border flex flex-col items-center gap-2">
-				{#if store.canUserRoll}
-					<button
-						type="button"
-						onclick={() => store.rollDice()}
-						class="w-full py-3 rounded-xl bg-primary text-primary-content font-bold hover:bg-primary-hover transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-wider text-sm"
-					>
-						Roll
-					</button>
-				{/if}
-				{#if store.gameStatus === 'bot_thinking'}
-					<span class="text-xs text-content-muted italic font-mono animate-pulse"
-						>Bot thinking…</span
-					>
-				{/if}
-			</div>
-		</aside>
 	</section>
 {/if}
