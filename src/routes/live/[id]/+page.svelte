@@ -2,23 +2,36 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Board from '../../../components/Board.svelte';
-	import LiveClock from '../../../components/LiveClock.svelte';
 	import PawnPromotionSelector from '../../../components/PawnPromotionSelector.svelte';
-	import { getPieceImage } from '$lib/utils/getPieceImage';
+	import PlayerStrip from '../../../components/PlayerStrip.svelte';
+	import DicePanel from '../../../components/DicePanel.svelte';
+	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { LiveGameStore } from '$lib/live/liveGameStore.svelte';
 	import { parseSeat } from '$lib/live/seatLink';
 	import type { Seat } from '$lib/live/liveTypes';
 
 	const live = new LiveGameStore();
 
+	let confirmResign = $state(false);
+
 	// Board is shown from the player's side (white for spectators), so the opponent's clock sits on top.
 	const bottomSeat = $derived<Seat>(live.playerColor === 'b' ? 'Black' : 'White');
 	const topSeat = $derived<Seat>(bottomSeat === 'White' ? 'Black' : 'White');
-	const clockMs = (seat: Seat): number =>
-		seat === 'White' ? live.whiteClockMs : live.blackClockMs;
+	const clockMs = (seat: Seat): number | undefined =>
+		live.hasClocks ? (seat === 'White' ? live.whiteClockMs : live.blackClockMs) : undefined;
 	const isTicking = (seat: Seat): boolean => live.tickingClockSeat === seat;
-	const clockLabel = (seat: Seat): string =>
+	const seatName = (seat: Seat): string =>
 		live.spectator ? seat : seat === bottomSeat ? 'You' : 'Opponent';
+	const seatSub = (seat: Seat): string =>
+		`${live.spectator ? 'live' : 'guest'} · ${seat.toLowerCase()}`;
+
+	// The board is the primary element: hide the app chrome while on the live board.
+	$effect(() => {
+		chromeStore.zen = true;
+		return () => {
+			chromeStore.zen = false;
+		};
+	});
 
 	// (Re)connect when the game id changes; tear the socket down on teardown/navigation.
 	$effect(() => {
@@ -53,72 +66,141 @@
 				return live.winner ? `${live.winner} won.` : 'Game over.';
 		}
 	});
+
+	let resignTimeout: ReturnType<typeof setTimeout> | undefined;
+
+	function resign() {
+		if (!confirmResign) {
+			confirmResign = true;
+			resignTimeout = setTimeout(() => (confirmResign = false), 3000);
+			return;
+		}
+		clearTimeout(resignTimeout);
+		confirmResign = false;
+		live.resign();
+	}
+
+	$effect(() => () => clearTimeout(resignTimeout));
 </script>
 
-<section class="flex flex-col items-center gap-4 w-full max-w-[560px] mx-auto">
-	{#if live.hasClocks}
-		<LiveClock ms={clockMs(topSeat)} active={isTicking(topSeat)} label={clockLabel(topSeat)} />
-	{/if}
-
-	<!-- Relative wrapper so the promotion overlay covers the board. -->
-	<div class="relative w-full aspect-square">
-		<Board store={live} />
-		{#if live.pendingPromotion}
-			<PawnPromotionSelector
-				color={live.pendingPromotion.color}
-				availablePieces={live.pendingPromotion.availablePieces}
-				onSelect={(p) => live.completePromotion(p)}
-				onCancel={() => live.cancelPromotion()}
-			/>
-		{/if}
-	</div>
-
-	{#if live.hasClocks}
-		<LiveClock
-			ms={clockMs(bottomSeat)}
-			active={isTicking(bottomSeat)}
-			label={clockLabel(bottomSeat)}
-		/>
-	{/if}
-
-	<!-- Dice bar -->
-	<div
-		class="flex items-center justify-center gap-3 w-full min-h-20 bg-surface/50 border border-border rounded-2xl p-3 shadow-lg"
+{#snippet iconBtn(kind: 'back' | 'flag')}
+	<svg
+		viewBox="0 0 24 24"
+		class="h-[17px] w-[17px]"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.8"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
 	>
-		{#if live.currentDice.length > 0}
-			<div class="flex items-center gap-2.5" aria-label="Dice">
-				{#each live.currentDice as d, i (i)}
-					<div
-						class="relative w-14 h-14 rounded-xl bg-dice-surface border border-border flex items-center justify-center transition-all duration-300
-							{d.used ? 'opacity-30 grayscale scale-95' : 'scale-100 shadow-md ring-1 ring-border-strong'}"
-					>
-						<img
-							src={getPieceImage(d.value)}
-							alt={d.value}
-							class="w-10 h-10 drop-shadow-md select-none pointer-events-none"
-						/>
-					</div>
-				{/each}
-			</div>
+		{#if kind === 'back'}
+			<path d="M19 12H6M11 6l-6 6 6 6" />
 		{:else}
-			<span class="text-content-muted text-sm">{statusText}</span>
+			<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
 		{/if}
+	</svg>
+{/snippet}
+
+<section class="w-full">
+	<div
+		class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-3 lg:gap-4"
+	>
+		<!-- Board column — the hero. Player strips sit above and below the board and share
+		     its width; the board is width-capped by the column and height-capped by the
+		     screen minus the strips. -->
+		<div class="order-2 flex min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1">
+			<div
+				class="flex w-full max-w-[min(560px,calc(100dvh-10rem))] flex-col gap-2.5 md:max-w-[calc(100dvh-11rem)]"
+			>
+				<PlayerStrip
+					name={seatName(topSeat)}
+					sub={seatSub(topSeat)}
+					active={isTicking(topSeat)}
+					clockMs={clockMs(topSeat)}
+				/>
+
+				<!-- Relative wrapper so the promotion overlay covers the board. -->
+				<div class="relative w-full aspect-square">
+					<Board store={live} />
+					{#if live.pendingPromotion}
+						<PawnPromotionSelector
+							color={live.pendingPromotion.color}
+							availablePieces={live.pendingPromotion.availablePieces}
+							onSelect={(p) => live.completePromotion(p)}
+							onCancel={() => live.cancelPromotion()}
+						/>
+					{/if}
+				</div>
+
+				<PlayerStrip
+					name={seatName(bottomSeat)}
+					sub={seatSub(bottomSeat)}
+					active={isTicking(bottomSeat)}
+					clockMs={clockMs(bottomSeat)}
+				/>
+			</div>
+		</div>
+
+		<!-- Rail: actions, players, dice. On mobile its children interleave around the board. -->
+		<div
+			class="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:flex md:flex-col md:gap-2.5 md:self-stretch md:[max-height:calc(100dvh-2rem)]"
+		>
+			<div class="order-1 flex items-center gap-1.5 md:order-none">
+				<a
+					href={resolve('/live')}
+					aria-label="Leave game"
+					title="Leave"
+					class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-content-muted transition-colors hover:border-border-strong hover:text-content"
+				>
+					{@render iconBtn('back')}
+				</a>
+				{#if live.canResign}
+					<button
+						type="button"
+						onclick={resign}
+						aria-label={confirmResign ? 'Click again to confirm resignation' : 'Resign'}
+						title="Resign"
+						class="flex h-8 items-center justify-center gap-1.5 rounded-lg border transition-colors {confirmResign
+							? 'border-danger/50 bg-danger/15 px-2.5 text-xs font-bold text-danger'
+							: 'w-8 border-border bg-surface text-content-muted hover:border-danger/50 hover:text-danger'}"
+					>
+						{@render iconBtn('flag')}
+						{#if confirmResign}Resign?{/if}
+					</button>
+				{/if}
+				{#if live.spectator}
+					<span
+						class="ml-auto rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-bold text-content-muted"
+					>
+						Spectating
+					</span>
+				{/if}
+			</div>
+
+			{#if live.gameStatus === 'over'}
+				<div
+					class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 md:order-none md:flex-1 md:justify-center"
+				>
+					<p class="text-lg font-bold text-content">{statusText}</p>
+					{#if live.termination}
+						<p class="text-sm text-content-muted">by {live.termination}</p>
+					{/if}
+					<a
+						href={resolve('/live')}
+						class="w-full rounded-xl bg-primary py-2.5 text-center font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
+					>
+						New game
+					</a>
+				</div>
+			{:else}
+				<div class="order-4 md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col">
+					<DicePanel
+						dice={live.currentDice}
+						emptyText={live.currentDice.length === 0 ? statusText : undefined}
+					/>
+				</div>
+			{/if}
+		</div>
 	</div>
-
-	<p class="text-lg font-bold text-content">{statusText}</p>
-
-	{#if live.gameStatus === 'over'}
-		{#if live.termination}<p class="text-sm text-content-muted">by {live.termination}</p>{/if}
-		<a href={resolve('/live')} class="text-sm text-content-muted hover:text-content underline"
-			>New game</a
-		>
-	{:else if live.canResign}
-		<button
-			type="button"
-			onclick={() => live.resign()}
-			class="text-sm text-content-muted hover:text-content underline py-1"
-		>
-			Resign
-		</button>
-	{/if}
 </section>
