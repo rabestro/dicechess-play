@@ -101,21 +101,39 @@
 	<div
 		class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-3 lg:gap-4"
 	>
-		<!-- Board — the hero. It scales with the viewport: width-capped by its column,
-		     height-capped by the screen (lichess-style). -->
+		<!-- Board column — the hero. Player strips sit above and below the board and share
+		     its width; the board is width-capped by the column and height-capped by the
+		     screen minus the strips. -->
 		<div class="order-2 flex min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1">
 			<div
-				class="relative w-full max-w-[min(560px,calc(100dvh-2rem))] md:max-w-[calc(100dvh-3.5rem)] aspect-square"
+				class="flex w-full max-w-[min(560px,calc(100dvh-10rem))] flex-col gap-2.5 md:max-w-[calc(100dvh-11rem)]"
 			>
-				<Board store={live} />
-				{#if live.pendingPromotion}
-					<PawnPromotionSelector
-						color={live.pendingPromotion.color}
-						availablePieces={live.pendingPromotion.availablePieces}
-						onSelect={(p) => live.completePromotion(p)}
-						onCancel={() => live.cancelPromotion()}
-					/>
-				{/if}
+				<PlayerStrip
+					name={seatName(topSeat)}
+					sub={seatSub(topSeat)}
+					active={isTicking(topSeat)}
+					clockMs={clockMs(topSeat)}
+				/>
+
+				<!-- Relative wrapper so the promotion overlay covers the board. -->
+				<div class="relative w-full aspect-square">
+					<Board store={live} />
+					{#if live.pendingPromotion}
+						<PawnPromotionSelector
+							color={live.pendingPromotion.color}
+							availablePieces={live.pendingPromotion.availablePieces}
+							onSelect={(p) => live.completePromotion(p)}
+							onCancel={() => live.cancelPromotion()}
+						/>
+					{/if}
+				</div>
+
+				<PlayerStrip
+					name={seatName(bottomSeat)}
+					sub={seatSub(bottomSeat)}
+					active={isTicking(bottomSeat)}
+					clockMs={clockMs(bottomSeat)}
+				/>
 			</div>
 		</div>
 
@@ -155,15 +173,6 @@
 				{/if}
 			</div>
 
-			<div class="order-1 md:order-none">
-				<PlayerStrip
-					name={seatName(topSeat)}
-					sub={seatSub(topSeat)}
-					active={isTicking(topSeat)}
-					clockMs={clockMs(topSeat)}
-				/>
-			</div>
-
 			{#if live.gameStatus === 'over'}
 				<div
 					class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 md:order-none md:flex-1 md:justify-center"
@@ -187,15 +196,6 @@
 					/>
 				</div>
 			{/if}
-
-			<div class="order-3 md:order-none">
-				<PlayerStrip
-					name={seatName(bottomSeat)}
-					sub={seatSub(bottomSeat)}
-					active={isTicking(bottomSeat)}
-					clockMs={clockMs(bottomSeat)}
-				/>
-			</div>
 		</div>
 	</div>
 </section>

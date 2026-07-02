@@ -8,17 +8,50 @@
 	import PlayerStrip from '../../components/PlayerStrip.svelte';
 	import DicePanel from '../../components/DicePanel.svelte';
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
+	import { preferencesStore } from '$lib/preferencesStore.svelte';
 	import { flushOutbox } from '$lib/ingest/outbox';
 	import { BOTS } from '$lib/bots';
 
 	const COLORS = ['white', 'black', 'random'] as const;
 
+	/** Bot-game time controls map onto the store's minutes-limit + seconds-bonus model.
+	 * No clock first: a casual bot game shouldn't surprise anyone with a flag fall. */
+	const TIME_PRESETS: {
+		label: string;
+		group: string;
+		limit: number | null;
+		bonus: number;
+	}[] = [
+		{ label: 'No clock', group: 'Casual', limit: null, bonus: 0 },
+		{ label: '3 + 2', group: 'Blitz', limit: 3, bonus: 2 },
+		{ label: '5 min', group: 'Blitz', limit: 5, bonus: 0 },
+		{ label: '5 + 3', group: 'Blitz', limit: 5, bonus: 3 },
+		{ label: '10 min', group: 'Rapid', limit: 10, bonus: 0 },
+		{ label: '10 + 5', group: 'Rapid', limit: 10, bonus: 5 },
+		{ label: '15 + 10', group: 'Rapid', limit: 15, bonus: 10 },
+	];
+	const TIME_GROUPS = ['Casual', 'Blitz', 'Rapid'].map((g) => ({
+		label: g,
+		presets: TIME_PRESETS.map((p, index) => ({ ...p, index })).filter((p) => p.group === g),
+	}));
+
 	// Move history is on by default only where a third column fits.
 	const wideScreen = () =>
 		typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
+	// Reflect the persisted preference so a stored time control is always VISIBLE in the
+	// picker — a clock must never tick that the player didn't see coming.
+	const storedTimeIndex = () => {
+		const i = TIME_PRESETS.findIndex(
+			(p) =>
+				p.limit === preferencesStore.timeLimit && p.bonus === (preferencesStore.timeBonus ?? 0),
+		);
+		return i >= 0 ? i : 0;
+	};
+
 	let selectedAlgo = $state('greedy');
 	let selectedColor = $state<(typeof COLORS)[number]>('white');
+	let selectedTime = $state(storedTimeIndex());
 	let showHistory = $state(wideScreen());
 	let confirmResign = $state(false);
 
@@ -31,6 +64,15 @@
 	const botColorName = $derived(store.playerColor === 'w' ? 'black' : 'white');
 	const botActive = $derived(!isOver && store.activeColor !== store.playerColor);
 	const youActive = $derived(!isOver && store.activeColor === store.playerColor);
+	const hasClocks = $derived(store.timeLimit !== null);
+	const timeLabel = $derived(TIME_PRESETS[selectedTime]?.label ?? 'No clock');
+
+	function startGame() {
+		const t = TIME_PRESETS[selectedTime];
+		preferencesStore.setTimeLimit(t.limit);
+		preferencesStore.setTimeBonus(t.bonus);
+		store.startNewGame(selectedColor, selectedAlgo);
+	}
 
 	// The board is the primary element: hide the app chrome while a game is on screen.
 	$effect(() => {
@@ -151,9 +193,39 @@
 			</div>
 		</div>
 
+		<fieldset class="flex flex-col gap-3">
+			<legend class="text-sm font-bold text-content-muted pb-2">Time control</legend>
+			{#each TIME_GROUPS as g (g.label)}
+				<div class="flex flex-col gap-1.5">
+					<span class="text-[10px] font-bold tracking-widest text-content-muted/80 uppercase">
+						{g.label}
+					</span>
+					<div class="flex flex-wrap gap-2">
+						{#each g.presets as p (p.label)}
+							<label
+								class="cursor-pointer rounded-lg border px-3 py-1.5 text-sm font-bold tabular-nums transition-colors focus-within:ring-2 focus-within:ring-primary/50
+									{selectedTime === p.index
+									? 'border-primary bg-primary text-primary-content'
+									: 'border-border bg-surface text-content-muted hover:text-content'}"
+							>
+								<input
+									type="radio"
+									name="botTimeControl"
+									value={p.index}
+									bind:group={selectedTime}
+									class="sr-only"
+								/>
+								{p.label}
+							</label>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</fieldset>
+
 		<button
 			type="button"
-			onclick={() => store.startNewGame(selectedColor, selectedAlgo)}
+			onclick={startGame}
 			class="px-6 py-3 rounded-xl bg-primary text-primary-content font-bold text-lg shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors"
 		>
 			Start game
@@ -163,7 +235,7 @@
 	<section class="w-full">
 		<div
 			class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-3 lg:gap-4 {showHistory
-				? 'lg:grid-cols-[240px_minmax(0,1fr)_280px]'
+				? 'lg:grid-cols-[300px_minmax(0,1fr)_280px]'
 				: ''}"
 		>
 			{#if showHistory}
@@ -179,29 +251,48 @@
 				</aside>
 			{/if}
 
-			<!-- Board — the hero. It scales with the viewport: width-capped by its column,
-			     height-capped by the screen (lichess-style). -->
+			<!-- Board column — the hero. Player strips sit above and below the board and share
+			     its width; the board is width-capped by the column and height-capped by the
+			     screen minus the strips. -->
 			<div
 				class="order-2 flex min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1 {showHistory
 					? 'lg:col-start-2'
 					: ''}"
 			>
 				<div
-					class="relative w-full max-w-[min(560px,calc(100dvh-2rem))] md:max-w-[calc(100dvh-3.5rem)] aspect-square"
+					class="flex w-full max-w-[min(560px,calc(100dvh-10rem))] flex-col gap-2.5 md:max-w-[calc(100dvh-11rem)]"
 				>
-					<Board {store} />
-					{#if store.pendingPromotion}
-						<PawnPromotionSelector
-							color={store.pendingPromotion.color}
-							availablePieces={store.pendingPromotion.availablePieces}
-							onSelect={(p) => store.completePromotion(p)}
-							onCancel={() => store.cancelPromotion()}
-						/>
-					{/if}
+					<PlayerStrip
+						name={bot?.label ?? 'Bot'}
+						sub="bot · {botColorName}"
+						active={botActive}
+						thinking={store.gameStatus === 'bot_thinking'}
+						clockMs={hasClocks ? store.botTimeLeft : undefined}
+					/>
+
+					<!-- Relative wrapper so the promotion overlay covers the board. -->
+					<div class="relative w-full aspect-square">
+						<Board {store} />
+						{#if store.pendingPromotion}
+							<PawnPromotionSelector
+								color={store.pendingPromotion.color}
+								availablePieces={store.pendingPromotion.availablePieces}
+								onSelect={(p) => store.completePromotion(p)}
+								onCancel={() => store.cancelPromotion()}
+							/>
+						{/if}
+					</div>
+
+					<PlayerStrip
+						name="You"
+						sub="guest · {yourColorName}"
+						active={youActive}
+						clockMs={hasClocks ? store.playerTimeLeft : undefined}
+					/>
 				</div>
 			</div>
 
-			<!-- Rail: actions, players, dice. On mobile its children interleave around the board. -->
+			<!-- Rail: actions and dice. -->
 			<div
 				class="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:flex md:flex-col md:gap-2.5 md:self-stretch md:[max-height:calc(100dvh-2rem)] {showHistory
 					? 'lg:col-start-3'
@@ -243,19 +334,10 @@
 						</button>
 					{/if}
 					<span
-						class="ml-auto rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-bold text-content-muted"
+						class="ml-auto truncate rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-bold text-content-muted"
 					>
-						{bot?.label ?? 'Bot'} · lvl {bot?.level ?? '?'}
+						{bot?.label ?? 'Bot'} · lvl {bot?.level ?? '?'}{hasClocks ? ` · ${timeLabel}` : ''}
 					</span>
-				</div>
-
-				<div class="order-1 md:order-none">
-					<PlayerStrip
-						name={bot?.label ?? 'Bot'}
-						sub="bot · {botColorName}"
-						active={botActive}
-						thinking={store.gameStatus === 'bot_thinking'}
-					/>
 				</div>
 
 				{#if isOver}
@@ -267,9 +349,12 @@
 							{:else if store.gameStatus === 'defeat'}You lost.
 							{:else}Draw.{/if}
 						</p>
+						{#if store.gameEndReason === 'timeout'}
+							<p class="text-sm text-content-muted">on time</p>
+						{/if}
 						<button
 							type="button"
-							onclick={() => store.startNewGame(selectedColor, selectedAlgo)}
+							onclick={startGame}
 							class="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
 						>
 							New game
@@ -292,10 +377,6 @@
 						/>
 					</div>
 				{/if}
-
-				<div class="order-3 md:order-none">
-					<PlayerStrip name="You" sub="guest · {yourColorName}" active={youActive} />
-				</div>
 			</div>
 		</div>
 	</section>
