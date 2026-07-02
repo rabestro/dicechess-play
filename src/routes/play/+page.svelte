@@ -71,6 +71,9 @@
 		const t = TIME_PRESETS[selectedTime];
 		preferencesStore.setTimeLimit(t.limit);
 		preferencesStore.setTimeBonus(t.bonus);
+		// Rolling is not a decision in dice chess — the play site always auto-rolls,
+		// so the dice panel never needs a Roll button.
+		preferencesStore.setAutoRollDice(true);
 		store.startNewGame(selectedColor, selectedAlgo);
 	}
 
@@ -239,8 +242,10 @@
 				: ''}"
 		>
 			{#if showHistory}
+				<!-- On phones the history acts as a tab: it takes the board's slot and the
+				     board/dice hide. From md up it is an extra panel alongside the game. -->
 				<aside
-					class="order-6 h-[320px] md:order-none md:col-span-2 md:row-start-2 lg:sticky lg:top-4 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:h-[calc(100dvh-2rem)]"
+					class="order-2 h-[70dvh] md:order-none md:col-span-2 md:row-start-2 md:h-[320px] lg:sticky lg:top-4 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:h-[calc(100dvh-2rem)]"
 				>
 					<MoveHistory
 						historyBlocks={store.historyBlocks}
@@ -255,9 +260,9 @@
 			     its width; the board is width-capped by the column and height-capped by the
 			     screen minus the strips. -->
 			<div
-				class="order-2 flex min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1 {showHistory
-					? 'lg:col-start-2'
-					: ''}"
+				class="order-2 min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1 {showHistory
+					? 'hidden md:flex lg:col-start-2'
+					: 'flex'}"
 			>
 				<div
 					class="flex w-full max-w-[min(560px,calc(100dvh-10rem))] flex-col gap-2.5 md:max-w-[calc(100dvh-11rem)]"
@@ -342,7 +347,9 @@
 
 				{#if isOver}
 					<div
-						class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 md:order-none md:flex-1 md:justify-center"
+						class="order-4 flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 md:order-none md:flex-1 md:justify-center {showHistory
+							? 'hidden md:flex'
+							: 'flex'}"
 					>
 						<p class="text-lg font-bold text-content">
 							{#if store.gameStatus === 'victory'}You won! 🎉
@@ -368,11 +375,15 @@
 						</button>
 					</div>
 				{:else}
-					<div class="order-4 md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col">
+					<div
+						class="order-4 md:order-none md:min-h-0 md:flex-1 md:flex-col {showHistory
+							? 'hidden md:flex'
+							: 'md:flex'}"
+					>
 						<DicePanel
 							dice={store.currentDice}
 							animating={store.isAnimatingRoll}
-							canRoll={store.canUserRoll}
+							canRoll={store.canUserRoll && !preferencesStore.autoRollDice}
 							onRoll={() => store.rollDice()}
 						/>
 					</div>
