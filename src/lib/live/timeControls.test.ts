@@ -14,7 +14,6 @@ describe('timeControlPresets', () => {
 
 	it('labels every preset consistently with timeControlLabel', () => {
 		for (const p of timeControlPresets) {
-			if (p.value === null) continue; // the Unlimited label is the picker's own wording
 			expect(timeControlLabel(p.value)).toBe(p.label);
 		}
 	});
