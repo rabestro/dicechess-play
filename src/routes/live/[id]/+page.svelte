@@ -99,12 +99,13 @@
 
 <section class="w-full">
 	<div
-		class="flex flex-col gap-2.5 lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start lg:gap-4"
+		class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-3 lg:gap-4"
 	>
-		<!-- Board — the hero. Relative wrapper so the promotion overlay covers it. -->
-		<div class="order-2 flex min-w-0 justify-center lg:order-none lg:col-start-1 lg:row-start-1">
+		<!-- Board — the hero. It scales with the viewport: width-capped by its column,
+		     height-capped by the screen (lichess-style). -->
+		<div class="order-2 flex min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1">
 			<div
-				class="relative w-full max-w-[560px] lg:max-w-[min(640px,calc(100dvh-7rem))] aspect-square"
+				class="relative w-full max-w-[min(560px,calc(100dvh-2rem))] md:max-w-[calc(100dvh-3.5rem)] aspect-square"
 			>
 				<Board store={live} />
 				{#if live.pendingPromotion}
@@ -120,9 +121,9 @@
 
 		<!-- Rail: actions, players, dice. On mobile its children interleave around the board. -->
 		<div
-			class="contents lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-2.5 lg:self-stretch lg:[max-height:calc(100dvh-2rem)]"
+			class="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:flex md:flex-col md:gap-2.5 md:self-stretch md:[max-height:calc(100dvh-2rem)]"
 		>
-			<div class="order-1 flex items-center gap-1.5 lg:order-none">
+			<div class="order-1 flex items-center gap-1.5 md:order-none">
 				<a
 					href={resolve('/live')}
 					aria-label="Leave game"
@@ -154,7 +155,7 @@
 				{/if}
 			</div>
 
-			<div class="order-1 lg:order-none">
+			<div class="order-1 md:order-none">
 				<PlayerStrip
 					name={seatName(topSeat)}
 					sub={seatSub(topSeat)}
@@ -165,7 +166,7 @@
 
 			{#if live.gameStatus === 'over'}
 				<div
-					class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 lg:order-none lg:flex-1 lg:justify-center"
+					class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 md:order-none md:flex-1 md:justify-center"
 				>
 					<p class="text-lg font-bold text-content">{statusText}</p>
 					{#if live.termination}
@@ -179,7 +180,7 @@
 					</a>
 				</div>
 			{:else}
-				<div class="order-4 lg:order-none lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+				<div class="order-4 md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col">
 					<DicePanel
 						dice={live.currentDice}
 						emptyText={live.currentDice.length === 0 ? statusText : undefined}
@@ -187,7 +188,7 @@
 				</div>
 			{/if}
 
-			<div class="order-3 lg:order-none">
+			<div class="order-3 md:order-none">
 				<PlayerStrip
 					name={seatName(bottomSeat)}
 					sub={seatSub(bottomSeat)}

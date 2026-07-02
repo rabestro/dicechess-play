@@ -125,9 +125,9 @@
 	{/if}
 
 	<main
-		class="flex-grow w-full max-w-5xl mx-auto px-3 sm:px-6 {chromeStore.zen
-			? 'py-3 sm:py-4'
-			: 'py-6 sm:py-8 pb-20 sm:pb-8'}"
+		class="flex-grow w-full mx-auto px-3 sm:px-6 {chromeStore.zen
+			? 'max-w-[1800px] py-3 sm:py-4'
+			: 'max-w-5xl py-6 sm:py-8 pb-20 sm:pb-8'}"
 	>
 		{@render children()}
 	</main>

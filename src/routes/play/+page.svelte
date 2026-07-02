@@ -13,9 +13,13 @@
 
 	const COLORS = ['white', 'black', 'random'] as const;
 
+	// Move history is on by default only where a third column fits.
+	const wideScreen = () =>
+		typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+
 	let selectedAlgo = $state('greedy');
 	let selectedColor = $state<(typeof COLORS)[number]>('white');
-	let showHistory = $state(false);
+	let showHistory = $state(wideScreen());
 	let confirmResign = $state(false);
 
 	const inLobby = $derived(store.gameStatus === 'idle');
@@ -39,7 +43,7 @@
 	// Reset transient panel state whenever a new game starts.
 	$effect(() => {
 		if (inLobby) {
-			showHistory = false;
+			showHistory = wideScreen();
 			confirmResign = false;
 		}
 	});
@@ -158,13 +162,13 @@
 {:else}
 	<section class="w-full">
 		<div
-			class="flex flex-col gap-2.5 lg:grid lg:items-start lg:gap-4 {showHistory
+			class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-3 lg:gap-4 {showHistory
 				? 'lg:grid-cols-[240px_minmax(0,1fr)_280px]'
-				: 'lg:grid-cols-[minmax(0,1fr)_280px]'}"
+				: ''}"
 		>
 			{#if showHistory}
 				<aside
-					class="order-6 h-[320px] lg:sticky lg:top-4 lg:order-none lg:col-start-1 lg:row-start-1 lg:h-[calc(100dvh-2rem)] lg:max-h-[720px]"
+					class="order-6 h-[320px] md:order-none md:col-span-2 md:row-start-2 lg:sticky lg:top-4 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:h-[calc(100dvh-2rem)]"
 				>
 					<MoveHistory
 						historyBlocks={store.historyBlocks}
@@ -175,14 +179,15 @@
 				</aside>
 			{/if}
 
-			<!-- Board — the hero. Relative wrapper so the promotion overlay covers it. -->
+			<!-- Board — the hero. It scales with the viewport: width-capped by its column,
+			     height-capped by the screen (lichess-style). -->
 			<div
-				class="order-2 flex min-w-0 justify-center lg:order-none lg:row-start-1 {showHistory
+				class="order-2 flex min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1 {showHistory
 					? 'lg:col-start-2'
-					: 'lg:col-start-1'}"
+					: ''}"
 			>
 				<div
-					class="relative w-full max-w-[560px] lg:max-w-[min(640px,calc(100dvh-7rem))] aspect-square"
+					class="relative w-full max-w-[min(560px,calc(100dvh-2rem))] md:max-w-[calc(100dvh-3.5rem)] aspect-square"
 				>
 					<Board {store} />
 					{#if store.pendingPromotion}
@@ -198,11 +203,11 @@
 
 			<!-- Rail: actions, players, dice. On mobile its children interleave around the board. -->
 			<div
-				class="contents lg:sticky lg:top-4 lg:row-start-1 lg:flex lg:flex-col lg:gap-2.5 lg:self-stretch lg:[max-height:calc(100dvh-2rem)] {showHistory
+				class="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:flex md:flex-col md:gap-2.5 md:self-stretch md:[max-height:calc(100dvh-2rem)] {showHistory
 					? 'lg:col-start-3'
-					: 'lg:col-start-2'}"
+					: ''}"
 			>
-				<div class="order-1 flex items-center gap-1.5 lg:order-none">
+				<div class="order-1 flex items-center gap-1.5 md:order-none">
 					<a
 						href={resolve('/')}
 						aria-label="Leave game"
@@ -244,7 +249,7 @@
 					</span>
 				</div>
 
-				<div class="order-1 lg:order-none">
+				<div class="order-1 md:order-none">
 					<PlayerStrip
 						name={bot?.label ?? 'Bot'}
 						sub="bot · {botColorName}"
@@ -255,7 +260,7 @@
 
 				{#if isOver}
 					<div
-						class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 lg:order-none lg:flex-1 lg:justify-center"
+						class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 md:order-none md:flex-1 md:justify-center"
 					>
 						<p class="text-lg font-bold text-content">
 							{#if store.gameStatus === 'victory'}You won! 🎉
@@ -278,7 +283,7 @@
 						</button>
 					</div>
 				{:else}
-					<div class="order-4 lg:order-none lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+					<div class="order-4 md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col">
 						<DicePanel
 							dice={store.currentDice}
 							animating={store.isAnimatingRoll}
@@ -288,7 +293,7 @@
 					</div>
 				{/if}
 
-				<div class="order-3 lg:order-none">
+				<div class="order-3 md:order-none">
 					<PlayerStrip name="You" sub="guest · {yourColorName}" active={youActive} />
 				</div>
 			</div>
