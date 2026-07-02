@@ -40,6 +40,9 @@ export const timeControlGroups: readonly TimeControlGroup[] = (
 	label,
 	presets: labels.map((l) => {
 		const index = timeControlPresets.findIndex((p) => p.label === l);
+		// Fail fast at module load — a drifted label would otherwise surface later
+		// as an opaque TypeError in the picker.
+		if (index === -1) throw new Error(`timeControlGroups: no preset labelled "${l}"`);
 		return { index, preset: timeControlPresets[index] };
 	}),
 }));

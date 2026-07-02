@@ -56,7 +56,7 @@
 					? 'border-primary/50 bg-primary/15 text-content'
 					: 'border-border bg-surface-hover/50 text-content'}"
 			class:animate-pulse={active && low}
-			aria-label="{name} clock"
+			aria-label="{name} clock: {formatClock(clockMs)}"
 		>
 			{formatClock(clockMs)}
 		</span>

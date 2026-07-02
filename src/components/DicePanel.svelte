@@ -38,7 +38,7 @@
 		</div>
 	{:else}
 		<div class="flex items-center justify-center gap-3" aria-label="Dice">
-			{#each Array(3) as _, i (i)}
+			{#each [0, 1, 2] as i (i)}
 				<div class="h-14 w-14 rounded-xl border border-border opacity-30 xl:h-16 xl:w-16"></div>
 			{/each}
 		</div>

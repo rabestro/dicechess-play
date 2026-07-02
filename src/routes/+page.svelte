@@ -24,7 +24,7 @@
 	] as const;
 </script>
 
-{#snippet wayIcon(icon: string)}
+{#snippet wayIcon(icon: 'bot' | 'link' | 'users')}
 	<svg
 		viewBox="0 0 24 24"
 		class="h-6 w-6"

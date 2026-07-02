@@ -113,15 +113,20 @@
 		void flushOutbox();
 	});
 
+	let resignTimeout: ReturnType<typeof setTimeout> | undefined;
+
 	function resign() {
 		if (!confirmResign) {
 			confirmResign = true;
-			setTimeout(() => (confirmResign = false), 3000);
+			resignTimeout = setTimeout(() => (confirmResign = false), 3000);
 			return;
 		}
+		clearTimeout(resignTimeout);
 		confirmResign = false;
 		store.resignGame();
 	}
+
+	$effect(() => () => clearTimeout(resignTimeout));
 </script>
 
 {#snippet iconBtn(kind: 'back' | 'list' | 'flag')}
@@ -328,7 +333,7 @@
 						<button
 							type="button"
 							onclick={resign}
-							aria-label="Resign"
+							aria-label={confirmResign ? 'Click again to confirm resignation' : 'Resign'}
 							title="Resign"
 							class="flex h-8 items-center justify-center gap-1.5 rounded-lg border transition-colors {confirmResign
 								? 'border-danger/50 bg-danger/15 px-2.5 text-xs font-bold text-danger'
