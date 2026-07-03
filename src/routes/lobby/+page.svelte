@@ -139,7 +139,7 @@
 			<button
 				type="button"
 				onclick={() => accept(botSeek)}
-				disabled={accepting}
+				disabled={accepting || creating}
 				class="flex items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-left transition-colors hover:bg-primary/15 disabled:opacity-60"
 			>
 				<span class="flex flex-col">

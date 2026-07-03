@@ -161,6 +161,7 @@ export class LiveGameStore {
 		this.outcome = null;
 		this.winner = null;
 		this.termination = null;
+		this.players = null;
 		this.gameStatus = 'connecting';
 		this.clockBaseMs = null;
 		this.clockSince = 0;
