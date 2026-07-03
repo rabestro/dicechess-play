@@ -8,6 +8,7 @@
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { LiveGameStore } from '$lib/live/liveGameStore.svelte';
 	import { parseSeat } from '$lib/live/seatLink';
+	import { seatDisplayName, seatDisplaySub } from '$lib/live/playerLabel';
 	import type { Seat } from '$lib/live/liveTypes';
 
 	const live = new LiveGameStore();
@@ -21,9 +22,8 @@
 		live.hasClocks ? (seat === 'White' ? live.whiteClockMs : live.blackClockMs) : undefined;
 	const isTicking = (seat: Seat): boolean => live.tickingClockSeat === seat;
 	const seatName = (seat: Seat): string =>
-		live.spectator ? seat : seat === bottomSeat ? 'You' : 'Opponent';
-	const seatSub = (seat: Seat): string =>
-		`${live.spectator ? 'live' : 'guest'} · ${seat.toLowerCase()}`;
+		seatDisplayName(live.players, seat, bottomSeat, live.spectator);
+	const seatSub = (seat: Seat): string => seatDisplaySub(live.players, seat, live.spectator);
 
 	// The board is the primary element: hide the app chrome while on the live board.
 	$effect(() => {

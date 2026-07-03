@@ -18,7 +18,7 @@
 		{
 			path: '/lobby',
 			title: 'Open lobby',
-			sub: 'find an opponent',
+			sub: 'humans & online bots',
 			icon: 'users',
 		},
 	] as const;

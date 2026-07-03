@@ -28,6 +28,22 @@ export type TimeControl =
 	| { Fischer: { initialSeconds: number; incrementSeconds: number } }
 	| { PerMove: { secondsPerMove: number } };
 
+// Whether a participant is a human or a bot — the public taxonomy the lobby and boards render.
+export type PlayerKind = 'Human' | 'Bot';
+
+// The public face of a participant: bots carry their team-qualified display name; humans stay
+// anonymous (guest ids are private and never on the wire).
+export interface PublicPlayer {
+	kind: PlayerKind;
+	name: string | null;
+}
+
+// Both seats' public faces, carried on the game state.
+export interface Players {
+	white: PublicPlayer;
+	black: PublicPlayer;
+}
+
 export interface PublicGameState {
 	version: number;
 	dfen: string;
@@ -35,6 +51,8 @@ export interface PublicGameState {
 	dicePending: boolean;
 	status: GameStatusWire;
 	clocks: Clocks | null;
+	// Optional so a pre-players server still parses; the current server always sends it.
+	players?: Players | null;
 }
 
 // Server -> client events on the game WebSocket, discriminated by the (single) case-name key,
@@ -65,10 +83,13 @@ export interface CreateGameResponse {
 
 // ── Lobby / open seeks (mirror the play-api lobby DTOs) ───────────────────────
 
-/** A public open seek in the lobby. */
+/** A public open seek in the lobby. `kind`/`name` say WHO is offering (bots by name, humans anonymous). */
 export interface Seek {
 	id: string;
 	timeControl: TimeControl;
+	// Optional so a pre-identity server still parses; the current server always sends them.
+	kind?: PlayerKind;
+	name?: string | null;
 }
 
 /** Posting a seek returns its id plus the creator's capability secret (to poll status / cancel). */
