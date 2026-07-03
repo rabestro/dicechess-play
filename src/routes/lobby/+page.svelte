@@ -4,6 +4,7 @@
 	import { isLiveEnabled } from '$lib/live/liveApi';
 	import { listSeeks, createSeek, seekStatus, acceptSeek, cancelSeek } from '$lib/live/lobbyApi';
 	import { buildJoinUrl } from '$lib/live/seatLink';
+	import { seekOffer } from '$lib/live/playerLabel';
 	import { timeControlLabel, timeControlPresets } from '$lib/live/timeControls';
 	import TimeControlPicker from '../../components/TimeControlPicker.svelte';
 	import type { Seek } from '$lib/live/liveTypes';
@@ -18,6 +19,9 @@
 	let waiting = $state<{ id: string; secret: string; label: string } | null>(null);
 	let creating = $state(false);
 	let accepting = $state(false);
+
+	// The quickstart target: the first standing bot offer (the house bot keeps some open).
+	const botSeek = $derived(seeks.find((s) => s.kind === 'Bot'));
 
 	function goToBoard(gameId: string, token: string, seat: 'White' | 'Black') {
 		// Full navigation: the board page connects fresh from the seat token in the URL.
@@ -130,6 +134,23 @@
 			Cancel
 		</button>
 	{:else}
+		{#if botSeek}
+			{@const offer = seekOffer(botSeek)}
+			<button
+				type="button"
+				onclick={() => accept(botSeek)}
+				disabled={accepting}
+				class="flex items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-left transition-colors hover:bg-primary/15 disabled:opacity-60"
+			>
+				<span class="flex flex-col">
+					<span class="font-bold text-content">Play a bot now</span>
+					<span class="text-xs text-content-muted">
+						{offer.name} · {timeControlLabel(botSeek.timeControl)} · server-side, provably-fair dice
+					</span>
+				</span>
+				<span class="font-bold text-primary">→</span>
+			</button>
+		{/if}
 		<div class="flex flex-col gap-3">
 			<TimeControlPicker bind:selected />
 			<button
@@ -149,10 +170,23 @@
 			{:else}
 				<ul class="flex flex-col gap-2">
 					{#each seeks as seek (seek.id)}
+						{@const offer = seekOffer(seek)}
 						<li
 							class="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/50 px-4 py-2.5"
 						>
-							<span class="font-bold text-content">{timeControlLabel(seek.timeControl)}</span>
+							<span class="flex min-w-0 flex-col">
+								<span class="font-bold text-content">{timeControlLabel(seek.timeControl)}</span>
+								<span class="flex items-center gap-1.5 text-xs text-content-muted">
+									<span class="truncate">{offer.name}</span>
+									{#if offer.bot}
+										<span
+											class="shrink-0 rounded bg-primary/15 px-1 py-px text-[10px] font-bold uppercase tracking-wide text-primary"
+										>
+											bot
+										</span>
+									{/if}
+								</span>
+							</span>
 							<button
 								type="button"
 								onclick={() => accept(seek)}

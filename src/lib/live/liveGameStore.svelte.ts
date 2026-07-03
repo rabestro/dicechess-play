@@ -9,7 +9,15 @@ import type { DieState } from '../playWithBot/playWithBotDice.svelte';
 import { LiveClient, randomClientSeed, type ConnStatus } from './liveClient';
 import { wsUrl } from './liveApi';
 import { splitDfen, stripDfen } from './dfenUtils';
-import type { ClientCommand, Clocks, Over, PublicGameState, Seat, ServerEvent } from './liveTypes';
+import type {
+	ClientCommand,
+	Clocks,
+	Over,
+	Players,
+	PublicGameState,
+	Seat,
+	ServerEvent,
+} from './liveTypes';
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,8 +57,11 @@ export class LiveGameStore {
 	outcome = $state<LiveOutcome | null>(null); // from this player's POV (null for spectators)
 	winner = $state<Seat | null>(null); // the winning side, for spectator display
 	termination = $state<string | null>(null);
+	players = $state<Players | null>(null); // both seats' public faces (bots by name), from the snapshot
 
-	private mySeat: Seat | null = null;
+	// Reactive: `spectator`/`canResign` (and through them the Spectating badge and the resign button) must re-render
+	// when `connect()` assigns the seat after the first paint — a plain field would freeze their first evaluation.
+	private mySeat = $state<Seat | null>(null);
 	private client: LiveClient | null = null;
 	private version = -1;
 	private pendingMoves: string[] = []; // optimistic UCI buffer for the turn in progress
@@ -206,6 +217,7 @@ export class LiveGameStore {
 	}
 
 	private syncState(state: PublicGameState): void {
+		this.players = state.players ?? null;
 		if ('Ended' in state.status) {
 			this.currentBoardFen = stripDfen(state.dfen);
 			// The server's final clocks are already settled in the snapshot; adopt them without re-zeroing.
