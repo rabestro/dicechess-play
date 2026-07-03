@@ -163,6 +163,9 @@ export class LiveGameStore {
 		this.termination = null;
 		this.players = null;
 		this.gameStatus = 'connecting';
+		// The connection status must restart too: the store is reused across /live/[id] navigations, and the previous
+		// game's 'open' would otherwise show through until the new socket actually connects.
+		this.connection = 'connecting';
 		this.clockBaseMs = null;
 		this.clockSince = 0;
 		this.tickingSeat = null;

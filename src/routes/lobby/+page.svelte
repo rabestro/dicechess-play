@@ -70,6 +70,7 @@
 	});
 
 	async function create() {
+		if (creating || accepting) return;
 		creating = true;
 		error = null;
 		try {
@@ -95,7 +96,7 @@
 	}
 
 	async function accept(seek: Seek) {
-		if (accepting) return;
+		if (accepting || creating) return;
 		accepting = true;
 		error = null;
 		try {
@@ -190,7 +191,7 @@
 							<button
 								type="button"
 								onclick={() => accept(seek)}
-								disabled={accepting}
+								disabled={accepting || creating}
 								class="px-4 py-1.5 rounded-lg bg-primary text-primary-content font-bold hover:bg-primary-hover transition-colors disabled:opacity-60"
 							>
 								Accept
