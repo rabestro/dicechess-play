@@ -1,5 +1,5 @@
 import { apiBase } from './liveApi';
-import type { CreatedSeek, Seek, SeekMatch, SeekState, TimeControl } from './liveTypes';
+import type { CreatedSeek, LiveGames, Seek, SeekMatch, SeekState, TimeControl } from './liveTypes';
 
 // REST client for the lobby (polling). The list is polled while browsing; a creator polls its seek's
 // status until matched. All anonymous — the guest id seats the player, the secret gates the creator's match.
@@ -9,6 +9,13 @@ export async function listSeeks(): Promise<Seek[]> {
 	const res = await fetch(`${apiBase()}/lobby/seeks`);
 	if (!res.ok) throw new Error(`listSeeks failed: ${res.status}`);
 	return (await res.json()) as Seek[];
+}
+
+/** The live games (most action first, capped server-side) — the lobby's board-wall tiles. */
+export async function listGames(): Promise<LiveGames> {
+	const res = await fetch(`${apiBase()}/games`);
+	if (!res.ok) throw new Error(`listGames failed: ${res.status}`);
+	return (await res.json()) as LiveGames;
 }
 
 /** Post an open seek (the guest is seated White when accepted); returns its id + the creator's secret. */
