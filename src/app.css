@@ -4,6 +4,8 @@
 	/* Semantic Status Tokens (theme-aware — values defined per theme below) */
 	--color-danger: var(--danger);
 	--color-badge-accent: var(--badge-accent);
+	/* "Alive" indicator (the lobby's LIVE tiles) — one green that reads on every theme's surfaces. */
+	--color-success: #22c55e;
 
 	/* Fixed Domain Tokens */
 	--color-piece-white: #ffffff;

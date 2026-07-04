@@ -110,3 +110,25 @@ export interface SeekMatch {
 	gameId: string;
 	token: string;
 }
+
+// ── Live games listing (mirror of play-api's GET /games) ─────────────────────
+
+/** One live game in the public listing: who plays, how far along it is, and the position (`dfen`)
+ * so the lobby can render mini-board tiles without per-game round trips. */
+export interface LiveGame {
+	gameId: string;
+	players: Players | null;
+	timeControl: TimeControl;
+	activeSeat: Seat;
+	dicePending: boolean;
+	clocks: Clocks | null;
+	version: number;
+	// Optional so a pre-dfen server still parses (tiles render an empty board); current servers send it.
+	dfen?: string;
+}
+
+/** The listing page (most action first, capped server-side) plus the uncapped total. */
+export interface LiveGames {
+	games: LiveGame[];
+	total: number;
+}
