@@ -33,6 +33,7 @@
 	let creating = $state(false);
 	let accepting = $state(false);
 	let createOpen = $state(false);
+	let loaded = $state(false); // first successful poll landed — until then, no "empty hall" flash
 
 	// The wall: the hottest game becomes the TV tile, the rest follow, open seeks close the row.
 	const tvGame = $derived(games.at(0));
@@ -40,7 +41,6 @@
 
 	const playerName = (p: PublicPlayer | undefined | null): string => p?.name ?? 'Anonymous';
 	const isBot = (p: PublicPlayer | undefined | null): boolean => p?.kind === 'Bot';
-	const watchHref = (game: LiveGame) => resolve(`/live/${game.gameId}`);
 	const versus = (game: LiveGame) =>
 		`${playerName(game.players?.white)} vs ${playerName(game.players?.black)}`;
 
@@ -60,6 +60,7 @@
 					seeks = nextSeeks;
 					games = nextGames.games;
 					totalGames = nextGames.total;
+					loaded = true;
 				}
 			} catch {
 				/* transient — keep the last wall */
@@ -221,7 +222,9 @@
 
 		{#if error}<p class="text-sm text-danger">{error}</p>{/if}
 
-		{#if games.length === 0 && seeks.length === 0}
+		{#if !loaded}
+			<p class="px-2 py-14 text-center text-sm text-content-muted">Looking around the hall…</p>
+		{:else if games.length === 0 && seeks.length === 0}
 			<div
 				class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-border px-6 py-14 text-center"
 			>
@@ -234,7 +237,7 @@
 			<div class="board-wall">
 				{#if tvGame}
 					<a
-						href={watchHref(tvGame)}
+						href={resolve('/live/[id]', { id: tvGame.gameId })}
 						class="tv group flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 transition-all hover:-translate-y-0.5 hover:border-primary"
 					>
 						<div class="flex items-center justify-between">
@@ -258,7 +261,7 @@
 
 				{#each otherGames as game (game.gameId)}
 					<a
-						href={watchHref(game)}
+						href={resolve('/live/[id]', { id: game.gameId })}
 						class="group flex flex-col gap-2 rounded-2xl border border-border bg-surface p-3 transition-all hover:-translate-y-0.5 hover:border-primary"
 					>
 						<span
