@@ -77,32 +77,28 @@ export class LiveGameStore {
 		buildTurnBlocks(this.historyMap, this.maxMoveIndex),
 	);
 
-	get currentBoardFen(): string {
+	currentBoardFen = $derived.by<string>(() => {
 		if (this.viewedIndex === null) return this.liveFen;
 		return this.historyMap[String(this.viewedIndex)]?.fen ?? this.liveFen;
-	}
+	});
 
-	get activeColor(): 'w' | 'b' {
+	activeColor = $derived.by<'w' | 'b'>(() => {
 		if (this.viewedIndex === null) return this.liveActiveColor;
 		return this.historyMap[String(this.viewedIndex)]?.active_color ?? this.liveActiveColor;
-	}
+	});
 
-	get currentDice(): DieState[] {
+	currentDice = $derived.by<DieState[]>(() => {
 		const source =
 			this.viewedIndex === null
 				? this.liveDice
 				: (this.historyMap[String(this.viewedIndex)]?.dices ?? this.liveDice);
 		return source.map((d) => ({ ...d }));
-	}
+	});
 
 	/** True while the user is browsing a past position instead of the live one. */
-	get isViewingHistory(): boolean {
-		return this.viewedIndex !== null;
-	}
+	isViewingHistory = $derived(this.viewedIndex !== null);
 
-	get currentMoveIndex(): number {
-		return this.viewedIndex ?? this.maxMoveIndex;
-	}
+	currentMoveIndex = $derived(this.viewedIndex ?? this.maxMoveIndex);
 
 	// Reactive: `spectator`/`canResign` (and through them the Spectating badge and the resign button) must re-render
 	// when `connect()` assigns the seat after the first paint — a plain field would freeze their first evaluation.
@@ -309,6 +305,7 @@ export class LiveGameStore {
 		this.termination = over.termination;
 		this.liveDice = [];
 		this.pendingMoves = [];
+		this.pendingPromotion = null;
 		// Always show the final position, even if the user was browsing history when the game ended.
 		this.viewedIndex = null;
 		this.settleClocks(over.termination);
@@ -486,7 +483,9 @@ export class LiveGameStore {
 
 	setMoveIndex(index: number): void {
 		if (index < 0 || index > this.maxMoveIndex) return;
-		if (this.pendingMoves.length > 0) return; // prevent history navigation during an active turn
+		// Prevent history navigation during an active turn — a pending promotion is already an
+		// in-progress live move (its die is consumed before pendingMoves is populated).
+		if (this.pendingMoves.length > 0 || this.pendingPromotion !== null) return;
 		this.viewedIndex = index === this.maxMoveIndex ? null : index;
 	}
 
