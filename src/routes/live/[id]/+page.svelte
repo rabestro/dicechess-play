@@ -134,7 +134,7 @@
 	$effect(() => () => clearTimeout(resignTimeout));
 </script>
 
-{#snippet iconBtn(kind: 'back' | 'list' | 'flag')}
+{#snippet iconBtn(kind: 'back' | 'list' | 'flag' | 'first' | 'prev' | 'next' | 'last')}
 	<svg
 		viewBox="0 0 24 24"
 		class="h-[17px] w-[17px]"
@@ -162,7 +162,17 @@
 				stroke="none"
 			/>
 		{:else}
-			<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
+			{#if kind === 'first'}
+				<path d="M11 6l-6 6 6 6M18 6l-6 6 6 6" />
+			{:else if kind === 'prev'}
+				<path d="M15 6l-6 6 6 6" />
+			{:else if kind === 'next'}
+				<path d="M9 6l6 6-6 6" />
+			{:else if kind === 'last'}
+				<path d="M6 6l6 6-6 6M13 6l6 6-6 6" />
+			{:else}
+				<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
+			{/if}
 		{/if}
 	</svg>
 {/snippet}
@@ -179,6 +189,7 @@
 			<!-- On phones the history acts as a tab: it takes the board's slot and the
 			     board/dice hide. From md up it is an extra panel alongside the game. -->
 			<aside
+				id="move-history-panel"
 				class="order-2 h-[70dvh] md:order-none md:col-span-2 md:row-start-2 md:h-[320px] lg:sticky lg:top-4 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:h-[calc(100dvh-2rem)]"
 			>
 				<MoveHistory
@@ -228,18 +239,18 @@
 						aria-label="First move"
 						onclick={() => setMove(0)}
 						disabled={live.currentMoveIndex === 0}
-						class="px-3 py-2 rounded-lg bg-surface border border-border text-content font-bold hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 					>
-						⏮
+						{@render iconBtn('first')}
 					</button>
 					<button
 						type="button"
 						aria-label="Previous move"
 						onclick={() => setMove(live.currentMoveIndex - 1)}
 						disabled={live.currentMoveIndex === 0}
-						class="px-3 py-2 rounded-lg bg-surface border border-border text-content font-bold hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 					>
-						◀
+						{@render iconBtn('prev')}
 					</button>
 					<span class="px-2 text-xs font-mono font-bold text-content-muted tabular-nums">
 						{live.currentMoveIndex} / {live.maxMoveIndex}
@@ -249,18 +260,18 @@
 						aria-label="Next move"
 						onclick={() => setMove(live.currentMoveIndex + 1)}
 						disabled={live.currentMoveIndex === live.maxMoveIndex}
-						class="px-3 py-2 rounded-lg bg-surface border border-border text-content font-bold hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 					>
-						▶
+						{@render iconBtn('next')}
 					</button>
 					<button
 						type="button"
 						aria-label="Last move"
 						onclick={() => setMove(live.maxMoveIndex)}
 						disabled={live.currentMoveIndex === live.maxMoveIndex}
-						class="px-3 py-2 rounded-lg bg-surface border border-border text-content font-bold hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 					>
-						⏭
+						{@render iconBtn('last')}
 					</button>
 				</div>
 
@@ -292,7 +303,8 @@
 					type="button"
 					onclick={() => (showHistory = !showHistory)}
 					aria-label="Move history"
-					aria-pressed={showHistory}
+					aria-expanded={showHistory}
+					aria-controls="move-history-panel"
 					title="Moves"
 					class="flex h-8 w-8 items-center justify-center rounded-lg border transition-colors {showHistory
 						? 'border-primary bg-primary/10 text-content'
