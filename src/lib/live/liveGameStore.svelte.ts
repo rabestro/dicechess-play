@@ -22,6 +22,7 @@ import * as DiceChessEngine from '@rabestro/dicechess-engine';
 import { buildTurnBlocks } from '../playWithBot/turnBlocks';
 import type { BotMoveHistoryState } from '../playWithBot/playWithBotHistory.svelte';
 import type { TurnBlock } from '../types';
+import { logger } from '../utils/logger';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
@@ -41,13 +42,17 @@ export type LiveOutcome = 'won' | 'lost' | 'draw';
  */
 export class LiveGameStore {
 	// ── Board read-surface ───────────────────────────────────────────────────
-	currentBoardFen = $state<string>(START_FEN);
-	activeColor = $state<'w' | 'b'>('w');
+	// `currentBoardFen`/`activeColor`/`currentDice` below are read-only getters, derived from either
+	// the live fields (liveFen/liveActiveColor/liveDice) or a historyMap entry, depending on whether
+	// the user is browsing history (see `viewedIndex`). Game logic must read the private live fields
+	// directly — never the public getters — so scrubbing history can never affect move validation.
+	private liveFen = $state<string>(START_FEN);
+	private liveActiveColor = $state<'w' | 'b'>('w');
 	playerColor = $state<'w' | 'b'>('w');
 	gameStatus = $state<LiveStatus>('connecting');
 
 	// ── Live UI state ────────────────────────────────────────────────────────
-	currentDice = $state<DieState[]>([]);
+	private liveDice = $state<DieState[]>([]);
 	isAnimatingRoll = $state<boolean>(false); // server pushes dice; kept for dice-component parity
 	pendingPromotion = $state<{
 		orig: string;
@@ -64,12 +69,40 @@ export class LiveGameStore {
 
 	// ── Move History ─────────────────────────────────────────────────────────
 	historyMap = $state<Record<string, BotMoveHistoryState>>({});
-	currentMoveIndex = $state<number>(0);
 	maxMoveIndex = $state<number>(0);
+	// null = showing the live position; otherwise the historyMap index currently displayed.
+	private viewedIndex = $state<number | null>(null);
 
 	historyBlocks = $derived.by<TurnBlock[]>(() =>
 		buildTurnBlocks(this.historyMap, this.maxMoveIndex),
 	);
+
+	get currentBoardFen(): string {
+		if (this.viewedIndex === null) return this.liveFen;
+		return this.historyMap[String(this.viewedIndex)]?.fen ?? this.liveFen;
+	}
+
+	get activeColor(): 'w' | 'b' {
+		if (this.viewedIndex === null) return this.liveActiveColor;
+		return this.historyMap[String(this.viewedIndex)]?.active_color ?? this.liveActiveColor;
+	}
+
+	get currentDice(): DieState[] {
+		const source =
+			this.viewedIndex === null
+				? this.liveDice
+				: (this.historyMap[String(this.viewedIndex)]?.dices ?? this.liveDice);
+		return source.map((d) => ({ ...d }));
+	}
+
+	/** True while the user is browsing a past position instead of the live one. */
+	get isViewingHistory(): boolean {
+		return this.viewedIndex !== null;
+	}
+
+	get currentMoveIndex(): number {
+		return this.viewedIndex ?? this.maxMoveIndex;
+	}
 
 	// Reactive: `spectator`/`canResign` (and through them the Spectating badge and the resign button) must re-render
 	// when `connect()` assigns the seat after the first paint — a plain field would freeze their first evaluation.
@@ -93,7 +126,7 @@ export class LiveGameStore {
 	}
 
 	get availableDiceValues(): number[] {
-		return this.currentDice.filter((d) => d.allowed && !d.used).map((d) => getDieValue(d));
+		return this.liveDice.filter((d) => d.allowed && !d.used).map((d) => getDieValue(d));
 	}
 
 	/** True for a timed game (clocks present); false for an unlimited one. */
@@ -131,12 +164,13 @@ export class LiveGameStore {
 	}
 
 	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
-		if (this.currentMoveIndex !== this.maxMoveIndex) return new Map();
-		if (this.gameStatus !== 'playing' || this.activeColor !== this.playerColor) return new Map();
+		if (this.isViewingHistory) return new Map();
+		if (this.gameStatus !== 'playing' || this.liveActiveColor !== this.playerColor)
+			return new Map();
 		const dice = this.availableDiceValues;
 		if (dice.length === 0) return new Map();
 		try {
-			const uci = DiceChess.getLegalUciMoves(buildDfen(this.currentBoardFen, dice)) || [];
+			const uci = DiceChess.getLegalUciMoves(buildDfen(this.liveFen, dice)) || [];
 			return deriveChessgroundDests(uci);
 		} catch {
 			return new Map();
@@ -164,9 +198,9 @@ export class LiveGameStore {
 	/** Clear per-game state (the same instance is reused across /live/[id] navigations). */
 	private reset(): void {
 		this.version = -1;
-		this.currentBoardFen = START_FEN;
-		this.activeColor = 'w';
-		this.currentDice = [];
+		this.liveFen = START_FEN;
+		this.liveActiveColor = 'w';
+		this.liveDice = [];
 		this.pendingPromotion = null;
 		this.pendingMoves = [];
 		this.confirmedFen = START_FEN;
@@ -183,7 +217,7 @@ export class LiveGameStore {
 		this.clockSince = 0;
 		this.tickingSeat = null;
 		this.historyMap = {};
-		this.currentMoveIndex = 0;
+		this.viewedIndex = null;
 		this.maxMoveIndex = 0;
 	}
 
@@ -219,9 +253,9 @@ export class LiveGameStore {
 			this.version = ev.TurnPlayed.v;
 			this.recordTurn(ev.TurnPlayed.moves, ev.TurnPlayed.seat);
 			this.confirmedFen = stripDfen(ev.TurnPlayed.fenAfter);
-			this.currentBoardFen = this.confirmedFen;
+			this.liveFen = this.confirmedFen;
 			this.pendingMoves = [];
-			this.currentDice = [];
+			this.liveDice = [];
 			this.gameStatus = 'waiting';
 			this.freezeClocks(); // hold the clocks until the next DiceRolled brings authoritative values
 			return;
@@ -243,7 +277,7 @@ export class LiveGameStore {
 	private syncState(state: PublicGameState): void {
 		this.players = state.players ?? null;
 		if ('Ended' in state.status) {
-			this.currentBoardFen = stripDfen(state.dfen);
+			this.liveFen = stripDfen(state.dfen);
 			// The server's final clocks are already settled in the snapshot; adopt them without re-zeroing.
 			this.setClocks(state.clocks, null);
 			this.endGame(state.status.Ended.over);
@@ -257,26 +291,26 @@ export class LiveGameStore {
 	private syncTurn(dfen: string, activeSeat: Seat, dicePending = true): void {
 		const { fen6, dice } = splitDfen(dfen);
 		this.confirmedFen = fen6;
-		this.currentBoardFen = fen6;
-		this.activeColor = activeSeat === 'White' ? 'w' : 'b';
+		this.liveFen = fen6;
+		this.liveActiveColor = activeSeat === 'White' ? 'w' : 'b';
 		this.pendingMoves = [];
-		this.currentDice = dicePending
-			? dice.map((value) => ({ value, allowed: true, used: false }))
-			: [];
-		this.confirmedDice = this.currentDice.map((d) => ({ ...d }));
+		this.liveDice = dicePending ? dice.map((value) => ({ value, allowed: true, used: false })) : [];
+		this.confirmedDice = this.liveDice.map((d) => ({ ...d }));
 		this.gameStatus = dicePending && activeSeat === this.mySeat ? 'playing' : 'waiting';
 
 		// Initialize history if it's empty
 		if (Object.keys(this.historyMap).length === 0) {
-			this.initHistory(fen6, this.activeColor, this.currentDice);
+			this.initHistory(fen6, this.liveActiveColor, this.liveDice);
 		}
 	}
 
 	private endGame(over: Over): void {
 		this.gameStatus = 'over';
 		this.termination = over.termination;
-		this.currentDice = [];
+		this.liveDice = [];
 		this.pendingMoves = [];
+		// Always show the final position, even if the user was browsing history when the game ended.
+		this.viewedIndex = null;
 		this.settleClocks(over.termination);
 		// The game is terminal and the room is about to be evicted: stop reconnecting (a no-op otherwise
 		// retries against a gone game). The outcome shows via gameStatus, not the connection status.
@@ -291,11 +325,10 @@ export class LiveGameStore {
 	}
 
 	private rollback(): void {
-		this.currentBoardFen = this.confirmedFen;
-		this.currentDice = this.confirmedDice.map((d) => ({ ...d }));
+		this.liveFen = this.confirmedFen;
+		this.liveDice = this.confirmedDice.map((d) => ({ ...d }));
 		this.pendingMoves = [];
-		this.gameStatus = this.activeColor === this.playerColor ? 'playing' : 'waiting';
-		this.currentMoveIndex = this.maxMoveIndex;
+		this.gameStatus = this.liveActiveColor === this.playerColor ? 'playing' : 'waiting';
 	}
 
 	// ── clocks ──────────────────────────────────────────────────────────────────
@@ -346,25 +379,25 @@ export class LiveGameStore {
 
 	// ── move handling (mirrors the vs-bot store, but submits the turn to the server) ──
 	handleBoardMove(orig: string, dest: string): void {
-		if (this.currentMoveIndex !== this.maxMoveIndex) return;
-		if (this.gameStatus !== 'playing' || this.activeColor !== this.playerColor) return;
+		if (this.isViewingHistory) return;
+		if (this.gameStatus !== 'playing' || this.liveActiveColor !== this.playerColor) return;
 		// Don't move optimistically while disconnected — the SubmitTurn would be dropped and the
 		// local board would diverge from the server.
 		if (this.connection !== 'open') return;
-		const piece = getPieceFromFen(this.currentBoardFen, orig);
+		const piece = getPieceFromFen(this.liveFen, orig);
 		if (!piece) return;
 
 		const dieVal = getDieValue(piece);
-		const dieIndex = this.currentDice.findIndex(
+		const dieIndex = this.liveDice.findIndex(
 			(d) => d.allowed && !d.used && getDieValue(d) === dieVal,
 		);
 		if (dieIndex === -1) return;
-		this.currentDice[dieIndex].used = true;
+		this.liveDice[dieIndex].used = true;
 
 		const isPromotion = piece.toLowerCase() === 'p' && (dest[1] === '8' || dest[1] === '1');
 		if (isPromotion) {
 			// Capturing the king on the promotion rank ends the game — auto-queen past the popup.
-			const target = getPieceFromFen(this.currentBoardFen, dest);
+			const target = getPieceFromFen(this.liveFen, dest);
 			if (target && target.toLowerCase() === 'k') {
 				this.completeMove(orig, dest, 'q', dieIndex);
 				return;
@@ -390,21 +423,20 @@ export class LiveGameStore {
 
 	cancelPromotion(): void {
 		if (!this.pendingPromotion) return;
-		this.currentDice[this.pendingPromotion.dieIndex].used = false;
+		this.liveDice[this.pendingPromotion.dieIndex].used = false;
 		this.pendingPromotion = null;
 		// Snap the piece back by briefly clearing the FEN (same trick as the vs-bot board).
-		const fen = this.currentBoardFen;
-		this.currentBoardFen = '';
-		setTimeout(() => (this.currentBoardFen = fen), 0);
+		const fen = this.liveFen;
+		this.liveFen = '';
+		setTimeout(() => (this.liveFen = fen), 0);
 	}
 
 	private promotionPieces(orig: string, dest: string, dieIndex: number): string[] {
-		const dice = this.currentDice
+		const dice = this.liveDice
 			.filter((d, i) => d.allowed && (!d.used || i === dieIndex))
 			.map((d) => getDieValue(d));
 		try {
-			const legal: string[] =
-				DiceChess.getLegalUciMoves(buildDfen(this.currentBoardFen, dice)) || [];
+			const legal: string[] = DiceChess.getLegalUciMoves(buildDfen(this.liveFen, dice)) || [];
 			const promos = legal
 				.filter((m) => m.startsWith(orig + dest) && m.length === 5)
 				.map((m) => m[4].toLowerCase());
@@ -421,16 +453,16 @@ export class LiveGameStore {
 		promo: string | undefined,
 		dieIndex: number,
 	): void {
-		const oldFen = this.currentBoardFen;
-		const dice = this.currentDice
+		const oldFen = this.liveFen;
+		const dice = this.liveDice
 			.filter((d, i) => d.allowed && (!d.used || i === dieIndex))
 			.map((d) => getDieValue(d));
 		const nextRaw = DiceChess.applyMove(buildDfen(oldFen, dice), orig, dest, promo);
 		if (!nextRaw) {
-			this.currentDice[dieIndex].used = false; // engine rejected; free the die
+			this.liveDice[dieIndex].used = false; // engine rejected; free the die
 			return;
 		}
-		this.currentBoardFen = stripDfen(nextRaw);
+		this.liveFen = stripDfen(nextRaw);
 		this.consumeCastlingDie(orig, dest, getPieceFromFen(oldFen, orig));
 		this.pendingMoves.push(orig + dest + (promo ?? ''));
 
@@ -443,8 +475,8 @@ export class LiveGameStore {
 		if (piece?.toLowerCase() !== 'k') return;
 		if (Math.abs(orig.charCodeAt(0) - dest.charCodeAt(0)) !== 2) return;
 		const rookDie = getDieValue('r');
-		const i = this.currentDice.findIndex((d) => d.allowed && !d.used && getDieValue(d) === rookDie);
-		if (i !== -1) this.currentDice[i].used = true;
+		const i = this.liveDice.findIndex((d) => d.allowed && !d.used && getDieValue(d) === rookDie);
+		if (i !== -1) this.liveDice[i].used = true;
 	}
 
 	private submitTurn(): void {
@@ -455,13 +487,7 @@ export class LiveGameStore {
 	setMoveIndex(index: number): void {
 		if (index < 0 || index > this.maxMoveIndex) return;
 		if (this.pendingMoves.length > 0) return; // prevent history navigation during an active turn
-		this.currentMoveIndex = index;
-		const state = this.historyMap[String(index)];
-		if (state) {
-			this.currentBoardFen = state.fen;
-			this.activeColor = state.active_color;
-			this.currentDice = state.dices.map((d) => ({ ...d }));
-		}
+		this.viewedIndex = index === this.maxMoveIndex ? null : index;
 	}
 
 	private initHistory(fen: string, color: 'w' | 'b', dice: DieState[]): void {
@@ -473,13 +499,11 @@ export class LiveGameStore {
 				gameMoveHistoryMove: null,
 			},
 		};
-		this.currentMoveIndex = 0;
 		this.maxMoveIndex = 0;
 	}
 
 	private recordRoll(fen: string, color: 'w' | 'b', dice: string[]): void {
 		if (Object.keys(this.historyMap).length === 0) return;
-		const wasAtLatest = this.currentMoveIndex === this.maxMoveIndex;
 		const nextIndex = this.maxMoveIndex + 1;
 		this.historyMap[String(nextIndex)] = {
 			fen,
@@ -488,17 +512,28 @@ export class LiveGameStore {
 			gameMoveHistoryMove: null,
 		};
 		this.maxMoveIndex = nextIndex;
-		if (wasAtLatest) {
-			this.currentMoveIndex = nextIndex;
-		}
 	}
 
 	private recordTurn(moves: string[], seat: Seat): void {
 		if (Object.keys(this.historyMap).length === 0) return;
 		const color: 'w' | 'b' = seat === 'White' ? 'w' : 'b';
-		const wasAtLatest = this.currentMoveIndex === this.maxMoveIndex;
 
 		const currentFen = this.confirmedFen;
+
+		if (moves.length === 0) {
+			// A legitimate pass turn (the rolled dice had no legal move) — record it with the
+			// PASS convention buildTurnBlocks expects instead of silently dropping the turn.
+			const nextIndex = this.maxMoveIndex + 1;
+			this.historyMap[String(nextIndex)] = {
+				fen: currentFen,
+				active_color: color,
+				dices: this.confirmedDice.map((d) => ({ ...d })),
+				gameMoveHistoryMove: { from: '', to: '', promotion: '' },
+			};
+			this.maxMoveIndex = nextIndex;
+			return;
+		}
+
 		const dice = this.confirmedDice.map((d) => getDieValue(d));
 		let currentDfen = buildDfen(currentFen, dice, color);
 		const tempDiceState = this.confirmedDice.map((d) => ({ ...d }));
@@ -536,6 +571,15 @@ export class LiveGameStore {
 
 			const nextDfen = DiceChess.applyMove(currentDfen, from, dest, promo);
 			if (!nextDfen) {
+				logger.error(
+					'recordTurn: local replay rejected a server-confirmed move; history truncated',
+					{
+						move,
+						moves,
+						seat,
+						lastRecordedIndex: this.maxMoveIndex,
+					},
+				);
 				break;
 			}
 
@@ -556,10 +600,6 @@ export class LiveGameStore {
 			this.maxMoveIndex = nextIndex;
 			currentDfen = nextDfen;
 			boardFen = nextBoardFen;
-		}
-
-		if (wasAtLatest) {
-			this.currentMoveIndex = this.maxMoveIndex;
 		}
 	}
 }
