@@ -454,6 +454,7 @@ export class LiveGameStore {
 
 	setMoveIndex(index: number): void {
 		if (index < 0 || index > this.maxMoveIndex) return;
+		if (this.pendingMoves.length > 0) return; // prevent history navigation during an active turn
 		this.currentMoveIndex = index;
 		const state = this.historyMap[String(index)];
 		if (state) {
@@ -478,6 +479,7 @@ export class LiveGameStore {
 
 	private recordRoll(fen: string, color: 'w' | 'b', dice: string[]): void {
 		if (Object.keys(this.historyMap).length === 0) return;
+		const wasAtLatest = this.currentMoveIndex === this.maxMoveIndex;
 		const nextIndex = this.maxMoveIndex + 1;
 		this.historyMap[String(nextIndex)] = {
 			fen,
@@ -486,12 +488,15 @@ export class LiveGameStore {
 			gameMoveHistoryMove: null,
 		};
 		this.maxMoveIndex = nextIndex;
-		this.currentMoveIndex = nextIndex;
+		if (wasAtLatest) {
+			this.currentMoveIndex = nextIndex;
+		}
 	}
 
 	private recordTurn(moves: string[], seat: Seat): void {
 		if (Object.keys(this.historyMap).length === 0) return;
 		const color: 'w' | 'b' = seat === 'White' ? 'w' : 'b';
+		const wasAtLatest = this.currentMoveIndex === this.maxMoveIndex;
 
 		const currentFen = this.confirmedFen;
 		const dice = this.confirmedDice.map((d) => getDieValue(d));
@@ -549,9 +554,12 @@ export class LiveGameStore {
 			};
 
 			this.maxMoveIndex = nextIndex;
-			this.currentMoveIndex = nextIndex;
 			currentDfen = nextDfen;
 			boardFen = nextBoardFen;
+		}
+
+		if (wasAtLatest) {
+			this.currentMoveIndex = this.maxMoveIndex;
 		}
 	}
 }
