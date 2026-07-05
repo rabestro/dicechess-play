@@ -232,7 +232,7 @@
 					{/if}
 				</div>
 
-				{#if live.isViewingHistory}
+				{#if live.isManuallyBrowsing}
 					<button
 						type="button"
 						onclick={() => setMove(live.maxMoveIndex)}
@@ -364,6 +364,7 @@
 				<div class="order-4 md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col">
 					<DicePanel
 						dice={live.currentDice}
+						animating={live.isAnimatingRoll}
 						emptyText={live.currentDice.length === 0 ? statusText : undefined}
 					/>
 				</div>

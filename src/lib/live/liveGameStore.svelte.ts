@@ -29,6 +29,12 @@ const DiceChess = (DiceChessEngine as any).DiceChess;
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
+// Pacing for the opponent's dice roll / moves, so a live game reads like the offline play-vs-bot
+// mode instead of teleporting through a whole turn at once (the player's own turn is never paced —
+// it's already live and interactive the instant the server event arrives, see `presentLoop`).
+const ROLL_ANIMATION_MS = 600;
+const MOVE_STEP_MS = 1000;
+
 export type LiveStatus = 'connecting' | 'waiting' | 'playing' | 'over';
 export type LiveOutcome = 'won' | 'lost' | 'draw';
 
@@ -53,7 +59,7 @@ export class LiveGameStore {
 
 	// ── Live UI state ────────────────────────────────────────────────────────
 	private liveDice = $state<DieState[]>([]);
-	isAnimatingRoll = $state<boolean>(false); // server pushes dice; kept for dice-component parity
+	isAnimatingRoll = $state<boolean>(false); // true while presenting an opponent's roll (see presentLoop)
 	pendingPromotion = $state<{
 		orig: string;
 		dest: string;
@@ -72,31 +78,50 @@ export class LiveGameStore {
 	maxMoveIndex = $state<number>(0);
 	// null = showing the live position; otherwise the historyMap index currently displayed.
 	private viewedIndex = $state<number | null>(null);
+	// How far the paced reveal (see `presentLoop`) has progressed through historyMap; lags behind
+	// `maxMoveIndex` while an opponent's roll/moves are still animating in.
+	private presentedIndex = $state<number>(0);
+	// Bumped by reset() to invalidate any in-flight presentLoop from a previous game/reconnect.
+	private epoch = 0;
+	// Which epoch, if any, currently has a presentLoop actively draining historyMap.
+	private pumpingEpoch: number | null = null;
 
 	historyBlocks = $derived.by<TurnBlock[]>(() =>
 		buildTurnBlocks(this.historyMap, this.maxMoveIndex),
 	);
 
 	currentBoardFen = $derived.by<string>(() => {
-		if (this.viewedIndex === null) return this.liveFen;
-		return this.historyMap[String(this.viewedIndex)]?.fen ?? this.liveFen;
+		if (this.viewedIndex !== null)
+			return this.historyMap[String(this.viewedIndex)]?.fen ?? this.liveFen;
+		if (this.presentedIndex < this.maxMoveIndex)
+			return this.historyMap[String(this.presentedIndex)]?.fen ?? this.liveFen;
+		return this.liveFen;
 	});
 
 	activeColor = $derived.by<'w' | 'b'>(() => {
-		if (this.viewedIndex === null) return this.liveActiveColor;
-		return this.historyMap[String(this.viewedIndex)]?.active_color ?? this.liveActiveColor;
+		if (this.viewedIndex !== null)
+			return this.historyMap[String(this.viewedIndex)]?.active_color ?? this.liveActiveColor;
+		if (this.presentedIndex < this.maxMoveIndex)
+			return this.historyMap[String(this.presentedIndex)]?.active_color ?? this.liveActiveColor;
+		return this.liveActiveColor;
 	});
 
 	currentDice = $derived.by<DieState[]>(() => {
-		const source =
-			this.viewedIndex === null
-				? this.liveDice
-				: (this.historyMap[String(this.viewedIndex)]?.dices ?? this.liveDice);
+		let source = this.liveDice;
+		if (this.viewedIndex !== null) {
+			source = this.historyMap[String(this.viewedIndex)]?.dices ?? this.liveDice;
+		} else if (this.presentedIndex < this.maxMoveIndex) {
+			source = this.historyMap[String(this.presentedIndex)]?.dices ?? this.liveDice;
+		}
 		return source.map((d) => ({ ...d }));
 	});
 
-	/** True while the user is browsing a past position instead of the live one. */
-	isViewingHistory = $derived(this.viewedIndex !== null);
+	/** True while the user is browsing a past position, or the paced reveal hasn't caught up to live. */
+	isViewingHistory = $derived(this.viewedIndex !== null || this.presentedIndex < this.maxMoveIndex);
+
+	/** True only for a deliberate manual scrub — never during ordinary catch-up pacing. Drives the
+	 * "Return to live" banner, which must not appear just because playback is still catching up. */
+	isManuallyBrowsing = $derived(this.viewedIndex !== null);
 
 	currentMoveIndex = $derived(this.viewedIndex ?? this.maxMoveIndex);
 
@@ -197,6 +222,7 @@ export class LiveGameStore {
 		this.liveFen = START_FEN;
 		this.liveActiveColor = 'w';
 		this.liveDice = [];
+		this.isAnimatingRoll = false;
 		this.pendingPromotion = null;
 		this.pendingMoves = [];
 		this.confirmedFen = START_FEN;
@@ -215,6 +241,8 @@ export class LiveGameStore {
 		this.historyMap = {};
 		this.viewedIndex = null;
 		this.maxMoveIndex = 0;
+		this.presentedIndex = 0;
+		this.epoch += 1; // invalidates any in-flight presentLoop from the previous game
 	}
 
 	dispose(): void {
@@ -304,10 +332,15 @@ export class LiveGameStore {
 		this.gameStatus = 'over';
 		this.termination = over.termination;
 		this.liveDice = [];
+		this.isAnimatingRoll = false; // clears a roll-reveal that was mid-flight when the game ended
 		this.pendingMoves = [];
 		this.pendingPromotion = null;
-		// Always show the final position, even if the user was browsing history when the game ended.
+		// Always show the final position, even if the user was browsing history or mid-catch-up
+		// when the game ended — v1 deliberately cuts off any still-animating reveal rather than
+		// letting it finish (a nicer "let the winning move land first" is a possible follow-up).
 		this.viewedIndex = null;
+		this.presentedIndex = this.maxMoveIndex;
+		this.epoch += 1;
 		this.settleClocks(over.termination);
 		// The game is terminal and the room is about to be evicted: stop reconnecting (a no-op otherwise
 		// retries against a gone game). The outcome shows via gameStatus, not the connection status.
@@ -486,6 +519,10 @@ export class LiveGameStore {
 		// Prevent history navigation during an active turn — a pending promotion is already an
 		// in-progress live move (its die is consumed before pendingMoves is populated).
 		if (this.pendingMoves.length > 0 || this.pendingPromotion !== null) return;
+		// Scrubbing during in-flight catch-up pacing (presentedIndex < maxMoveIndex) is intentionally
+		// unguarded: it snaps straight to the requested historyMap entry and shows the manual-browsing
+		// "Return to live" banner, interrupting the paced reveal. Matches the equivalent, already-
+		// accepted gap in the offline bot mode's own scrub-vs-timer interaction.
 		this.viewedIndex = index === this.maxMoveIndex ? null : index;
 	}
 
@@ -511,6 +548,7 @@ export class LiveGameStore {
 			gameMoveHistoryMove: null,
 		};
 		this.maxMoveIndex = nextIndex;
+		this.schedulePresentation();
 	}
 
 	private recordTurn(moves: string[], seat: Seat): void {
@@ -530,6 +568,7 @@ export class LiveGameStore {
 				gameMoveHistoryMove: { from: '', to: '', promotion: '' },
 			};
 			this.maxMoveIndex = nextIndex;
+			this.schedulePresentation();
 			return;
 		}
 
@@ -599,6 +638,56 @@ export class LiveGameStore {
 			this.maxMoveIndex = nextIndex;
 			currentDfen = nextDfen;
 			boardFen = nextBoardFen;
+		}
+
+		this.schedulePresentation();
+	}
+
+	private sleep(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	private schedulePresentation(): void {
+		if (this.pumpingEpoch === this.epoch) return; // a loop for the current epoch is already draining
+		this.pumpingEpoch = this.epoch;
+		const epoch = this.epoch;
+		void this.presentLoop(epoch).finally(() => {
+			if (this.pumpingEpoch === epoch) this.pumpingEpoch = null;
+		});
+	}
+
+	/** Reveals new historyMap entries one at a time: a roll gets a spin, a move/pass pauses on the
+	 * old position first. Skips pacing entirely for the player's own entries (roll, move, or pass) —
+	 * their own turn already applied live and interactively the instant the server event arrived
+	 * (see syncTurn), so there's nothing left to "catch up" for them; only the opponent's entries
+	 * (or, for a spectator, either side's) get animated. */
+	private async presentLoop(epoch: number): Promise<void> {
+		while (this.presentedIndex < this.maxMoveIndex) {
+			if (epoch !== this.epoch) return;
+
+			const nextIndex = this.presentedIndex + 1;
+			const entry = this.historyMap[String(nextIndex)];
+			if (!entry) return;
+
+			const isRoll = entry.gameMoveHistoryMove === null;
+			const alreadySeenLive = !this.spectator && entry.active_color === this.playerColor;
+
+			if (alreadySeenLive) {
+				this.presentedIndex = nextIndex;
+				continue;
+			}
+
+			if (isRoll) {
+				this.presentedIndex = nextIndex; // dice values visible immediately, spin plays on top
+				this.isAnimatingRoll = true;
+				await this.sleep(ROLL_ANIMATION_MS);
+				if (epoch !== this.epoch) return;
+				this.isAnimatingRoll = false;
+			} else {
+				await this.sleep(MOVE_STEP_MS); // pause on the OLD position, then reveal
+				if (epoch !== this.epoch) return;
+				this.presentedIndex = nextIndex;
+			}
 		}
 	}
 }
