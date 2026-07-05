@@ -19,6 +19,9 @@ import type {
 	ServerEvent,
 } from './liveTypes';
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
+import { buildTurnBlocks } from '../playWithBot/turnBlocks';
+import type { BotMoveHistoryState } from '../playWithBot/playWithBotHistory.svelte';
+import type { TurnBlock } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
@@ -58,6 +61,15 @@ export class LiveGameStore {
 	winner = $state<Seat | null>(null); // the winning side, for spectator display
 	termination = $state<string | null>(null);
 	players = $state<Players | null>(null); // both seats' public faces (bots by name), from the snapshot
+
+	// ── Move History ─────────────────────────────────────────────────────────
+	historyMap = $state<Record<string, BotMoveHistoryState>>({});
+	currentMoveIndex = $state<number>(0);
+	maxMoveIndex = $state<number>(0);
+
+	historyBlocks = $derived.by<TurnBlock[]>(() =>
+		buildTurnBlocks(this.historyMap, this.maxMoveIndex),
+	);
 
 	// Reactive: `spectator`/`canResign` (and through them the Spectating badge and the resign button) must re-render
 	// when `connect()` assigns the seat after the first paint — a plain field would freeze their first evaluation.
@@ -119,6 +131,7 @@ export class LiveGameStore {
 	}
 
 	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
+		if (this.currentMoveIndex !== this.maxMoveIndex) return new Map();
 		if (this.gameStatus !== 'playing' || this.activeColor !== this.playerColor) return new Map();
 		const dice = this.availableDiceValues;
 		if (dice.length === 0) return new Map();
@@ -169,6 +182,9 @@ export class LiveGameStore {
 		this.clockBaseMs = null;
 		this.clockSince = 0;
 		this.tickingSeat = null;
+		this.historyMap = {};
+		this.currentMoveIndex = 0;
+		this.maxMoveIndex = 0;
 	}
 
 	dispose(): void {
@@ -191,6 +207,9 @@ export class LiveGameStore {
 		if ('DiceRolled' in ev) {
 			if (ev.DiceRolled.v <= this.version) return;
 			this.version = ev.DiceRolled.v;
+			const { fen6, dice } = splitDfen(ev.DiceRolled.dfen);
+			const color: 'w' | 'b' = ev.DiceRolled.seat === 'White' ? 'w' : 'b';
+			this.recordRoll(fen6, color, dice);
 			this.syncTurn(ev.DiceRolled.dfen, ev.DiceRolled.seat);
 			this.setClocks(ev.DiceRolled.clocks, ev.DiceRolled.seat);
 			return;
@@ -198,6 +217,7 @@ export class LiveGameStore {
 		if ('TurnPlayed' in ev) {
 			if (ev.TurnPlayed.v <= this.version) return;
 			this.version = ev.TurnPlayed.v;
+			this.recordTurn(ev.TurnPlayed.moves, ev.TurnPlayed.seat);
 			this.confirmedFen = stripDfen(ev.TurnPlayed.fenAfter);
 			this.currentBoardFen = this.confirmedFen;
 			this.pendingMoves = [];
@@ -245,6 +265,11 @@ export class LiveGameStore {
 			: [];
 		this.confirmedDice = this.currentDice.map((d) => ({ ...d }));
 		this.gameStatus = dicePending && activeSeat === this.mySeat ? 'playing' : 'waiting';
+
+		// Initialize history if it's empty
+		if (Object.keys(this.historyMap).length === 0) {
+			this.initHistory(fen6, this.activeColor, this.currentDice);
+		}
 	}
 
 	private endGame(over: Over): void {
@@ -270,6 +295,7 @@ export class LiveGameStore {
 		this.currentDice = this.confirmedDice.map((d) => ({ ...d }));
 		this.pendingMoves = [];
 		this.gameStatus = this.activeColor === this.playerColor ? 'playing' : 'waiting';
+		this.currentMoveIndex = this.maxMoveIndex;
 	}
 
 	// ── clocks ──────────────────────────────────────────────────────────────────
@@ -320,6 +346,7 @@ export class LiveGameStore {
 
 	// ── move handling (mirrors the vs-bot store, but submits the turn to the server) ──
 	handleBoardMove(orig: string, dest: string): void {
+		if (this.currentMoveIndex !== this.maxMoveIndex) return;
 		if (this.gameStatus !== 'playing' || this.activeColor !== this.playerColor) return;
 		// Don't move optimistically while disconnected — the SubmitTurn would be dropped and the
 		// local board would diverge from the server.
@@ -423,5 +450,81 @@ export class LiveGameStore {
 	private submitTurn(): void {
 		this.gameStatus = 'waiting'; // optimistic: turn sent, await the server's TurnPlayed / Rejected
 		this.client?.send({ SubmitTurn: { moves: [...this.pendingMoves] } });
+	}
+
+	setMoveIndex(index: number): void {
+		if (index < 0 || index > this.maxMoveIndex) return;
+		this.currentMoveIndex = index;
+		const state = this.historyMap[String(index)];
+		if (state) {
+			this.currentBoardFen = state.fen;
+			this.activeColor = state.active_color;
+			this.currentDice = state.dices ? state.dices.map((d) => ({ ...d })) : [];
+		}
+	}
+
+	private initHistory(fen: string, color: 'w' | 'b', dice: DieState[]): void {
+		this.historyMap = {
+			'0': {
+				fen,
+				active_color: color,
+				dices: dice.map((d) => ({ ...d })),
+				gameMoveHistoryMove: null,
+			},
+		};
+		this.currentMoveIndex = 0;
+		this.maxMoveIndex = 0;
+	}
+
+	private recordRoll(fen: string, color: 'w' | 'b', dice: string[]): void {
+		if (Object.keys(this.historyMap).length === 0) return;
+		const nextIndex = this.maxMoveIndex + 1;
+		this.historyMap[String(nextIndex)] = {
+			fen,
+			active_color: color,
+			dices: dice.map((value) => ({ value, allowed: true, used: false })),
+			gameMoveHistoryMove: null,
+		};
+		this.maxMoveIndex = nextIndex;
+		this.currentMoveIndex = nextIndex;
+	}
+
+	private recordTurn(moves: string[], seat: Seat): void {
+		if (Object.keys(this.historyMap).length === 0) return;
+		const color: 'w' | 'b' = seat === 'White' ? 'w' : 'b';
+
+		const currentFen = this.confirmedFen;
+		const dice = this.confirmedDice.map((d) => getDieValue(d));
+		let currentDfen = buildDfen(currentFen, dice, color);
+
+		for (const move of moves) {
+			if (move.length < 4) continue;
+			const from = move.slice(0, 2);
+			const dest = move.slice(2, 4);
+			const promo = move.slice(4) || undefined;
+
+			const nextDfen = DiceChess.applyMove(currentDfen, from, dest, promo);
+			if (!nextDfen) {
+				break;
+			}
+
+			const nextBoardFen = nextDfen.split(/\s+/).slice(0, 6).join(' ');
+			const nextIndex = this.maxMoveIndex + 1;
+
+			this.historyMap[String(nextIndex)] = {
+				fen: nextBoardFen,
+				active_color: color,
+				dices: [],
+				gameMoveHistoryMove: {
+					from,
+					to: dest,
+					promotion: promo ? promo.toUpperCase() : 'NONE',
+				},
+			};
+
+			this.maxMoveIndex = nextIndex;
+			this.currentMoveIndex = nextIndex;
+			currentDfen = nextDfen;
+		}
 	}
 }
