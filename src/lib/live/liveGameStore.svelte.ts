@@ -459,7 +459,7 @@ export class LiveGameStore {
 		if (state) {
 			this.currentBoardFen = state.fen;
 			this.activeColor = state.active_color;
-			this.currentDice = state.dices ? state.dices.map((d) => ({ ...d })) : [];
+			this.currentDice = state.dices.map((d) => ({ ...d }));
 		}
 	}
 
@@ -496,12 +496,38 @@ export class LiveGameStore {
 		const currentFen = this.confirmedFen;
 		const dice = this.confirmedDice.map((d) => getDieValue(d));
 		let currentDfen = buildDfen(currentFen, dice, color);
+		const tempDiceState = this.confirmedDice.map((d) => ({ ...d }));
+		let boardFen = currentFen;
 
 		for (const move of moves) {
 			if (move.length < 4) continue;
 			const from = move.slice(0, 2);
 			const dest = move.slice(2, 4);
 			const promo = move.slice(4) || undefined;
+
+			const piece = getPieceFromFen(boardFen, from);
+			if (piece) {
+				const dieVal = getDieValue(piece);
+				const dieIndex = tempDiceState.findIndex(
+					(d) => d.allowed && !d.used && getDieValue(d) === dieVal,
+				);
+				if (dieIndex !== -1) {
+					tempDiceState[dieIndex].used = true;
+				}
+				// Handle castling rook die consumption
+				if (
+					piece.toLowerCase() === 'k' &&
+					Math.abs(from.charCodeAt(0) - dest.charCodeAt(0)) === 2
+				) {
+					const rookDie = getDieValue('r');
+					const rIdx = tempDiceState.findIndex(
+						(d) => d.allowed && !d.used && getDieValue(d) === rookDie,
+					);
+					if (rIdx !== -1) {
+						tempDiceState[rIdx].used = true;
+					}
+				}
+			}
 
 			const nextDfen = DiceChess.applyMove(currentDfen, from, dest, promo);
 			if (!nextDfen) {
@@ -514,7 +540,7 @@ export class LiveGameStore {
 			this.historyMap[String(nextIndex)] = {
 				fen: nextBoardFen,
 				active_color: color,
-				dices: [],
+				dices: tempDiceState.map((d) => ({ ...d })),
 				gameMoveHistoryMove: {
 					from,
 					to: dest,
@@ -525,6 +551,7 @@ export class LiveGameStore {
 			this.maxMoveIndex = nextIndex;
 			this.currentMoveIndex = nextIndex;
 			currentDfen = nextDfen;
+			boardFen = nextBoardFen;
 		}
 	}
 }

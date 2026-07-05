@@ -25,8 +25,8 @@
 	}
 
 	function onKeydown(event: KeyboardEvent) {
-		// Disable keyboard navigation during active game play to prevent accidental jumps
-		if (live.gameStatus !== 'over') return;
+		// Disable keyboard navigation during active game play to prevent accidental jumps, unless spectating
+		if (live.gameStatus !== 'over' && !live.spectator) return;
 
 		const el = document.activeElement;
 		if (
