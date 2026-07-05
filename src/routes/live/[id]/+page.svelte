@@ -5,15 +5,66 @@
 	import PawnPromotionSelector from '../../../components/PawnPromotionSelector.svelte';
 	import PlayerStrip from '../../../components/PlayerStrip.svelte';
 	import DicePanel from '../../../components/DicePanel.svelte';
+	import MoveHistory from '../../../components/MoveHistory.svelte';
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { LiveGameStore } from '$lib/live/liveGameStore.svelte';
 	import { parseSeat } from '$lib/live/seatLink';
 	import { seatDisplayName, seatDisplaySub } from '$lib/live/playerLabel';
 	import type { Seat } from '$lib/live/liveTypes';
 
+	const wideScreen = () =>
+		typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+
 	const live = new LiveGameStore();
 
 	let confirmResign = $state(false);
+	let showHistory = $state(wideScreen());
+
+	function setMove(index: number) {
+		live.setMoveIndex(index);
+	}
+
+	function onKeydown(event: KeyboardEvent) {
+		// Disable keyboard navigation during active game play to prevent accidental jumps, unless spectating
+		if (live.gameStatus !== 'over' && !live.spectator) return;
+
+		const el = document.activeElement;
+		if (
+			el &&
+			(el.tagName === 'INPUT' ||
+				el.tagName === 'TEXTAREA' ||
+				el.tagName === 'SELECT' ||
+				el.hasAttribute('contenteditable'))
+		) {
+			return;
+		}
+
+		switch (event.key) {
+			case 'ArrowLeft':
+				setMove(live.currentMoveIndex - 1);
+				event.preventDefault();
+				break;
+			case 'ArrowRight':
+				setMove(live.currentMoveIndex + 1);
+				event.preventDefault();
+				break;
+			case 'Home':
+				setMove(0);
+				event.preventDefault();
+				break;
+			case 'End':
+				setMove(live.maxMoveIndex);
+				event.preventDefault();
+				break;
+		}
+	}
+
+	$effect(() => {
+		// Reset showHistory to default wideScreen value when game changes
+		if (page.params.id) {
+			showHistory = wideScreen();
+		}
+	});
 
 	// Board is shown from the player's side (white for spectators), so the opponent's clock sits on top.
 	const bottomSeat = $derived<Seat>(live.playerColor === 'b' ? 'Black' : 'White');
@@ -83,7 +134,7 @@
 	$effect(() => () => clearTimeout(resignTimeout));
 </script>
 
-{#snippet iconBtn(kind: 'back' | 'flag')}
+{#snippet iconBtn(kind: 'back' | 'list' | 'flag' | 'first' | 'prev' | 'next' | 'last')}
 	<svg
 		viewBox="0 0 24 24"
 		class="h-[17px] w-[17px]"
@@ -96,20 +147,68 @@
 	>
 		{#if kind === 'back'}
 			<path d="M19 12H6M11 6l-6 6 6 6" />
+		{:else if kind === 'list'}
+			<path d="M9 6h11M9 12h11M9 18h11" /><circle
+				cx="5"
+				cy="6"
+				r="1.2"
+				fill="currentColor"
+				stroke="none"
+			/><circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none" /><circle
+				cx="5"
+				cy="18"
+				r="1.2"
+				fill="currentColor"
+				stroke="none"
+			/>
 		{:else}
-			<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
+			{#if kind === 'first'}
+				<path d="M11 6l-6 6 6 6M18 6l-6 6 6 6" />
+			{:else if kind === 'prev'}
+				<path d="M15 6l-6 6 6 6" />
+			{:else if kind === 'next'}
+				<path d="M9 6l6 6-6 6" />
+			{:else if kind === 'last'}
+				<path d="M6 6l6 6-6 6M13 6l6 6-6 6" />
+			{:else}
+				<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
+			{/if}
 		{/if}
 	</svg>
 {/snippet}
 
+<svelte:window onkeydown={onKeydown} />
+
 <section class="w-full">
 	<div
-		class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-3 lg:gap-4"
+		class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-3 lg:gap-4 {showHistory
+			? 'lg:grid-cols-[300px_minmax(0,1fr)_280px]'
+			: ''}"
 	>
+		{#if showHistory}
+			<!-- On phones the history acts as a tab: it takes the board's slot and the
+			     board/dice hide. From md up it is an extra panel alongside the game. -->
+			<aside
+				id="move-history-panel"
+				class="order-2 h-[70dvh] md:order-none md:col-span-2 md:row-start-2 md:h-[320px] lg:sticky lg:top-4 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:h-[calc(100dvh-2rem)]"
+			>
+				<MoveHistory
+					historyBlocks={live.historyBlocks}
+					currentMoveIndex={live.currentMoveIndex}
+					maxMoveIndex={live.maxMoveIndex}
+					onSetMove={(i) => setMove(i)}
+				/>
+			</aside>
+		{/if}
+
 		<!-- Board column — the hero. Player strips sit above and below the board and share
 		     its width; the board is width-capped by the column and height-capped by the
 		     screen minus the strips. -->
-		<div class="order-2 flex min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1">
+		<div
+			class="order-2 min-w-0 justify-center md:order-none md:col-start-1 md:row-start-1 {showHistory
+				? 'hidden md:flex lg:col-start-2'
+				: 'flex'}"
+		>
 			<div
 				class="flex w-full max-w-[min(560px,calc(100dvh-10rem))] flex-col gap-2.5 md:max-w-[calc(100dvh-11rem)]"
 			>
@@ -133,6 +232,49 @@
 					{/if}
 				</div>
 
+				<!-- History navigation buttons under the board -->
+				<div class="flex items-center justify-center gap-2 w-full">
+					<button
+						type="button"
+						aria-label="First move"
+						onclick={() => setMove(0)}
+						disabled={live.currentMoveIndex === 0}
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+					>
+						{@render iconBtn('first')}
+					</button>
+					<button
+						type="button"
+						aria-label="Previous move"
+						onclick={() => setMove(live.currentMoveIndex - 1)}
+						disabled={live.currentMoveIndex === 0}
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+					>
+						{@render iconBtn('prev')}
+					</button>
+					<span class="px-2 text-xs font-mono font-bold text-content-muted tabular-nums">
+						{live.currentMoveIndex} / {live.maxMoveIndex}
+					</span>
+					<button
+						type="button"
+						aria-label="Next move"
+						onclick={() => setMove(live.currentMoveIndex + 1)}
+						disabled={live.currentMoveIndex === live.maxMoveIndex}
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+					>
+						{@render iconBtn('next')}
+					</button>
+					<button
+						type="button"
+						aria-label="Last move"
+						onclick={() => setMove(live.maxMoveIndex)}
+						disabled={live.currentMoveIndex === live.maxMoveIndex}
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+					>
+						{@render iconBtn('last')}
+					</button>
+				</div>
+
 				<PlayerStrip
 					name={seatName(bottomSeat)}
 					sub={seatSub(bottomSeat)}
@@ -144,7 +286,9 @@
 
 		<!-- Rail: actions, players, dice. On mobile its children interleave around the board. -->
 		<div
-			class="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:flex md:flex-col md:gap-2.5 md:self-stretch md:[max-height:calc(100dvh-2rem)]"
+			class="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:flex md:flex-col md:gap-2.5 md:self-stretch md:[max-height:calc(100dvh-2rem)] {showHistory
+				? 'lg:col-start-3'
+				: ''}"
 		>
 			<div class="order-1 flex items-center gap-1.5 md:order-none">
 				<a
@@ -155,6 +299,19 @@
 				>
 					{@render iconBtn('back')}
 				</a>
+				<button
+					type="button"
+					onclick={() => (showHistory = !showHistory)}
+					aria-label="Move history"
+					aria-expanded={showHistory}
+					aria-controls="move-history-panel"
+					title="Moves"
+					class="flex h-8 w-8 items-center justify-center rounded-lg border transition-colors {showHistory
+						? 'border-primary bg-primary/10 text-content'
+						: 'border-border bg-surface text-content-muted hover:border-border-strong hover:text-content'}"
+				>
+					{@render iconBtn('list')}
+				</button>
 				{#if live.canResign}
 					<button
 						type="button"
