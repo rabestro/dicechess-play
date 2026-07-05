@@ -13,8 +13,10 @@ export const timeControlPresets: readonly TimeControlPreset[] = [
 	{ label: '5 + 3', value: { Fischer: { initialSeconds: 300, incrementSeconds: 3 } } },
 	{ label: '3 + 2', value: { Fischer: { initialSeconds: 180, incrementSeconds: 2 } } },
 	{ label: '5 min', value: { SuddenDeath: { initialSeconds: 300 } } },
+	{ label: '5 + 5', value: { Fischer: { initialSeconds: 300, incrementSeconds: 5 } } },
 	{ label: '10 min', value: { SuddenDeath: { initialSeconds: 600 } } },
 	{ label: '10 + 5', value: { Fischer: { initialSeconds: 600, incrementSeconds: 5 } } },
+	{ label: '10 + 10', value: { Fischer: { initialSeconds: 600, incrementSeconds: 10 } } },
 	{ label: '15 + 10', value: { Fischer: { initialSeconds: 900, incrementSeconds: 10 } } },
 	{ label: '30s / move', value: { PerMove: { secondsPerMove: 30 } } },
 	{ label: '60s / move', value: { PerMove: { secondsPerMove: 60 } } },
@@ -31,8 +33,8 @@ export interface TimeControlGroup {
  * by a test). */
 export const timeControlGroups: readonly TimeControlGroup[] = (
 	[
-		['Blitz', ['3 + 2', '5 min', '5 + 3']],
-		['Rapid', ['10 min', '10 + 5', '15 + 10']],
+		['Blitz', ['3 + 2', '5 + 3', '5 + 5', '5 min']],
+		['Rapid', ['10 + 5', '10 + 10', '15 + 10', '10 min']],
 		['Per move', ['30s / move', '60s / move']],
 		['No clock', ['Unlimited']],
 	] as [string, string[]][]
