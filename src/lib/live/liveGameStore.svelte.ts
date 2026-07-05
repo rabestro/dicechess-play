@@ -650,44 +650,54 @@ export class LiveGameStore {
 	private schedulePresentation(): void {
 		if (this.pumpingEpoch === this.epoch) return; // a loop for the current epoch is already draining
 		this.pumpingEpoch = this.epoch;
-		const epoch = this.epoch;
-		void this.presentLoop(epoch).finally(() => {
-			if (this.pumpingEpoch === epoch) this.pumpingEpoch = null;
-		});
+		void this.presentLoop(this.epoch);
 	}
 
 	/** Reveals new historyMap entries one at a time: a roll gets a spin, a move/pass pauses on the
 	 * old position first. Skips pacing entirely for the player's own entries (roll, move, or pass) —
 	 * their own turn already applied live and interactively the instant the server event arrived
 	 * (see syncTurn), so there's nothing left to "catch up" for them; only the opponent's entries
-	 * (or, for a spectator, either side's) get animated. */
+	 * (or, for a spectator, either side's) get animated.
+	 *
+	 * Note: if the player's own next roll/turn arrives while an opponent's earlier multi-move turn is
+	 * still being revealed, it queues behind it — legalMovesDests/handleBoardMove stay blocked (via
+	 * isViewingHistory) until the opponent's moves finish animating in order, even though the entry is
+	 * itself never paced once reached. This is intentional, matching the offline bot mode: the player
+	 * sees the opponent's whole turn land before the board becomes theirs to act on. */
 	private async presentLoop(epoch: number): Promise<void> {
-		while (this.presentedIndex < this.maxMoveIndex) {
-			if (epoch !== this.epoch) return;
-
-			const nextIndex = this.presentedIndex + 1;
-			const entry = this.historyMap[String(nextIndex)];
-			if (!entry) return;
-
-			const isRoll = entry.gameMoveHistoryMove === null;
-			const alreadySeenLive = !this.spectator && entry.active_color === this.playerColor;
-
-			if (alreadySeenLive) {
-				this.presentedIndex = nextIndex;
-				continue;
-			}
-
-			if (isRoll) {
-				this.presentedIndex = nextIndex; // dice values visible immediately, spin plays on top
-				this.isAnimatingRoll = true;
-				await this.sleep(ROLL_ANIMATION_MS);
+		try {
+			while (this.presentedIndex < this.maxMoveIndex) {
 				if (epoch !== this.epoch) return;
-				this.isAnimatingRoll = false;
-			} else {
-				await this.sleep(MOVE_STEP_MS); // pause on the OLD position, then reveal
-				if (epoch !== this.epoch) return;
-				this.presentedIndex = nextIndex;
+
+				const nextIndex = this.presentedIndex + 1;
+				const entry = this.historyMap[String(nextIndex)];
+				if (!entry) return;
+
+				const isRoll = entry.gameMoveHistoryMove === null;
+				const alreadySeenLive = !this.spectator && entry.active_color === this.playerColor;
+
+				if (alreadySeenLive) {
+					this.presentedIndex = nextIndex;
+					continue;
+				}
+
+				if (isRoll) {
+					this.presentedIndex = nextIndex; // dice values visible immediately, spin plays on top
+					this.isAnimatingRoll = true;
+					await this.sleep(ROLL_ANIMATION_MS);
+					if (epoch !== this.epoch) return;
+					this.isAnimatingRoll = false;
+				} else {
+					await this.sleep(MOVE_STEP_MS); // pause on the OLD position, then reveal
+					if (epoch !== this.epoch) return;
+					this.presentedIndex = nextIndex;
+				}
 			}
+		} finally {
+			// Cleared synchronously on the same tick the loop exits (rather than in a .finally()
+			// chained by the caller), so a new schedulePresentation() call can never observe a stale
+			// pumpingEpoch from a loop that has already finished but not yet "reported back".
+			if (this.pumpingEpoch === epoch) this.pumpingEpoch = null;
 		}
 	}
 }

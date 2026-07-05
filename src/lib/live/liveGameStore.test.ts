@@ -234,4 +234,27 @@ describe('LiveGameStore pacing', () => {
 		expect(live.isViewingHistory).toBe(true);
 		expect(live.isManuallyBrowsing).toBe(true);
 	});
+
+	it('starts a fresh pump for a new event delivered synchronously right after a zero-delay one completes', () => {
+		deliver(snapshot()); // index 0 via initHistory
+		// White's own second roll: alreadySeenLive, so its pump resolves with zero awaits — this used
+		// to leave pumpingEpoch cleared only on a later microtask (via a caller-side .finally()), which
+		// could race a same-tick delivery below. Both delivers happen with no await between them.
+		deliver({
+			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
+		});
+		// Immediately, same tick: the opponent's roll arrives and needs a real pump.
+		deliver({
+			DiceRolled: {
+				v: 2,
+				seat: 'Black',
+				dice: [2],
+				dfen: `${START_FEN.replace(' w ', ' b ')} n`,
+				clocks: null,
+			},
+		});
+
+		// The second pump must have actually started, not been silently dropped by a stale pumpingEpoch.
+		expect(live.isAnimatingRoll).toBe(true);
+	});
 });
