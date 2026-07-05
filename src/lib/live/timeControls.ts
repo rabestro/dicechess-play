@@ -33,8 +33,8 @@ export interface TimeControlGroup {
  * by a test). */
 export const timeControlGroups: readonly TimeControlGroup[] = (
 	[
-		['Blitz', ['3 + 2', '5 min', '5 + 3', '5 + 5']],
-		['Rapid', ['10 min', '10 + 5', '10 + 10', '15 + 10']],
+		['Blitz', ['3 + 2', '5 + 3', '5 + 5', '5 min']],
+		['Rapid', ['10 + 5', '10 + 10', '15 + 10', '10 min']],
 		['Per move', ['30s / move', '60s / move']],
 		['No clock', ['Unlimited']],
 	] as [string, string[]][]
