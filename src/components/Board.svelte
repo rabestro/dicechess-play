@@ -14,7 +14,9 @@
 	const toCg = (c: 'w' | 'b'): 'white' | 'black' => (c === 'w' ? 'white' : 'black');
 
 	const canMove = $derived(
-		store.gameStatus === 'playing' && store.activeColor === store.playerColor,
+		store.gameStatus === 'playing' &&
+			store.activeColor === store.playerColor &&
+			!store.isViewingHistory,
 	);
 </script>
 

@@ -232,6 +232,16 @@
 					{/if}
 				</div>
 
+				{#if live.isViewingHistory}
+					<button
+						type="button"
+						onclick={() => setMove(live.maxMoveIndex)}
+						class="w-full rounded-xl border border-primary bg-primary/10 py-2 text-center text-sm font-bold text-primary transition-colors hover:bg-primary/20"
+					>
+						Viewing history — Return to live
+					</button>
+				{/if}
+
 				<!-- History navigation buttons under the board -->
 				<div class="flex items-center justify-center gap-2 w-full">
 					<button

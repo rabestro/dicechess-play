@@ -139,6 +139,14 @@ export class PlayWithBotStore {
 	// Composed Bot Engine
 	bot = new PlayWithBotBot();
 
+	// TODO: bot-mode's own setMoveIndex overwrites currentBoardFen/activeColor/currentDice the same
+	// way liveGameStore's used to, which can corrupt history if a move is made while scrubbed (it
+	// also lacks the legalMovesDests/handleBoardMove guards live mode has) — deferred, tracked
+	// separately. Hardcoded false keeps Board.svelte's canMove behavior unchanged here for now.
+	get isViewingHistory(): boolean {
+		return false;
+	}
+
 	// Backward compatibility delegates to history engine
 	get currentMoveIndex() {
 		return this.history.currentMoveIndex;

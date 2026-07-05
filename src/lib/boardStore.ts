@@ -13,6 +13,8 @@ export interface BoardStore {
 	gameStatus: string;
 	/** Legal destinations for the current dice, keyed by origin square. */
 	legalMovesDests: Map<Key, Key[]>;
+	/** True while the user is browsing a past position instead of the live/current one. */
+	isViewingHistory: boolean;
 	/** Called by chessground after the user drops a piece. */
 	handleBoardMove(orig: string, dest: string): void;
 }
