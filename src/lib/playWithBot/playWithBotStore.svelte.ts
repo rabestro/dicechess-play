@@ -67,8 +67,15 @@ export type GameStatus =
 export class PlayWithBotStore {
 	gameStatus = $state<GameStatus>('idle');
 	gameEndReason = $state<GameEndReason | null>(null);
-	currentBoardFen = $state<string>('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
-	activeColor = $state<'w' | 'b'>('w');
+	// `currentBoardFen`/`activeColor`/`currentDice` are read-only getters (defined further down, once
+	// the `history`/`dice` sub-objects exist), derived from either these live fields or a historyMap
+	// entry depending on whether the user is browsing history (see `viewedIndex`). Game logic must
+	// read the private live fields (or `this.dice.currentDice`) directly — never the public getters —
+	// so scrubbing history can never affect move validation or feed the bot a stale position mid-turn.
+	private liveBoardFen = $state<string>('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+	private liveActiveColor = $state<'w' | 'b'>('w');
+	// null = tracking live; otherwise the historyMap index currently displayed.
+	private viewedIndex = $state<number | null>(null);
 	playerColor = $state<'w' | 'b'>('w');
 	botAlgorithm = $state<string>('greedy');
 	botColor = $derived((this.playerColor === 'w' ? 'b' : 'w') as 'w' | 'b');
@@ -139,21 +146,29 @@ export class PlayWithBotStore {
 	// Composed Bot Engine
 	bot = new PlayWithBotBot();
 
-	// TODO: bot-mode's own setMoveIndex overwrites currentBoardFen/activeColor/currentDice the same
-	// way liveGameStore's used to, which can corrupt history if a move is made while scrubbed (it
-	// also lacks the legalMovesDests/handleBoardMove guards live mode has) — deferred, tracked
-	// separately. Hardcoded false keeps Board.svelte's canMove behavior unchanged here for now.
-	get isViewingHistory(): boolean {
-		return false;
-	}
+	currentBoardFen = $derived.by<string>(() => {
+		if (this.viewedIndex !== null)
+			return this.historyMap[String(this.viewedIndex)]?.fen ?? this.liveBoardFen;
+		return this.liveBoardFen;
+	});
 
-	// Backward compatibility delegates to history engine
-	get currentMoveIndex() {
-		return this.history.currentMoveIndex;
-	}
-	set currentMoveIndex(v) {
-		this.history.currentMoveIndex = v;
-	}
+	activeColor = $derived.by<'w' | 'b'>(() => {
+		if (this.viewedIndex !== null)
+			return this.historyMap[String(this.viewedIndex)]?.active_color ?? this.liveActiveColor;
+		return this.liveActiveColor;
+	});
+
+	currentDice = $derived.by<DieState[]>(() => {
+		const source =
+			this.viewedIndex !== null
+				? (this.historyMap[String(this.viewedIndex)]?.dices ?? this.dice.currentDice)
+				: this.dice.currentDice;
+		return source.map((d) => ({ ...d }));
+	});
+
+	isViewingHistory = $derived(this.viewedIndex !== null);
+
+	currentMoveIndex = $derived(this.viewedIndex ?? this.maxMoveIndex);
 
 	get maxMoveIndex() {
 		return this.history.maxMoveIndex;
@@ -186,20 +201,6 @@ export class PlayWithBotStore {
 	get historyBlocks() {
 		return this.history.historyBlocks;
 	}
-	get canGoToStart() {
-		return this.history.canGoToStart;
-	}
-	get canGoToEnd() {
-		return this.history.canGoToEnd;
-	}
-
-	// Backward compatibility delegates to dice engine
-	get currentDice() {
-		return this.dice.currentDice;
-	}
-	set currentDice(v) {
-		this.dice.currentDice = v;
-	}
 
 	get isAnimatingRoll() {
 		return this.dice.isAnimatingRoll;
@@ -215,26 +216,6 @@ export class PlayWithBotStore {
 	startTime = $state<string>('');
 
 	private readonly initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-
-	handleFirstMove(): void {
-		this.setMoveIndex(0);
-	}
-
-	handleLastMove(): void {
-		this.setMoveIndex(this.history.maxMoveIndex);
-	}
-
-	handlePreviousTurn(): void {
-		if (this.history.currentMoveIndex > 0) {
-			this.setMoveIndex(this.history.currentMoveIndex - 1);
-		}
-	}
-
-	handleNextTurn(): void {
-		if (this.history.currentMoveIndex < this.history.maxMoveIndex) {
-			this.setMoveIndex(this.history.currentMoveIndex + 1);
-		}
-	}
 
 	constructor() {
 		this.bot.initializeWorker();
@@ -261,10 +242,11 @@ export class PlayWithBotStore {
 			this.playerColor = colorPref === 'white' ? 'w' : 'b';
 		}
 
-		this.activeColor = 'w';
+		this.liveActiveColor = 'w';
+		this.viewedIndex = null;
 		const startFen = this.parsedDfen.fen || this.initialFen;
-		this.currentBoardFen = startFen;
-		this.currentDice = [];
+		this.liveBoardFen = startFen;
+		this.dice.currentDice = [];
 		this.startTime = new Date().toISOString();
 
 		// Initialize the history engine
@@ -339,7 +321,7 @@ export class PlayWithBotStore {
 			const delta = now - this.lastTickTimestamp;
 			this.lastTickTimestamp = now;
 
-			if (this.activeColor === 'w') {
+			if (this.liveActiveColor === 'w') {
 				this.whiteTimeLeft = Math.max(0, this.whiteTimeLeft - delta);
 				if (this.whiteTimeLeft === 0) {
 					this.handleTimeout('w');
@@ -363,9 +345,9 @@ export class PlayWithBotStore {
 	private checkTimeout(): boolean {
 		if (this.timeLimit === null) return false;
 
-		const currentTime = this.activeColor === 'w' ? this.whiteTimeLeft : this.blackTimeLeft;
+		const currentTime = this.liveActiveColor === 'w' ? this.whiteTimeLeft : this.blackTimeLeft;
 		if (currentTime <= 0) {
-			this.handleTimeout(this.activeColor);
+			this.handleTimeout(this.liveActiveColor);
 			return true;
 		}
 		return false;
@@ -395,7 +377,7 @@ export class PlayWithBotStore {
 		}
 
 		if (this.currentTurnRecord) {
-			this.currentTurnRecord.end_dfen = this.currentBoardFen;
+			this.currentTurnRecord.end_dfen = this.liveBoardFen;
 			this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 			this.currentTurnRecord = null;
 		}
@@ -430,8 +412,9 @@ export class PlayWithBotStore {
 	endSession() {
 		this.stopTimer();
 		this.gameStatus = 'idle';
-		this.currentDice = [];
-		this.currentBoardFen = this.initialFen;
+		this.dice.currentDice = [];
+		this.liveBoardFen = this.initialFen;
+		this.viewedIndex = null;
 		this.history.clear();
 
 		// Reset draw states on session end
@@ -445,7 +428,7 @@ export class PlayWithBotStore {
 	/** Roll 3 random dice for Human */
 	canUserRoll = $derived(
 		this.gameStatus === 'rolling' &&
-			this.activeColor === this.playerColor &&
+			this.liveActiveColor === this.playerColor &&
 			!this.isAnimatingRoll &&
 			this.activeDrawOffer === null &&
 			this.activeDoubleOffer === null,
@@ -454,7 +437,7 @@ export class PlayWithBotStore {
 	canUserDouble = $derived(
 		this.mode === 'x2' &&
 			this.gameStatus === 'rolling' &&
-			this.activeColor === this.playerColor &&
+			this.liveActiveColor === this.playerColor &&
 			!this.isAnimatingRoll &&
 			(this.cubeOwner === null || this.cubeOwner === this.playerColor) &&
 			this.bet < this.baseBet * 64 &&
@@ -472,23 +455,23 @@ export class PlayWithBotStore {
 
 		let rolled: DieState[];
 		if (this.parsedDfen.dice && this.history.maxMoveIndex === 0) {
-			rolled = this.getInitialDice(this.activeColor);
+			rolled = this.getInitialDice(this.liveActiveColor);
 		} else {
-			rolled = this.dice.generateRandomDice(this.activeColor);
+			rolled = this.dice.generateRandomDice(this.liveActiveColor);
 		}
 
 		const gameId = this.startTime;
-		this.currentDice = rolled;
+		this.dice.currentDice = rolled;
 		await new Promise((resolve) => setTimeout(resolve, 600));
 		if (this.startTime !== gameId) return;
 		this.isAnimatingRoll = false;
 
-		if (this.gameStatus !== 'rolling' || this.activeColor !== this.playerColor) return;
+		if (this.gameStatus !== 'rolling' || this.liveActiveColor !== this.playerColor) return;
 
 		const allVals = rolled.map((d) => getDieValue(d));
 		let hasAtLeastOneLegalMove = false;
 		try {
-			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(this.currentBoardFen, allVals)) || [];
+			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, allVals)) || [];
 			if (uciMoves.length > 0) {
 				hasAtLeastOneLegalMove = true;
 			}
@@ -496,12 +479,12 @@ export class PlayWithBotStore {
 			logger.error('Error calculating legal moves for initial roll', e as Error);
 		}
 
-		this.currentDice = rolled;
+		this.dice.currentDice = rolled;
 
 		this.currentTurnRecord = {
 			turn_number: this.turnHistory.length + 1,
 			active_color: this.playerColor === 'w' ? 'WHITE' : 'BLACK',
-			start_dfen: buildDfen(this.currentBoardFen, allVals, this.playerColor),
+			start_dfen: buildDfen(this.liveBoardFen, allVals, this.playerColor),
 			moves: [],
 		};
 
@@ -516,14 +499,13 @@ export class PlayWithBotStore {
 		} else {
 			const rollIndex = this.maxMoveIndex + 1;
 			const rollState: BotMoveHistoryState = {
-				fen: this.currentBoardFen,
+				fen: this.liveBoardFen,
 				active_color: this.playerColor,
 				dices: structuredClone(rolled),
 				gameMoveHistoryMove: null,
 				leftTime: this.getLeftTimeMap(),
 			};
 			this.historyMap[String(rollIndex)] = rollState;
-			this.currentMoveIndex = rollIndex;
 			this.maxMoveIndex = rollIndex;
 		}
 
@@ -531,9 +513,9 @@ export class PlayWithBotStore {
 			toastStore.info('No legal moves available. Turn forfeited!');
 			this.gameStatus = 'bot_thinking';
 			if (this.toggleActiveColorInFen()) {
-				this.updateStateInHistory({ fen: this.currentBoardFen });
+				this.updateStateInHistory({ fen: this.liveBoardFen });
 				setTimeout(() => {
-					this.activeColor = this.botColor;
+					this.liveActiveColor = this.botColor;
 					this.botTurn();
 				}, 1500);
 			} else {
@@ -547,9 +529,10 @@ export class PlayWithBotStore {
 
 	/** Cached legal moves for Chessground board — recomputed eagerly after state mutations */
 	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
+		if (this.isViewingHistory) return new Map();
 		if (
 			this.gameStatus !== 'playing' ||
-			this.activeColor !== this.playerColor ||
+			this.liveActiveColor !== this.playerColor ||
 			this.activeDrawOffer !== null
 		) {
 			return new Map();
@@ -562,7 +545,7 @@ export class PlayWithBotStore {
 		}
 
 		try {
-			const fullFen = this.currentBoardFen;
+			const fullFen = this.liveBoardFen;
 			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(fullFen, availableDice)) || [];
 			return deriveChessgroundDests(uciMoves);
 		} catch (e) {
@@ -573,13 +556,14 @@ export class PlayWithBotStore {
 
 	/** Human Move Handler */
 	handleBoardMove(orig: string, dest: string, _fenAfterMove?: string) {
-		if (this.gameStatus !== 'playing' || this.activeColor !== this.playerColor) return;
+		if (this.isViewingHistory) return;
+		if (this.gameStatus !== 'playing' || this.liveActiveColor !== this.playerColor) return;
 
-		const piece = getPieceFromFen(this.currentBoardFen, orig);
+		const piece = getPieceFromFen(this.liveBoardFen, orig);
 		if (!piece) return;
 
 		const dieVal = getDieValue(piece);
-		const dieIndex = this.currentDice.findIndex(
+		const dieIndex = this.dice.currentDice.findIndex(
 			(d) => d.allowed && !d.used && getDieValue(d) === dieVal,
 		);
 
@@ -597,13 +581,13 @@ export class PlayWithBotStore {
 		if (isPromotion) {
 			// If capturing the King on the promotion rank, the game ends immediately.
 			// Auto-promote to Queen to bypass the popup UI.
-			const targetPiece = getPieceFromFen(this.currentBoardFen, dest);
+			const targetPiece = getPieceFromFen(this.liveBoardFen, dest);
 			if (targetPiece && targetPiece.toLowerCase() === 'k') {
 				this.completeMoveLogic(orig, dest, 'q', dieIndex);
 				return;
 			}
 
-			const availableDice = this.currentDice
+			const availableDice = this.dice.currentDice
 				.filter((d, i) => d.allowed && (!d.used || i === dieIndex))
 				.map((d) => getDieValue(d));
 
@@ -611,7 +595,7 @@ export class PlayWithBotStore {
 			try {
 				if (typeof DiceChess.getLegalUciMoves === 'function') {
 					const legalMoves: string[] =
-						DiceChess.getLegalUciMoves(buildDfen(this.currentBoardFen, availableDice)) || [];
+						DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, availableDice)) || [];
 					const movePrefix = orig + dest;
 					const apiPromos = legalMoves
 						.filter((m) => m.startsWith(movePrefix) && m.length === 5)
@@ -639,10 +623,10 @@ export class PlayWithBotStore {
 
 		// Force a board redraw by slightly mutating the FEN or relying on a redraw signal
 		// to snap the piece back to its original square.
-		const currentFen = this.currentBoardFen;
-		this.currentBoardFen = '';
+		const currentFen = this.liveBoardFen;
+		this.liveBoardFen = '';
 		setTimeout(() => {
-			this.currentBoardFen = currentFen;
+			this.liveBoardFen = currentFen;
 		}, 0);
 	}
 
@@ -659,7 +643,7 @@ export class PlayWithBotStore {
 			Math.abs(orig.charCodeAt(0) - dest.charCodeAt(0)) === 2
 		) {
 			const rookDieVal = getDieValue('r'); // Rook die value
-			const rookDieIndex = this.currentDice.findIndex(
+			const rookDieIndex = this.dice.currentDice.findIndex(
 				(d) => d.allowed && !d.used && getDieValue(d) === rookDieVal,
 			);
 			if (rookDieIndex !== -1) {
@@ -681,12 +665,12 @@ export class PlayWithBotStore {
 		promotionStr: string | undefined,
 		dieIndex: number,
 	) {
-		const oldBoardFen = this.currentBoardFen;
-		const availableDice = this.currentDice
+		const oldBoardFen = this.liveBoardFen;
+		const availableDice = this.dice.currentDice
 			.filter((d, i) => d.allowed && (!d.used || i === dieIndex))
 			.map((d) => getDieValue(d));
 		const nextBoardFenRaw = DiceChess.applyMove(
-			buildDfen(this.currentBoardFen, availableDice),
+			buildDfen(this.liveBoardFen, availableDice),
 			orig,
 			dest,
 			promotionStr,
@@ -701,7 +685,7 @@ export class PlayWithBotStore {
 		// We just drop the 7th field (dice pool) if it exists, as the UI tracks dice independently.
 		const nextBoardFen = nextBoardFenRaw.split(/\s+/).slice(0, 6).join(' ');
 
-		this.currentBoardFen = nextBoardFen;
+		this.liveBoardFen = nextBoardFen;
 
 		// Handle castling die consumption after successful move validation
 		const pieceChar = getPieceFromFen(oldBoardFen, orig);
@@ -727,7 +711,7 @@ export class PlayWithBotStore {
 		const newState: BotMoveHistoryState = {
 			fen: nextBoardFen,
 			active_color: this.playerColor,
-			dices: $state.snapshot(this.currentDice),
+			dices: $state.snapshot(this.dice.currentDice),
 			gameMoveHistoryMove: {
 				from: orig,
 				to: dest,
@@ -738,14 +722,13 @@ export class PlayWithBotStore {
 
 		this.historyMap[String(moveIndex)] = newState;
 
-		this.currentMoveIndex = moveIndex;
 		this.maxMoveIndex = moveIndex;
 
 		if (isVictory) {
 			this.stopTimer();
 			this.gameEndReason = 'mate';
 			if (this.currentTurnRecord) {
-				this.currentTurnRecord.end_dfen = this.currentBoardFen;
+				this.currentTurnRecord.end_dfen = this.liveBoardFen;
 				this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 				this.currentTurnRecord = null;
 			}
@@ -763,10 +746,10 @@ export class PlayWithBotStore {
 		if (!hasRemainingMoves) {
 			this.gameStatus = 'bot_thinking';
 			if (this.toggleActiveColorInFen()) {
-				this.updateStateInHistory({ fen: this.currentBoardFen });
+				this.updateStateInHistory({ fen: this.liveBoardFen });
 
 				setTimeout(() => {
-					this.activeColor = this.botColor;
+					this.liveActiveColor = this.botColor;
 					this.botTurn();
 				}, 800);
 			} else {
@@ -778,7 +761,7 @@ export class PlayWithBotStore {
 
 	/** Greedy Bot Turn logic */
 	async botTurn(bypassDoubleCheck = false) {
-		if (this.gameStatus !== 'bot_thinking' || this.activeColor === this.playerColor) return;
+		if (this.gameStatus !== 'bot_thinking' || this.liveActiveColor === this.playerColor) return;
 
 		// Bot Doubling Check
 		if (
@@ -787,7 +770,7 @@ export class PlayWithBotStore {
 			(this.cubeOwner === null || this.cubeOwner === this.botColor) &&
 			this.bet < this.baseBet * 64
 		) {
-			const currentDfen = buildDfen(this.currentBoardFen, [], this.botColor);
+			const currentDfen = buildDfen(this.liveBoardFen, [], this.botColor);
 			let botWantsToDouble = false;
 			try {
 				if (typeof DiceChess?.shouldBotOfferDouble === 'function') {
@@ -813,7 +796,7 @@ export class PlayWithBotStore {
 
 		// Check if bot wants to offer a draw before making its moves
 		if (this.botCanOfferDraw) {
-			const currentDfen = buildDfen(this.currentBoardFen, [], this.botColor);
+			const currentDfen = buildDfen(this.liveBoardFen, [], this.botColor);
 			try {
 				const wantsDraw =
 					typeof DiceChess?.shouldBotOfferDraw === 'function'
@@ -837,13 +820,13 @@ export class PlayWithBotStore {
 
 		let rolled: DieState[];
 		if (this.parsedDfen.dice && this.history.maxMoveIndex === 0) {
-			rolled = this.getInitialDice(this.activeColor);
+			rolled = this.getInitialDice(this.liveActiveColor);
 		} else {
-			rolled = this.dice.generateRandomDice(this.activeColor);
+			rolled = this.dice.generateRandomDice(this.liveActiveColor);
 		}
 
 		const gameId = this.startTime;
-		this.currentDice = rolled;
+		this.dice.currentDice = rolled;
 		await new Promise((resolve) => setTimeout(resolve, 600));
 		if (this.startTime !== gameId) return;
 		this.isAnimatingRoll = false;
@@ -851,12 +834,12 @@ export class PlayWithBotStore {
 		// Ensure timer is running after dice animation
 		this.startTimer();
 
-		if (this.activeColor === this.playerColor) return;
+		if (this.liveActiveColor === this.playerColor) return;
 
 		const allVals = rolled.map((d) => getDieValue(d));
 		let botHasMoves = false;
 		try {
-			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(this.currentBoardFen, allVals)) || [];
+			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, allVals)) || [];
 			if (uciMoves.length > 0) {
 				botHasMoves = true;
 			}
@@ -864,18 +847,18 @@ export class PlayWithBotStore {
 			logger.error('Error calculating Bot legal moves for initial roll', e as Error);
 		}
 
-		this.currentDice = rolled;
+		this.dice.currentDice = rolled;
 
 		this.currentTurnRecord = {
 			turn_number: this.turnHistory.length + 1,
 			active_color: this.botColor === 'w' ? 'WHITE' : 'BLACK',
-			start_dfen: buildDfen(this.currentBoardFen, allVals, this.botColor),
+			start_dfen: buildDfen(this.liveBoardFen, allVals, this.botColor),
 			moves: [],
 		};
 
 		const rollIndex = this.maxMoveIndex + 1;
 		const rollState: BotMoveHistoryState = {
-			fen: this.currentBoardFen,
+			fen: this.liveBoardFen,
 			active_color: this.botColor,
 			dices: structuredClone(rolled),
 			gameMoveHistoryMove: null,
@@ -883,7 +866,6 @@ export class PlayWithBotStore {
 		};
 
 		this.historyMap[String(rollIndex)] = rollState;
-		this.currentMoveIndex = rollIndex;
 		this.maxMoveIndex = rollIndex;
 
 		if (!botHasMoves) {
@@ -891,9 +873,9 @@ export class PlayWithBotStore {
 			await new Promise((resolve) => setTimeout(resolve, 1500));
 			this.gameStatus = 'rolling';
 			if (this.toggleActiveColorInFen()) {
-				this.activeColor = this.playerColor;
-				this.updateStateInHistory({ fen: this.currentBoardFen });
-				this.currentDice = [];
+				this.liveActiveColor = this.playerColor;
+				this.updateStateInHistory({ fen: this.liveBoardFen });
+				this.dice.currentDice = [];
 				this.tryAutoRoll();
 			} else {
 				toastStore.error('System error: Turn transition failed.');
@@ -913,7 +895,7 @@ export class PlayWithBotStore {
 				? { remainingMs: this.botTimeLeft, incrementMs: (this.timeBonus ?? 0) * 1000 }
 				: undefined;
 		const botMovePromise = this.bot.selectBestMove(
-			this.currentBoardFen,
+			this.liveBoardFen,
 			availableDice,
 			this.botAlgorithm,
 			clock,
@@ -966,11 +948,11 @@ export class PlayWithBotStore {
 			// Check for timeout during bot move execution
 			if (this.checkTimeout()) return;
 
-			const movingPiece = getPieceFromFen(this.currentBoardFen, move.from);
+			const movingPiece = getPieceFromFen(this.liveBoardFen, move.from);
 			if (!movingPiece) continue;
 
 			const dieVal = getDieValue(movingPiece);
-			const botDieIndex = this.currentDice.findIndex(
+			const botDieIndex = this.dice.currentDice.findIndex(
 				(d) => d.allowed && !d.used && getDieValue(d) === dieVal,
 			);
 
@@ -978,10 +960,10 @@ export class PlayWithBotStore {
 				this.dice.markUsed(botDieIndex);
 			}
 
-			const prevBoard = this.currentBoardFen;
+			const prevBoard = this.liveBoardFen;
 			const dfenBefore = buildDfen(
-				this.currentBoardFen,
-				this.currentDice
+				this.liveBoardFen,
+				this.dice.currentDice
 					.filter((d, i) => d.allowed && (!d.used || i === botDieIndex))
 					.map((d) => getDieValue(d)),
 			);
@@ -1003,7 +985,7 @@ export class PlayWithBotStore {
 			// We just drop the 7th field (dice pool) if it exists, as the UI tracks dice independently.
 			const nextBoardFen = nextBoardFenRaw.split(/\s+/).slice(0, 6).join(' ');
 
-			this.currentBoardFen = nextBoardFen;
+			this.liveBoardFen = nextBoardFen;
 
 			// Handle castling die consumption for bot moves
 			this.handleCastlingDieConsumption(move.from, move.to, movingPiece);
@@ -1027,7 +1009,7 @@ export class PlayWithBotStore {
 			const newState: BotMoveHistoryState = {
 				fen: nextBoardFen,
 				active_color: this.botColor,
-				dices: $state.snapshot(this.currentDice),
+				dices: $state.snapshot(this.dice.currentDice),
 				gameMoveHistoryMove: {
 					from: move.from,
 					to: move.to,
@@ -1037,14 +1019,13 @@ export class PlayWithBotStore {
 			};
 
 			this.historyMap[String(moveIndex)] = newState;
-			this.currentMoveIndex = moveIndex;
 			this.maxMoveIndex = moveIndex;
 
 			if (isKingCaptured) {
 				this.stopTimer();
 				this.gameEndReason = 'mate';
 				if (this.currentTurnRecord) {
-					this.currentTurnRecord.end_dfen = this.currentBoardFen;
+					this.currentTurnRecord.end_dfen = this.liveBoardFen;
 					this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 					this.currentTurnRecord = null;
 				}
@@ -1059,9 +1040,9 @@ export class PlayWithBotStore {
 
 		this.gameStatus = 'rolling';
 		if (this.toggleActiveColorInFen()) {
-			this.activeColor = this.playerColor;
-			this.updateStateInHistory({ fen: this.currentBoardFen });
-			this.currentDice = [];
+			this.liveActiveColor = this.playerColor;
+			this.updateStateInHistory({ fen: this.liveBoardFen });
+			this.dice.currentDice = [];
 			this.tryAutoRoll();
 		} else {
 			toastStore.error('System error: Turn transition failed.');
@@ -1071,13 +1052,18 @@ export class PlayWithBotStore {
 
 	setMoveIndex(index: number) {
 		if (index < 0 || index > this.maxMoveIndex) return;
-		this.currentMoveIndex = index;
-		const state = this.historyMap[String(index)];
-		if (state) {
-			this.currentBoardFen = state.fen;
-			this.activeColor = state.active_color;
-			this.currentDice = $state.snapshot(state.dices || []);
-		}
+		// An action is mid-flight and its outcome (a die consumption, a bot accept/decline decision)
+		// is pinned to the live position — don't let a scrub observe or corrupt it. Mirrors
+		// liveGameStore's equivalent pendingPromotion guard, extended for bot mode's two additional
+		// in-flight AI-decision windows (offerDraw/offerDouble each await ~1200ms before reading the
+		// live board).
+		if (
+			this.pendingPromotion !== null ||
+			this.activeDrawOffer !== null ||
+			this.activeDoubleOffer !== null
+		)
+			return;
+		this.viewedIndex = index === this.maxMoveIndex ? null : index;
 	}
 
 	resignGame() {
@@ -1089,7 +1075,7 @@ export class PlayWithBotStore {
 		botStatsStore.recordResult(this.botAlgorithm, 'loss');
 		toastStore.info('You resigned from this game.');
 		if (this.currentTurnRecord) {
-			this.currentTurnRecord.end_dfen = this.currentBoardFen;
+			this.currentTurnRecord.end_dfen = this.liveBoardFen;
 			this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 			this.currentTurnRecord = null;
 		}
@@ -1099,7 +1085,7 @@ export class PlayWithBotStore {
 	async offerDraw() {
 		if (
 			!this.playerCanOfferDraw ||
-			this.activeColor !== this.playerColor ||
+			this.liveActiveColor !== this.playerColor ||
 			this.gameStatus !== 'playing'
 		) {
 			return;
@@ -1124,7 +1110,7 @@ export class PlayWithBotStore {
 			return;
 		}
 
-		const currentDfen = buildDfen(this.currentBoardFen, this.availableDiceValues, this.playerColor);
+		const currentDfen = buildDfen(this.liveBoardFen, this.availableDiceValues, this.playerColor);
 		let botAccepts = false;
 		try {
 			if (typeof DiceChess?.shouldBotAcceptDraw === 'function') {
@@ -1178,7 +1164,7 @@ export class PlayWithBotStore {
 
 		if (
 			this.gameStatus !== 'rolling' ||
-			this.activeColor !== this.playerColor ||
+			this.liveActiveColor !== this.playerColor ||
 			this.activeDoubleOffer !== 'player'
 		) {
 			this.activeDoubleOffer = null;
@@ -1187,7 +1173,7 @@ export class PlayWithBotStore {
 		}
 
 		const proposedBet = 2 * this.bet;
-		const currentDfen = buildDfen(this.currentBoardFen, [], this.playerColor);
+		const currentDfen = buildDfen(this.liveBoardFen, [], this.playerColor);
 		let botAccepts = false;
 		try {
 			if (typeof DiceChess?.shouldBotAcceptDouble === 'function') {
@@ -1241,7 +1227,7 @@ export class PlayWithBotStore {
 		botStatsStore.recordResult(this.botAlgorithm, 'win');
 
 		if (this.currentTurnRecord) {
-			this.currentTurnRecord.end_dfen = this.currentBoardFen;
+			this.currentTurnRecord.end_dfen = this.liveBoardFen;
 			this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 			this.currentTurnRecord = null;
 		}
@@ -1256,7 +1242,7 @@ export class PlayWithBotStore {
 		botStatsStore.recordResult(this.botAlgorithm, 'loss');
 
 		if (this.currentTurnRecord) {
-			this.currentTurnRecord.end_dfen = this.currentBoardFen;
+			this.currentTurnRecord.end_dfen = this.liveBoardFen;
 			this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 			this.currentTurnRecord = null;
 		}
@@ -1275,7 +1261,7 @@ export class PlayWithBotStore {
 		);
 
 		if (this.currentTurnRecord) {
-			this.currentTurnRecord.end_dfen = this.currentBoardFen;
+			this.currentTurnRecord.end_dfen = this.liveBoardFen;
 			this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 			this.currentTurnRecord = null;
 		}
@@ -1289,7 +1275,7 @@ export class PlayWithBotStore {
 		this.gameEndReason = 'agreement';
 
 		if (this.currentTurnRecord) {
-			this.currentTurnRecord.end_dfen = this.currentBoardFen;
+			this.currentTurnRecord.end_dfen = this.liveBoardFen;
 			this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 			this.currentTurnRecord = null;
 		}
@@ -1319,20 +1305,20 @@ export class PlayWithBotStore {
 	}
 
 	private toggleActiveColorInFen(): boolean {
-		const nextFen = DiceChess.endTurn(this.currentBoardFen);
+		const nextFen = DiceChess.endTurn(this.liveBoardFen);
 		if (nextFen) {
 			if (this.timeBonus && this.timeLimit !== null) {
-				if (this.activeColor === 'w') {
+				if (this.liveActiveColor === 'w') {
 					this.whiteTimeLeft += this.timeBonus * 1000;
 				} else {
 					this.blackTimeLeft += this.timeBonus * 1000;
 				}
 			}
-			this.currentBoardFen = nextFen.split(/\s+/).slice(0, 6).join(' ');
-			this.activeColor = this.activeColor === 'w' ? 'b' : 'w';
+			this.liveBoardFen = nextFen.split(/\s+/).slice(0, 6).join(' ');
+			this.liveActiveColor = this.liveActiveColor === 'w' ? 'b' : 'w';
 
 			if (this.currentTurnRecord) {
-				this.currentTurnRecord.end_dfen = this.currentBoardFen;
+				this.currentTurnRecord.end_dfen = this.liveBoardFen;
 				this.turnHistory.push(this.currentTurnRecord as DiceChessTurnHistory);
 				this.currentTurnRecord = null;
 			}

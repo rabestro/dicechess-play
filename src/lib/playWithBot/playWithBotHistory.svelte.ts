@@ -23,9 +23,6 @@ export class PlayWithBotHistory {
 	/** The reactive map correlating move indices with their corresponding board and dice states. */
 	historyMap = $state<Record<string, BotMoveHistoryState>>({});
 
-	/** The current active move index that the board is displaying. */
-	currentMoveIndex = $state<number>(0);
-
 	/** The highest move index reached in the active game. */
 	maxMoveIndex = $state<number>(0);
 
@@ -40,7 +37,6 @@ export class PlayWithBotHistory {
 	 * @param initialFen The starting FEN position.
 	 */
 	initializeNewGame(initialFen: string) {
-		this.currentMoveIndex = 0;
 		this.maxMoveIndex = 0;
 		this.turnHistory = [];
 		this.currentTurnRecord = null;
@@ -59,63 +55,9 @@ export class PlayWithBotHistory {
 	 */
 	clear() {
 		this.historyMap = {};
-		this.currentMoveIndex = 0;
 		this.maxMoveIndex = 0;
 		this.turnHistory = [];
 		this.currentTurnRecord = null;
-	}
-
-	/**
-	 * Whether the game is navigable backwards.
-	 */
-	get canGoToStart(): boolean {
-		return this.currentMoveIndex > 0;
-	}
-
-	/**
-	 * Whether the game is navigable forwards.
-	 */
-	get canGoToEnd(): boolean {
-		return this.currentMoveIndex < this.maxMoveIndex;
-	}
-
-	/**
-	 * Records a new move position in the history map.
-	 * @param nextFen The FEN board position after applying the move.
-	 * @param activeColor The color active on the turn.
-	 * @param dices Snapshot of the current turn's dice pool.
-	 * @param move Details of the applied micro-move (from square, to square, promotion piece).
-	 * @returns The newly created move index.
-	 */
-	recordMove(
-		nextFen: string,
-		activeColor: 'w' | 'b',
-		dices: { value: string; allowed: boolean; used: boolean }[],
-		move: { from: string; to: string; promotion: string } | null,
-	): number {
-		const moveIndex = this.maxMoveIndex + 1;
-		const newState: BotMoveHistoryState = {
-			fen: nextFen,
-			active_color: activeColor,
-			dices: $state.snapshot(dices),
-			gameMoveHistoryMove: move,
-		};
-
-		this.historyMap[String(moveIndex)] = newState;
-		this.currentMoveIndex = moveIndex;
-		this.maxMoveIndex = moveIndex;
-		return moveIndex;
-	}
-
-	/**
-	 * Updates partial state parameters on the most recent history record.
-	 * @param update Partial parameters of BotMoveHistoryState to override.
-	 */
-	updateStateInHistory(update: Partial<BotMoveHistoryState>) {
-		const state = this.historyMap[String(this.maxMoveIndex)];
-		if (state) {
-			Object.assign(state, update);
-		}
 	}
 
 	/**
