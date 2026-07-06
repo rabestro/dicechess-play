@@ -1052,17 +1052,14 @@ export class PlayWithBotStore {
 
 	setMoveIndex(index: number) {
 		if (index < 0 || index > this.maxMoveIndex) return;
-		// An action is mid-flight and its outcome (a die consumption, a bot accept/decline decision)
-		// is pinned to the live position — don't let a scrub observe or corrupt it. Mirrors
-		// liveGameStore's equivalent pendingPromotion guard, extended for bot mode's two additional
-		// in-flight AI-decision windows (offerDraw/offerDouble each await ~1200ms before reading the
-		// live board).
-		if (
-			this.pendingPromotion !== null ||
-			this.activeDrawOffer !== null ||
-			this.activeDoubleOffer !== null
-		)
-			return;
+		// A pending promotion is an in-progress move — its die is already consumed and its
+		// orig/dest are fixed, so there's nothing to gain from seeing the live board before it
+		// resolves. Mirrors liveGameStore's equivalent guard. Deliberately NOT extended to
+		// activeDrawOffer/activeDoubleOffer: offerDraw/offerDouble already read the private
+		// liveBoardFen directly (a scrub can't affect their AI decision either way), and blocking
+		// navigation there would trap the user in a historical view exactly when they'd want to
+		// check the live position before accepting or declining.
+		if (this.pendingPromotion !== null) return;
 		this.viewedIndex = index === this.maxMoveIndex ? null : index;
 	}
 

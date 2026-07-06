@@ -16,7 +16,9 @@ const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
  * many of the 3 seeded dice have been consumed, without depending on random dice faces.
  */
 function createMockDiceChess() {
-	const applyMove = vi.fn(() => START_FEN);
+	const applyMove = vi.fn(
+		(_dfen: string, _from?: string, _to?: string, _promo?: string) => START_FEN,
+	);
 	const getLegalUciMoves = vi.fn((dfen: string) => {
 		const diceSuffix = dfen.trim().split(/\s+/)[6] ?? '';
 		return diceSuffix.length >= 1 ? ['e2e4'] : [];
@@ -130,7 +132,7 @@ describe('PlayWithBotStore history scrubbing (issue #55)', () => {
 		expect(store.activeColor).toBe('w'); // turn handed back to the player, now viewed live
 	});
 
-	it('does not scrub while a promotion, draw offer, or double offer is pending', async () => {
+	it('blocks scrubbing only for an in-progress promotion, not draw or double offers', async () => {
 		await startAndRollPlayerTurn();
 		store.handleBoardMove('e2', 'e4');
 		expect(store.maxMoveIndex).toBe(1);
@@ -146,19 +148,19 @@ describe('PlayWithBotStore history scrubbing (issue #55)', () => {
 		expect(store.isViewingHistory).toBe(false);
 		store.pendingPromotion = null;
 
+		// Draw/double offers must NOT block navigation: offerDraw/offerDouble already read the
+		// live board directly, and the player may want to check the live position before deciding.
 		store.activeDrawOffer = 'player';
 		store.setMoveIndex(0);
-		expect(store.isViewingHistory).toBe(false);
+		expect(store.isViewingHistory).toBe(true);
+		store.setMoveIndex(store.maxMoveIndex);
 		store.activeDrawOffer = null;
 
 		store.activeDoubleOffer = 'bot';
 		store.setMoveIndex(0);
-		expect(store.isViewingHistory).toBe(false);
-		store.activeDoubleOffer = null;
-
-		// With nothing pending, scrubbing works normally.
-		store.setMoveIndex(0);
 		expect(store.isViewingHistory).toBe(true);
+		store.setMoveIndex(store.maxMoveIndex);
+		store.activeDoubleOffer = null;
 	});
 
 	it("keeps the wall-clock timer decrementing the live side's time regardless of what's displayed", async () => {
