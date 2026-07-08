@@ -237,8 +237,10 @@ describe('PlayWithBotStore history scrubbing (issue #55)', () => {
 		await rolled;
 
 		// Check that the legal moves calculation received lowercase dice pool 'ppp'
-		const lastLegalMovesCall = mock.getLegalUciMoves.mock.calls.at(-1)?.[0];
+		const lastLegalMovesCall = mock.getLegalUciMoves.mock.calls.at(-1)?.[0] as string;
 		expect(lastLegalMovesCall).toContain(' b ');
-		expect(lastLegalMovesCall).toContain('ppp'); // lowercase 'ppp' because activeColor was passed as 'b'
+		const parts = lastLegalMovesCall.trim().split(/\s+/);
+		const diceSuffix = parts[6] ?? '';
+		expect(diceSuffix).toBe('ppp');
 	});
 });

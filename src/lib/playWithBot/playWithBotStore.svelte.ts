@@ -239,7 +239,8 @@ export class PlayWithBotStore {
 		this.viewedIndex = null;
 		const startFen = this.parsedDfen.fen || this.initialFen;
 		this.liveBoardFen = startFen;
-		this.liveActiveColor = (startFen.split(/\s+/)[1] as 'w' | 'b') || 'w';
+		const activeColorToken = startFen.split(/\s+/)[1];
+		this.liveActiveColor = activeColorToken === 'b' ? 'b' : 'w';
 		this.dice.currentDice = [];
 		this.startTime = new Date().toISOString();
 
