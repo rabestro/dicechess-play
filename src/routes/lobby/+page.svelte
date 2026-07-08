@@ -41,8 +41,6 @@
 
 	const playerName = (p: PublicPlayer | undefined | null): string => p?.name ?? 'Anonymous';
 	const isBot = (p: PublicPlayer | undefined | null): boolean => p?.kind === 'Bot';
-	const versus = (game: LiveGame) =>
-		`${playerName(game.players?.white)} vs ${playerName(game.players?.black)}`;
 
 	function goToBoard(gameId: string, token: string, seat: 'White' | 'Black') {
 		// Full navigation: the board page connects fresh from the seat token in the URL.
@@ -262,16 +260,63 @@
 				{#each otherGames as game (game.gameId)}
 					<a
 						href={resolve('/live/[id]', { id: game.gameId })}
-						class="group flex flex-col gap-2 rounded-2xl border border-border bg-surface p-3 transition-all hover:-translate-y-0.5 hover:border-primary"
+						class="group flex flex-row sm:flex-col gap-3 rounded-2xl border border-border bg-surface p-3 transition-all hover:-translate-y-0.5 hover:border-primary"
 					>
-						<span
-							class="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-success"
-						>
-							<span class="live-dot"></span>
-							live · move {fullmoveOf(game.dfen)}
-						</span>
-						<MiniBoard fen={game.dfen} />
-						<span class="truncate text-xs text-content-muted">{versus(game)}</span>
+						<div class="w-20 h-20 shrink-0 sm:w-full sm:h-auto">
+							<MiniBoard fen={game.dfen} />
+						</div>
+						<div class="flex flex-col justify-between flex-1 min-w-0">
+							<div class="flex items-center justify-between gap-2">
+								<span
+									class="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-success"
+								>
+									<span class="live-dot"></span>
+									live · move {fullmoveOf(game.dfen)}
+								</span>
+								<span
+									class="text-xs text-content-muted opacity-0 transition-opacity group-hover:opacity-100 hidden sm:inline"
+								>
+									Watch →
+								</span>
+							</div>
+							<div class="flex flex-col gap-1.5 my-1.5 min-w-0">
+								<div class="flex items-center justify-between gap-2 min-w-0">
+									<span class="flex items-center gap-1.5 min-w-0 text-xs text-content-muted">
+										<span
+											class="w-2 h-2 rounded-full bg-slate-950 border border-slate-700 shrink-0"
+											aria-hidden="true"
+										></span>
+										<span class="truncate">{playerName(game.players?.black)}</span>
+										{#if isBot(game.players?.black)}
+											<span
+												class="shrink-0 rounded bg-primary/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-primary"
+											>
+												bot
+											</span>
+										{/if}
+									</span>
+								</div>
+								<div class="flex items-center justify-between gap-2 min-w-0">
+									<span class="flex items-center gap-1.5 min-w-0 text-xs text-content-muted">
+										<span
+											class="w-2 h-2 rounded-full bg-white border border-slate-300 shrink-0"
+											aria-hidden="true"
+										></span>
+										<span class="truncate">{playerName(game.players?.white)}</span>
+										{#if isBot(game.players?.white)}
+											<span
+												class="shrink-0 rounded bg-primary/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-primary"
+											>
+												bot
+											</span>
+										{/if}
+									</span>
+								</div>
+							</div>
+							<div class="sm:hidden mt-auto">
+								<span class="inline-block text-xs font-semibold text-primary"> Watch game → </span>
+							</div>
+						</div>
 					</a>
 				{/each}
 
@@ -281,22 +326,29 @@
 						type="button"
 						onclick={() => accept(seek)}
 						disabled={accepting || creating}
-						class="flex flex-col gap-2 rounded-2xl border-2 border-dashed p-3 text-left transition-all hover:-translate-y-0.5 disabled:opacity-60
+						class="group flex flex-row sm:flex-col gap-3 rounded-2xl border-2 border-dashed p-3 text-left transition-all hover:-translate-y-0.5 disabled:opacity-60
 							{offer.bot
 							? 'border-primary/50 bg-primary/5 hover:border-primary'
 							: 'border-border bg-surface/50 hover:border-primary/60'}"
 					>
-						<span
-							class="font-mono text-[10px] font-bold uppercase tracking-wider {offer.bot
-								? 'text-primary'
-								: 'text-content-muted'}"
-						>
-							open table
-						</span>
-						<MiniBoard fen={START_FEN} faded />
-						<span class="flex min-w-0 items-center justify-between gap-2">
-							<span class="flex min-w-0 items-center gap-1.5 text-xs text-content-muted">
-								<span class="truncate">{offer.name}</span>
+						<div class="w-20 h-20 shrink-0 sm:w-full sm:h-auto">
+							<MiniBoard fen={START_FEN} faded />
+						</div>
+						<div class="flex flex-col justify-between flex-1 min-w-0">
+							<div class="flex items-center justify-between gap-2">
+								<span
+									class="font-mono text-[10px] font-bold uppercase tracking-wider {offer.bot
+										? 'text-primary'
+										: 'text-content-muted'}"
+								>
+									open table
+								</span>
+								<span class="text-xs text-content-muted shrink-0">
+									{timeControlLabel(seek.timeControl)}
+								</span>
+							</div>
+							<div class="flex items-center gap-1.5 min-w-0 my-1.5">
+								<b class="truncate text-sm text-content">{offer.name}</b>
 								{#if offer.bot}
 									<span
 										class="shrink-0 rounded bg-primary/15 px-1 py-px text-[10px] font-bold uppercase tracking-wide text-primary"
@@ -304,14 +356,15 @@
 										bot
 									</span>
 								{/if}
-								<span class="shrink-0">· {timeControlLabel(seek.timeControl)}</span>
-							</span>
-							<span
-								class="shrink-0 rounded-lg bg-primary px-3 py-1 text-xs font-bold text-primary-content"
-							>
-								Sit down
-							</span>
-						</span>
+							</div>
+							<div class="mt-auto sm:mt-2">
+								<span
+									class="inline-block w-full text-center rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-content shadow-sm transition-colors group-hover:bg-primary-hover"
+								>
+									Sit down
+								</span>
+							</div>
+						</div>
 					</button>
 				{/each}
 			</div>
@@ -326,20 +379,21 @@
 <style>
 	.board-wall {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-		gap: 12px;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 16px;
 		align-items: start;
 	}
 	.tv {
 		grid-column: span 2;
 		grid-row: span 2;
 	}
-	@media (max-width: 480px) {
+	@media (max-width: 640px) {
 		.board-wall {
-			grid-template-columns: 1fr 1fr;
+			grid-template-columns: 1fr;
+			gap: 12px;
 		}
 		.tv {
-			grid-column: 1 / -1;
+			grid-column: auto;
 			grid-row: auto;
 		}
 	}
