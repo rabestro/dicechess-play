@@ -70,7 +70,7 @@ Identity: `source='playsite'`; human = `guest:<uuidv7>` (per-browser), bot =
 
 - [ ] **Ingest gateway**: separate service (not in this repo) — Koyeb, holds the token, local engine pre-validate. Set `VITE_INGEST_GATEWAY_URL` once it exists.
 - [ ] **Outbox**: add retry backoff (the `quarantined` state for 422 rejects is already implemented).
-- [x] **Engine version pin**: updated to `^1.6.0` in `package.json`.
+- [x] **Engine version pin**: updated to `^1.6.6` in `package.json`.
 - [x] **Termination**: persisting `gameEndReason` onto `LocalGameRecord` and mapping to analytics is done.
 - [x] **UI polish**: clocks, draw/double, and interactive dice/board are done.
 - [x] **Tests**: engine-dependent integration tests (`playWithBotStore.test.ts`) are implemented and run in CI with `NODE_AUTH_TOKEN`.
