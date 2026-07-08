@@ -68,16 +68,12 @@ Identity: `source='playsite'`; human = `guest:<uuidv7>` (per-browser), bot =
 
 ## Phase-1 follow-ups (scaffold TODOs)
 
-- **Ingest gateway** is a separate service (not in this repo) — Koyeb, holds the token,
-  local engine pre-validate. Set `VITE_INGEST_GATEWAY_URL` once it exists.
-- **Engine version pin**: `^1.4.3` to match the analytics backend replay. Add a
-  boot-time client==gateway==backend version assertion + a golden-corpus CI gate.
-- **Termination**: `mapper.deriveTermination()` infers from the final board; persist the
-  store's `gameEndReason` onto `LocalGameRecord` and consume it instead.
-- **Outbox**: add backoff + a `quarantined` state for 422 rejects.
-- **UI polish**: clocks, draw/double, richer dice/board (currently a thin slice).
-- **Tests**: only the pure-logic unit tests are ported; the engine-dependent
-  playWithBot tests need `NODE_AUTH_TOKEN` to install and were left for a later pass.
+- [ ] **Ingest gateway**: separate service (not in this repo) — Koyeb, holds the token, local engine pre-validate. Set `VITE_INGEST_GATEWAY_URL` once it exists.
+- [ ] **Outbox**: add retry backoff (the `quarantined` state for 422 rejects is already implemented).
+- [x] **Engine version pin**: updated to `^1.6.0` in `package.json`.
+- [x] **Termination**: persisting `gameEndReason` onto `LocalGameRecord` and mapping to analytics is done.
+- [x] **UI polish**: clocks, draw/double, and interactive dice/board are done.
+- [x] **Tests**: engine-dependent integration tests (`playWithBotStore.test.ts`) are implemented and run in CI with `NODE_AUTH_TOKEN`.
 
 ## License
 
