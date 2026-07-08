@@ -140,16 +140,20 @@
 	}
 </script>
 
+{#snippet botBadge(sizeClass: string = 'text-[10px]')}
+	<span
+		class="shrink-0 rounded bg-primary/15 px-1 py-px {sizeClass} font-bold uppercase tracking-wide text-primary"
+	>
+		bot
+	</span>
+{/snippet}
+
 {#snippet playerLine(p: PublicPlayer | undefined | null, clockMs: number | undefined)}
 	<div class="flex items-center justify-between gap-2 min-w-0">
 		<span class="flex items-center gap-1.5 min-w-0 text-sm">
 			<b class="truncate text-content">{playerName(p)}</b>
 			{#if isBot(p)}
-				<span
-					class="shrink-0 rounded bg-primary/15 px-1 py-px text-[10px] font-bold uppercase tracking-wide text-primary"
-				>
-					bot
-				</span>
+				{@render botBadge()}
 			{/if}
 		</span>
 		{#if clockMs !== undefined}
@@ -288,11 +292,7 @@
 										></span>
 										<span class="truncate">{playerName(game.players?.black)}</span>
 										{#if isBot(game.players?.black)}
-											<span
-												class="shrink-0 rounded bg-primary/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-primary"
-											>
-												bot
-											</span>
+											{@render botBadge('text-[9px]')}
 										{/if}
 									</span>
 								</div>
@@ -304,11 +304,7 @@
 										></span>
 										<span class="truncate">{playerName(game.players?.white)}</span>
 										{#if isBot(game.players?.white)}
-											<span
-												class="shrink-0 rounded bg-primary/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-primary"
-											>
-												bot
-											</span>
+											{@render botBadge('text-[9px]')}
 										{/if}
 									</span>
 								</div>
@@ -331,11 +327,11 @@
 							? 'border-primary/50 bg-primary/5 hover:border-primary'
 							: 'border-border bg-surface/50 hover:border-primary/60'}"
 					>
-						<div class="w-20 h-20 shrink-0 sm:w-full sm:h-auto">
+						<span class="block w-20 h-20 shrink-0 sm:w-full sm:h-auto">
 							<MiniBoard fen={START_FEN} faded />
-						</div>
-						<div class="flex flex-col justify-between flex-1 min-w-0">
-							<div class="flex items-center justify-between gap-2">
+						</span>
+						<span class="flex flex-col justify-between flex-1 min-w-0">
+							<span class="flex items-center justify-between gap-2">
 								<span
 									class="font-mono text-[10px] font-bold uppercase tracking-wider {offer.bot
 										? 'text-primary'
@@ -346,25 +342,21 @@
 								<span class="text-xs text-content-muted shrink-0">
 									{timeControlLabel(seek.timeControl)}
 								</span>
-							</div>
-							<div class="flex items-center gap-1.5 min-w-0 my-1.5">
+							</span>
+							<span class="flex items-center gap-1.5 min-w-0 my-1.5">
 								<b class="truncate text-sm text-content">{offer.name}</b>
 								{#if offer.bot}
-									<span
-										class="shrink-0 rounded bg-primary/15 px-1 py-px text-[10px] font-bold uppercase tracking-wide text-primary"
-									>
-										bot
-									</span>
+									{@render botBadge()}
 								{/if}
-							</div>
-							<div class="mt-auto sm:mt-2">
+							</span>
+							<span class="block mt-auto sm:mt-2">
 								<span
 									class="inline-block w-full text-center rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-content shadow-sm transition-colors group-hover:bg-primary-hover"
 								>
 									Sit down
 								</span>
-							</div>
-						</div>
+							</span>
+						</span>
 					</button>
 				{/each}
 			</div>
