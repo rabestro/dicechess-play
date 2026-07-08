@@ -206,4 +206,41 @@ describe('PlayWithBotStore history scrubbing (issue #55)', () => {
 		expect(store.blackTimeLeft).toBeLessThan(blackBefore); // the true (live) side's clock ticks down
 		expect(store.whiteTimeLeft).toBe(whiteBefore); // the scrubbed-display side's clock does not
 	});
+
+	it('correctly derives initial active color from custom starting FEN and schedules bot/player start accordingly', async () => {
+		// Custom FEN with Black to move
+		const blackStartFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1';
+		store.customDfen = blackStartFen;
+
+		// 1. Player is White, Bot is Black (so Black/Bot to move first)
+		store.startNewGame('white', 'greedy');
+		expect(store.activeColor).toBe('b');
+		expect(store.gameStatus).toBe('bot_thinking');
+
+		store.endSession();
+
+		// 2. Player is Black, Bot is White (so Black/Player to move first)
+		store.startNewGame('black', 'greedy');
+		expect(store.activeColor).toBe('b');
+		expect(store.gameStatus).toBe('rolling');
+	});
+
+	it('passes correct activeColor argument to buildDfen calls during player and bot turns', async () => {
+		// Start a game where it's black's turn to move first
+		const blackStartFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1';
+		store.customDfen = `${blackStartFen} ppp`;
+		store.startNewGame('black', 'greedy'); // Player is black, starts with roll
+
+		// Player rolls dice
+		const rolled = store.rollDice();
+		await vi.advanceTimersByTimeAsync(600);
+		await rolled;
+
+		// Check that the legal moves calculation received lowercase dice pool 'ppp'
+		const lastLegalMovesCall = mock.getLegalUciMoves.mock.calls.at(-1)?.[0] as string;
+		expect(lastLegalMovesCall).toContain(' b ');
+		const parts = lastLegalMovesCall.trim().split(/\s+/);
+		const diceSuffix = parts[6] ?? '';
+		expect(diceSuffix).toBe('ppp');
+	});
 });
