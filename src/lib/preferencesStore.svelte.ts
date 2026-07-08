@@ -33,11 +33,7 @@ class PreferencesStore {
 	constructor() {
 		// Load from localStorage on initialization
 		const storedMode = getStoredValue('preferredMode') as
-			| 'view'
-			| 'train'
-			| 'bookmarks'
-			| 'positions'
-			| null;
+			'view' | 'train' | 'bookmarks' | 'positions' | null;
 		if (
 			storedMode === 'view' ||
 			storedMode === 'train' ||
