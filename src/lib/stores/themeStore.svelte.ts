@@ -1,11 +1,5 @@
 export type Theme =
-	| 'dark'
-	| 'light'
-	| 'dracula'
-	| 'nord'
-	| 'solarized-dark'
-	| 'tokyo-night'
-	| 'gruvbox';
+	'dark' | 'light' | 'dracula' | 'nord' | 'solarized-dark' | 'tokyo-night' | 'gruvbox';
 
 const metaColors: Record<Theme, string> = {
 	dark: '#020617',
