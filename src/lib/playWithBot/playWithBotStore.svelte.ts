@@ -236,10 +236,10 @@ export class PlayWithBotStore {
 			this.playerColor = colorPref === 'white' ? 'w' : 'b';
 		}
 
-		this.liveActiveColor = 'w';
 		this.viewedIndex = null;
 		const startFen = this.parsedDfen.fen || this.initialFen;
 		this.liveBoardFen = startFen;
+		this.liveActiveColor = (startFen.split(/\s+/)[1] as 'w' | 'b') || 'w';
 		this.dice.currentDice = [];
 		this.startTime = new Date().toISOString();
 
@@ -279,7 +279,7 @@ export class PlayWithBotStore {
 			this.blackTimeLeft = 0;
 		}
 
-		if (this.playerColor === 'b') {
+		if (this.liveActiveColor === this.botColor) {
 			this.gameStatus = 'bot_thinking';
 			setTimeout(() => {
 				this.botTurn();
@@ -465,7 +465,9 @@ export class PlayWithBotStore {
 		const allVals = rolled.map((d) => getDieValue(d));
 		let hasAtLeastOneLegalMove = false;
 		try {
-			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, allVals)) || [];
+			const uciMoves =
+				DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, allVals, this.liveActiveColor)) ||
+				[];
 			if (uciMoves.length > 0) {
 				hasAtLeastOneLegalMove = true;
 			}
@@ -540,7 +542,8 @@ export class PlayWithBotStore {
 
 		try {
 			const fullFen = this.liveBoardFen;
-			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(fullFen, availableDice)) || [];
+			const uciMoves =
+				DiceChess.getLegalUciMoves(buildDfen(fullFen, availableDice, this.liveActiveColor)) || [];
 			return deriveChessgroundDests(uciMoves);
 		} catch (e) {
 			logger.error('Error calculating legal moves', e as Error);
@@ -589,7 +592,9 @@ export class PlayWithBotStore {
 			try {
 				if (typeof DiceChess.getLegalUciMoves === 'function') {
 					const legalMoves: string[] =
-						DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, availableDice)) || [];
+						DiceChess.getLegalUciMoves(
+							buildDfen(this.liveBoardFen, availableDice, this.liveActiveColor),
+						) || [];
 					const movePrefix = orig + dest;
 					const apiPromos = legalMoves
 						.filter((m) => m.startsWith(movePrefix) && m.length === 5)
@@ -664,7 +669,7 @@ export class PlayWithBotStore {
 			.filter((d, i) => d.allowed && (!d.used || i === dieIndex))
 			.map((d) => getDieValue(d));
 		const nextBoardFenRaw = DiceChess.applyMove(
-			buildDfen(this.liveBoardFen, availableDice),
+			buildDfen(this.liveBoardFen, availableDice, this.liveActiveColor),
 			orig,
 			dest,
 			promotionStr,
@@ -833,7 +838,9 @@ export class PlayWithBotStore {
 		const allVals = rolled.map((d) => getDieValue(d));
 		let botHasMoves = false;
 		try {
-			const uciMoves = DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, allVals)) || [];
+			const uciMoves =
+				DiceChess.getLegalUciMoves(buildDfen(this.liveBoardFen, allVals, this.liveActiveColor)) ||
+				[];
 			if (uciMoves.length > 0) {
 				botHasMoves = true;
 			}
@@ -960,6 +967,7 @@ export class PlayWithBotStore {
 				this.dice.currentDice
 					.filter((d, i) => d.allowed && (!d.used || i === botDieIndex))
 					.map((d) => getDieValue(d)),
+				this.liveActiveColor,
 			);
 			const nextBoardFenRaw = DiceChess.applyMove(
 				dfenBefore,
