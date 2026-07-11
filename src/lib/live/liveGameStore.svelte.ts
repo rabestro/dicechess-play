@@ -24,17 +24,12 @@ import type { BotMoveHistoryState } from '../playWithBot/playWithBotHistory.svel
 import type { TurnBlock } from '../types';
 import { logger } from '../utils/logger';
 import { playDiceSound } from '../sound';
+import { ROLL_ANIMATION_MS, MOVE_STEP_MS } from '../timings';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-
-// Pacing for the opponent's dice roll / moves, so a live game reads like the offline play-vs-bot
-// mode instead of teleporting through a whole turn at once (the player's own turn is never paced —
-// it's already live and interactive the instant the server event arrives, see `presentLoop`).
-const ROLL_ANIMATION_MS = 600;
-const MOVE_STEP_MS = 1000;
 
 export type LiveStatus = 'connecting' | 'waiting' | 'playing' | 'over';
 export type LiveOutcome = 'won' | 'lost' | 'draw';
@@ -60,7 +55,7 @@ export class LiveGameStore {
 
 	// ── Live UI state ────────────────────────────────────────────────────────
 	private liveDice = $state<DieState[]>([]);
-	isAnimatingRoll = $state<boolean>(false); // true while presenting an opponent's roll (see presentLoop)
+	isAnimatingRoll = $state<boolean>(false); // true while a roll's spin is presenting — either side's (see presentLoop)
 	pendingPromotion = $state<{
 		orig: string;
 		dest: string;
@@ -187,6 +182,7 @@ export class LiveGameStore {
 
 	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
 		if (this.isViewingHistory) return new Map();
+		if (this.isAnimatingRoll) return new Map(); // own roll: no moves until the spin lands
 		if (this.gameStatus !== 'playing' || this.liveActiveColor !== this.playerColor)
 			return new Map();
 		const dice = this.availableDiceValues;
@@ -271,10 +267,8 @@ export class LiveGameStore {
 			this.recordRoll(fen6, color, dice);
 			this.syncTurn(ev.DiceRolled.dfen, ev.DiceRolled.seat);
 			this.setClocks(ev.DiceRolled.clocks, ev.DiceRolled.seat);
-			// The player's own roll goes live immediately (presentLoop skips own entries),
-			// so its sound fires here; opponent/spectated rolls sound in presentLoop instead,
-			// in sync with the visible spin.
-			if (!this.spectator && ev.DiceRolled.seat === this.mySeat) playDiceSound();
+			// No sound here: every roll — the player's own included — sounds in presentLoop,
+			// in sync with its visible spin (which may lag this event during catch-up).
 			return;
 		}
 		if ('TurnPlayed' in ev) {
@@ -415,6 +409,7 @@ export class LiveGameStore {
 	// ── move handling (mirrors the vs-bot store, but submits the turn to the server) ──
 	handleBoardMove(orig: string, dest: string): void {
 		if (this.isViewingHistory) return;
+		if (this.isAnimatingRoll) return; // own roll: no moves until the spin lands
 		if (this.gameStatus !== 'playing' || this.liveActiveColor !== this.playerColor) return;
 		// Don't move optimistically while disconnected — the SubmitTurn would be dropped and the
 		// local board would diverge from the server.
@@ -658,17 +653,19 @@ export class LiveGameStore {
 		void this.presentLoop(this.epoch);
 	}
 
-	/** Reveals new historyMap entries one at a time: a roll gets a spin, a move/pass pauses on the
-	 * old position first. Skips pacing entirely for the player's own entries (roll, move, or pass) —
-	 * their own turn already applied live and interactively the instant the server event arrived
-	 * (see syncTurn), so there's nothing left to "catch up" for them; only the opponent's entries
-	 * (or, for a spectator, either side's) get animated.
+	/** Reveals new historyMap entries one at a time: a roll gets a spin (with sound), a move/pass
+	 * pauses on the old position first. Every ROLL is paced — the player's own included, matching
+	 * the offline bot mode (interaction is gated during the spin via the isAnimatingRoll checks in
+	 * legalMovesDests/handleBoardMove). The player's own MOVES and PASSES are still skipped: their
+	 * own turn already applied live and interactively as they played it (see syncTurn), so there's
+	 * nothing left to "catch up" for them; the opponent's entries (or, for a spectator, either
+	 * side's) get animated in full.
 	 *
-	 * Note: if the player's own next roll/turn arrives while an opponent's earlier multi-move turn is
-	 * still being revealed, it queues behind it — legalMovesDests/handleBoardMove stay blocked (via
-	 * isViewingHistory) until the opponent's moves finish animating in order, even though the entry is
-	 * itself never paced once reached. This is intentional, matching the offline bot mode: the player
-	 * sees the opponent's whole turn land before the board becomes theirs to act on. */
+	 * Note: if the player's own roll arrives while an opponent's earlier multi-move turn is still
+	 * being revealed, it queues behind it — legalMovesDests/handleBoardMove stay blocked (via
+	 * isViewingHistory) until the opponent's moves finish animating in order, and the roll's
+	 * spin+sound then fire when it actually presents. This is intentional: the player sees the
+	 * opponent's whole turn land before the board becomes theirs to act on. */
 	private async presentLoop(epoch: number): Promise<void> {
 		try {
 			while (this.presentedIndex < this.maxMoveIndex) {
@@ -681,7 +678,8 @@ export class LiveGameStore {
 				const isRoll = entry.gameMoveHistoryMove === null;
 				const alreadySeenLive = !this.spectator && entry.active_color === this.playerColor;
 
-				if (alreadySeenLive) {
+				// Own moves/passes were played live by the player; only own ROLLS get the spin.
+				if (alreadySeenLive && !isRoll) {
 					this.presentedIndex = nextIndex;
 					continue;
 				}
