@@ -6,6 +6,7 @@
 	import MoveHistory from '../../components/MoveHistory.svelte';
 	import PawnPromotionSelector from '../../components/PawnPromotionSelector.svelte';
 	import PlayerStrip from '../../components/PlayerStrip.svelte';
+	import GameEndModal from '../../components/GameEndModal.svelte';
 	import DicePanel from '../../components/DicePanel.svelte';
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { preferencesStore } from '$lib/preferencesStore.svelte';
@@ -64,6 +65,27 @@
 	const bot = $derived(BOTS.find((b) => b.id === selectedAlgo));
 	const yourColorName = $derived(store.playerColor === 'w' ? 'white' : 'black');
 	const botColorName = $derived(store.playerColor === 'w' ? 'black' : 'white');
+	// End-of-game modal: shows once per finished game, re-armed when a new game starts.
+	let endModalDismissed = $state(false);
+	$effect(() => {
+		if (!isOver) endModalDismissed = false;
+	});
+	const showEndModal = $derived(isOver && !endModalDismissed);
+	const endTone = $derived(
+		store.gameStatus === 'victory'
+			? ('win' as const)
+			: store.gameStatus === 'defeat'
+				? ('loss' as const)
+				: ('neutral' as const),
+	);
+	const endHeadline = $derived(
+		store.gameStatus === 'victory'
+			? 'You won! 🎉'
+			: store.gameStatus === 'defeat'
+				? 'You lost.'
+				: 'Draw.',
+	);
+
 	const botActive = $derived(!isOver && store.activeColor !== store.playerColor);
 	const youActive = $derived(!isOver && store.activeColor === store.playerColor);
 	const hasClocks = $derived(store.timeLimit !== null);
@@ -170,6 +192,29 @@
 		{/if}
 	</svg>
 {/snippet}
+
+<GameEndModal
+	open={showEndModal}
+	headline={endHeadline}
+	tone={endTone}
+	reason={endReasonLabel(store.gameEndReason)}
+	onDismiss={() => (endModalDismissed = true)}
+>
+	<button
+		type="button"
+		onclick={startGame}
+		class="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
+	>
+		New game
+	</button>
+	<button
+		type="button"
+		onclick={() => store.endSession()}
+		class="text-sm text-content-muted underline transition-colors hover:text-content"
+	>
+		Change opponent
+	</button>
+</GameEndModal>
 
 {#if inLobby}
 	<section class="max-w-md mx-auto flex flex-col gap-6">

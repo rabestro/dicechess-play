@@ -6,6 +6,7 @@
 	import PlayerStrip from '../../../components/PlayerStrip.svelte';
 	import DicePanel from '../../../components/DicePanel.svelte';
 	import MoveHistory from '../../../components/MoveHistory.svelte';
+	import GameEndModal from '../../../components/GameEndModal.svelte';
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { LiveGameStore } from '$lib/live/liveGameStore.svelte';
 	import { parseSeat } from '$lib/live/seatLink';
@@ -96,6 +97,21 @@
 		if (live.spectator) return live.activeColor === 'w' ? 'White to move' : 'Black to move';
 		return myMove ? 'Your move' : 'Waiting for opponent…';
 	});
+	// The end-of-game modal shows once per finished game; dismissing reveals the board with
+	// the side-rail card as fallback. Any transition away from 'over' (new game) re-arms it.
+	let endModalDismissed = $state(false);
+	$effect(() => {
+		if (live.gameStatus !== 'over') endModalDismissed = false;
+	});
+	const showEndModal = $derived(live.gameStatus === 'over' && !endModalDismissed);
+	const endTone = $derived(
+		live.outcome === 'won'
+			? ('win' as const)
+			: live.outcome === 'lost'
+				? ('loss' as const)
+				: ('neutral' as const),
+	);
+
 	const seatName = (seat: Seat): string =>
 		seatDisplayName(live.players, seat, bottomSeat, live.spectator);
 	const seatSub = (seat: Seat): string => seatDisplaySub(live.players, seat, live.spectator);
@@ -242,6 +258,21 @@
 </svelte:head>
 
 <svelte:window onkeydown={onKeydown} />
+
+<GameEndModal
+	open={showEndModal}
+	headline={statusText ?? 'Game over.'}
+	tone={endTone}
+	reason={endReason}
+	onDismiss={() => (endModalDismissed = true)}
+>
+	<a
+		href={resolve('/live')}
+		class="w-full rounded-xl bg-primary py-2.5 text-center font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
+	>
+		New game
+	</a>
+</GameEndModal>
 
 <section class="w-full">
 	<div
