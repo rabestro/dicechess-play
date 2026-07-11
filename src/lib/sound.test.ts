@@ -32,7 +32,7 @@ describe('sound service', () => {
 		vi.resetModules(); // fresh module state: no cached Audio element between tests
 		AudioMock.instances = [];
 		vi.stubGlobal('Audio', AudioMock);
-		localStorage.clear(); // soundEnabled must not leak into the re-imported store
+		globalThis.localStorage?.clear(); // soundEnabled must not leak into the re-imported store
 	});
 
 	it('plays the dice sound through a single reused element', async () => {
