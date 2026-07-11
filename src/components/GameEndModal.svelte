@@ -26,6 +26,8 @@
 	};
 
 	function onKeydown(event: KeyboardEvent) {
+		// <svelte:window> can't live inside {#if open} (Svelte forbids svelte: tags in a block),
+		// so the listener is always mounted and gated here instead.
 		if (open && event.key === 'Escape') {
 			event.preventDefault();
 			onDismiss();
