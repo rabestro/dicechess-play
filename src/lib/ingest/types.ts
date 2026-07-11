@@ -9,10 +9,19 @@
 export type Color = 'w' | 'b';
 
 export type EventType =
-	'DOUBLE_OFFER' | 'DOUBLE_ACCEPT' | 'DOUBLE_DECLINE' | 'DRAW_OFFER' | 'DRAW_ACCEPT';
+	| 'DOUBLE_OFFER'
+	| 'DOUBLE_ACCEPT'
+	| 'DOUBLE_DECLINE'
+	| 'DRAW_OFFER'
+	| 'DRAW_ACCEPT';
 
 export type Termination =
-	'king_captured' | 'timeout' | 'resign' | 'draw_agreement' | 'double_declined' | 'unknown';
+	| 'king_captured'
+	| 'timeout'
+	| 'resign'
+	| 'draw_agreement'
+	| 'double_declined'
+	| 'unknown';
 
 export interface PlayerInputWire {
 	external_id: string;
