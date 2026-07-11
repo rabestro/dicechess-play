@@ -514,6 +514,7 @@ export class PlayWithBotStore {
 			if (this.toggleActiveColorInFen()) {
 				this.updateStateInHistory({ fen: this.liveBoardFen });
 				setTimeout(() => {
+					if (this.startTime !== gameId) return; // session ended/restarted during the dwell
 					this.liveActiveColor = this.botColor;
 					this.botTurn();
 				}, PASS_DWELL_MS);
@@ -875,6 +876,7 @@ export class PlayWithBotStore {
 		if (!botHasMoves) {
 			toastStore.info('Bot has no legal moves. Turn forfeited!');
 			await new Promise((resolve) => setTimeout(resolve, PASS_DWELL_MS));
+			if (this.startTime !== gameId) return; // session ended/restarted during the dwell
 			this.gameStatus = 'rolling';
 			if (this.toggleActiveColorInFen()) {
 				this.liveActiveColor = this.playerColor;
