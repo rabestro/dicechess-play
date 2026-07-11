@@ -29,6 +29,7 @@ class PreferencesStore {
 	timeBonus: number | null = $state(0);
 	botLobbyBet: number = $state(0);
 	botLobbyMode: 'classic' | 'x2' = $state('classic');
+	soundEnabled: boolean = $state(true);
 
 	constructor() {
 		// Load from localStorage on initialization
@@ -101,6 +102,11 @@ class PreferencesStore {
 		if (this.botLobbyBet === 0) {
 			this.botLobbyMode = 'classic';
 		}
+
+		const storedSoundEnabled = getStoredValue('soundEnabled');
+		if (storedSoundEnabled !== null) {
+			this.soundEnabled = storedSoundEnabled === 'true';
+		}
 	}
 
 	setMode(mode: 'view' | 'train' | 'bookmarks' | 'positions') {
@@ -149,6 +155,11 @@ class PreferencesStore {
 		if (bet === 0) {
 			this.setBotLobbyMode('classic');
 		}
+	}
+
+	setSoundEnabled(value: boolean) {
+		this.soundEnabled = value;
+		setStoredValue('soundEnabled', String(value));
 	}
 
 	setBotLobbyMode(mode: 'classic' | 'x2') {

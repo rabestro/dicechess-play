@@ -23,6 +23,7 @@ import { buildTurnBlocks } from '../playWithBot/turnBlocks';
 import type { BotMoveHistoryState } from '../playWithBot/playWithBotHistory.svelte';
 import type { TurnBlock } from '../types';
 import { logger } from '../utils/logger';
+import { playDiceSound } from '../sound';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
@@ -270,6 +271,10 @@ export class LiveGameStore {
 			this.recordRoll(fen6, color, dice);
 			this.syncTurn(ev.DiceRolled.dfen, ev.DiceRolled.seat);
 			this.setClocks(ev.DiceRolled.clocks, ev.DiceRolled.seat);
+			// The player's own roll goes live immediately (presentLoop skips own entries),
+			// so its sound fires here; opponent/spectated rolls sound in presentLoop instead,
+			// in sync with the visible spin.
+			if (!this.spectator && ev.DiceRolled.seat === this.mySeat) playDiceSound();
 			return;
 		}
 		if ('TurnPlayed' in ev) {
@@ -684,6 +689,7 @@ export class LiveGameStore {
 				if (isRoll) {
 					this.presentedIndex = nextIndex; // dice values visible immediately, spin plays on top
 					this.isAnimatingRoll = true;
+					playDiceSound();
 					await this.sleep(ROLL_ANIMATION_MS);
 					if (epoch !== this.epoch) return;
 					this.isAnimatingRoll = false;
