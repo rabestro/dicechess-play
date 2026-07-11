@@ -23,7 +23,7 @@
      so the strip doesn't jump when clock state arrives after connect. -->
 <div
 	class="flex min-h-14 items-center gap-2.5 rounded-xl border bg-surface px-3 py-2 transition-colors
-		{active ? (low ? 'border-danger/50' : 'border-primary/60') : 'border-border'}"
+		{active ? (low ? 'border-danger/50' : 'border-badge-accent/60') : 'border-border'}"
 >
 	<span
 		class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border-strong bg-surface-hover text-content-muted"
@@ -51,11 +51,11 @@
 	</span>
 	{#if clockMs !== undefined}
 		<span
-			class="ml-auto min-w-[92px] rounded-lg border px-2.5 py-0.5 text-right font-mono text-2xl font-bold tabular-nums transition-colors
+			class="ml-auto min-w-[92px] rounded-lg border px-2.5 py-0.5 text-right font-mono text-2xl font-bold tabular-nums transition-all
 				{low
 				? 'border-danger/50 bg-danger/15 text-danger'
 				: active
-					? 'border-primary/50 bg-primary/15 text-content'
+					? 'border-badge-accent/60 bg-badge-accent/15 text-content shadow-[0_0_12px] shadow-badge-accent/25'
 					: 'border-border bg-surface-hover/50 text-content'}"
 			class:animate-pulse={active && low}
 			aria-label="{name} clock: {formatClock(clockMs)}"
