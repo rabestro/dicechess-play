@@ -25,9 +25,14 @@ async function loadSound() {
 
 describe('sound service', () => {
 	beforeEach(() => {
+		// Flush unlock listeners leaked by the previous test's module instance
+		// (they self-remove on first gesture) BEFORE resetting the mock registry,
+		// so they fire against their own mocks, not this test's.
+		window.dispatchEvent(new Event('pointerdown'));
 		vi.resetModules(); // fresh module state: no cached Audio element between tests
 		AudioMock.instances = [];
 		vi.stubGlobal('Audio', AudioMock);
+		localStorage.clear(); // soundEnabled must not leak into the re-imported store
 	});
 
 	it('plays the dice sound through a single reused element', async () => {
