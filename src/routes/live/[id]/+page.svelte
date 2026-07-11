@@ -73,7 +73,28 @@
 	const topSeat = $derived<Seat>(bottomSeat === 'White' ? 'Black' : 'White');
 	const clockMs = (seat: Seat): number | undefined =>
 		live.hasClocks ? (seat === 'White' ? live.whiteClockMs : live.blackClockMs) : undefined;
-	const isTicking = (seat: Seat): boolean => live.tickingClockSeat === seat;
+	// Turn highlight follows the PRESENTED position (consistent with board/dice pacing) and is
+	// deliberately independent of clocks: tickingClockSeat is null in unlimited games and nulled
+	// between turns, which used to leave the highlight dark or blinking.
+	const isActiveSeat = (seat: Seat): boolean =>
+		live.gameStatus !== 'over' &&
+		live.gameStatus !== 'connecting' &&
+		(seat === 'White') === (live.activeColor === 'w');
+
+	// One unmistakable your-move cue: a persistent line by the dice panel + a title marker.
+	// gameStatus === 'playing' is live truth (my dice are pending). The presented activeColor
+	// additionally delays the cue during catch-up pacing until my roll visually lands — but a
+	// deliberate manual scrub must NOT flicker it off: it is still my move while I browse.
+	const myMove = $derived(
+		!live.spectator &&
+			live.gameStatus === 'playing' &&
+			(live.isManuallyBrowsing || live.activeColor === live.playerColor),
+	);
+	const turnLine = $derived.by(() => {
+		if (live.gameStatus === 'over' || live.gameStatus === 'connecting') return null;
+		if (live.spectator) return live.activeColor === 'w' ? 'White to move' : 'Black to move';
+		return myMove ? 'Your move' : 'Waiting for opponent…';
+	});
 	const seatName = (seat: Seat): string =>
 		seatDisplayName(live.players, seat, bottomSeat, live.spectator);
 	const seatSub = (seat: Seat): string => seatDisplaySub(live.players, seat, live.spectator);
@@ -200,6 +221,10 @@
 	</svg>
 {/snippet}
 
+<svelte:head>
+	<title>{myMove ? '● Your move · Dice Chess' : 'Dice Chess — Play'}</title>
+</svelte:head>
+
 <svelte:window onkeydown={onKeydown} />
 
 <section class="w-full">
@@ -238,7 +263,7 @@
 				<PlayerStrip
 					name={seatName(topSeat)}
 					sub={seatSub(topSeat)}
-					active={isTicking(topSeat)}
+					active={isActiveSeat(topSeat)}
 					clockMs={clockMs(topSeat)}
 				/>
 
@@ -311,7 +336,7 @@
 				<PlayerStrip
 					name={seatName(bottomSeat)}
 					sub={seatSub(bottomSeat)}
-					active={isTicking(bottomSeat)}
+					active={isActiveSeat(bottomSeat)}
 					clockMs={clockMs(bottomSeat)}
 				/>
 			</div>
@@ -396,6 +421,18 @@
 					</a>
 				</div>
 			{:else}
+				{#if turnLine}
+					<p
+						class="order-3 text-center text-sm font-semibold md:order-none {myMove
+							? 'text-content'
+							: 'text-content-muted'}"
+						aria-live="polite"
+					>
+						<!-- Single line: inter-block whitespace renders as a literal space and would
+						     off-center the text when the dot is absent. -->
+						{#if myMove}<span class="mr-1.5 text-badge-accent">●</span>{/if}{turnLine}
+					</p>
+				{/if}
 				<div class="order-4 md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col">
 					<DicePanel
 						dice={live.currentDice}
