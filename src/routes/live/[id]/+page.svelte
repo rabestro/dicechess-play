@@ -82,8 +82,13 @@
 		(seat === 'White') === (live.activeColor === 'w');
 
 	// One unmistakable your-move cue: a persistent line by the dice panel + a title marker.
+	// gameStatus === 'playing' is live truth (my dice are pending). The presented activeColor
+	// additionally delays the cue during catch-up pacing until my roll visually lands — but a
+	// deliberate manual scrub must NOT flicker it off: it is still my move while I browse.
 	const myMove = $derived(
-		!live.spectator && live.gameStatus === 'playing' && live.activeColor === live.playerColor,
+		!live.spectator &&
+			live.gameStatus === 'playing' &&
+			(live.isManuallyBrowsing || live.activeColor === live.playerColor),
 	);
 	const turnLine = $derived.by(() => {
 		if (live.gameStatus === 'over' || live.gameStatus === 'connecting') return null;
