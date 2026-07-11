@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LiveGameStore } from './liveGameStore.svelte';
 import type { PublicGameState, ServerEvent } from './liveTypes';
 import { getPieceFromFen } from '../../utils/fenUtils';
+import { playDiceSound } from '../sound';
+
+// The store triggers real audio through the shared sound service; stub it so tests can
+// assert WHEN a roll sounds (aligned with its presented spin) without touching Audio.
+vi.mock('../sound', () => ({
+	playDiceSound: vi.fn(),
+	preloadSounds: vi.fn(),
+}));
 
 // Minimal WebSocket stand-in: the store opens one via LiveClient; we drive events through it.
 class MockWebSocket {
@@ -50,6 +58,7 @@ describe('LiveGameStore pacing', () => {
 
 	beforeEach(() => {
 		vi.useFakeTimers();
+		vi.clearAllMocks();
 		vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
 		MockWebSocket.last = null;
 		live = new LiveGameStore();
@@ -113,16 +122,56 @@ describe('LiveGameStore pacing', () => {
 		expect(live.isViewingHistory).toBe(false);
 	});
 
-	it("does not pace or block the player's own dice roll", () => {
+	it("paces the player's own dice roll: spin + sound, no moves until it lands", async () => {
 		deliver(snapshot()); // index 0: White's first roll, seeded by initHistory (never paced)
 		deliver({
 			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
-		}); // index 1: White's second roll, this time through recordRoll -> schedulePresentation
+		}); // index 1: White's second roll, through recordRoll -> schedulePresentation
 
-		// No timer advance at all — already fully caught up synchronously.
+		// The spin presents immediately (values already visible underneath), with its sound…
+		expect(live.isAnimatingRoll).toBe(true);
+		expect(vi.mocked(playDiceSound)).toHaveBeenCalledTimes(1);
+		// …and the board is NOT playable until the spin lands.
+		expect(live.legalMovesDests.size).toBe(0);
+
+		await vi.advanceTimersByTimeAsync(600);
+
 		expect(live.isAnimatingRoll).toBe(false);
+		expect(live.legalMovesDests.size).toBeGreaterThan(0); // knight die: b1/g1 can move
 		expect(live.isViewingHistory).toBe(false);
 		expect(live.currentMoveIndex).toBe(1);
+	});
+
+	it('aligns the own-roll spin and sound with presentation during catch-up, not event arrival', async () => {
+		deliver(snapshot({ dfen: `${START_FEN_BLACK} nn`, activeSeat: 'Black' }));
+		deliver({
+			TurnPlayed: { v: 1, seat: 'Black', moves: ['b8c6', 'g8f6'], fenAfter: AFTER_BLACK_KNIGHTS },
+		});
+		deliver({
+			DiceRolled: {
+				v: 2,
+				seat: 'White',
+				dice: [2],
+				dfen: `${AFTER_BLACK_KNIGHTS} N`,
+				clocks: null,
+			},
+		});
+
+		// The opponent's two knight moves are still revealing — the own roll must wait its turn.
+		expect(vi.mocked(playDiceSound)).not.toHaveBeenCalled();
+		expect(live.isAnimatingRoll).toBe(false);
+
+		await vi.advanceTimersByTimeAsync(1000); // first knight move lands
+		expect(vi.mocked(playDiceSound)).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(1000); // second knight move lands -> roll presents
+		expect(vi.mocked(playDiceSound)).toHaveBeenCalledTimes(1);
+		expect(live.isAnimatingRoll).toBe(true);
+		expect(live.legalMovesDests.size).toBe(0);
+
+		await vi.advanceTimersByTimeAsync(600);
+		expect(live.isAnimatingRoll).toBe(false);
+		expect(live.legalMovesDests.size).toBeGreaterThan(0);
 	});
 
 	it("does not pace the player's own confirmed multi-move turn", () => {

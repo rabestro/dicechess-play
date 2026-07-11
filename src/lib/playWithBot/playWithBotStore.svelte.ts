@@ -13,6 +13,7 @@ import {
 } from './playWithBotBot';
 import { authStore } from '../authStore.svelte';
 import { playDiceSound } from '../sound';
+import { ROLL_ANIMATION_MS, PASS_DWELL_MS } from '../timings';
 
 let DiceChess = (DiceChessEngine as any).DiceChess;
 
@@ -458,7 +459,7 @@ export class PlayWithBotStore {
 
 		const gameId = this.startTime;
 		this.dice.currentDice = rolled;
-		await new Promise((resolve) => setTimeout(resolve, 600));
+		await new Promise((resolve) => setTimeout(resolve, ROLL_ANIMATION_MS));
 		if (this.startTime !== gameId) return;
 		this.isAnimatingRoll = false;
 
@@ -515,7 +516,7 @@ export class PlayWithBotStore {
 				setTimeout(() => {
 					this.liveActiveColor = this.botColor;
 					this.botTurn();
-				}, 1500);
+				}, PASS_DWELL_MS);
 			} else {
 				toastStore.error('System error: Turn transition failed.');
 				this.endSession();
@@ -828,7 +829,7 @@ export class PlayWithBotStore {
 
 		const gameId = this.startTime;
 		this.dice.currentDice = rolled;
-		await new Promise((resolve) => setTimeout(resolve, 600));
+		await new Promise((resolve) => setTimeout(resolve, ROLL_ANIMATION_MS));
 		if (this.startTime !== gameId) return;
 		this.isAnimatingRoll = false;
 
@@ -873,7 +874,7 @@ export class PlayWithBotStore {
 
 		if (!botHasMoves) {
 			toastStore.info('Bot has no legal moves. Turn forfeited!');
-			await new Promise((resolve) => setTimeout(resolve, 1500));
+			await new Promise((resolve) => setTimeout(resolve, PASS_DWELL_MS));
 			this.gameStatus = 'rolling';
 			if (this.toggleActiveColorInFen()) {
 				this.liveActiveColor = this.playerColor;
