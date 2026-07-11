@@ -10,6 +10,7 @@
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { preferencesStore } from '$lib/preferencesStore.svelte';
 	import { preloadSounds } from '$lib/sound';
+	import { endReasonLabel } from '$lib/gameOutcome';
 	import { flushOutbox } from '$lib/ingest/outbox';
 	import { BOTS } from '$lib/bots';
 
@@ -381,8 +382,8 @@
 							{:else if store.gameStatus === 'defeat'}You lost.
 							{:else}Draw.{/if}
 						</p>
-						{#if store.gameEndReason === 'timeout'}
-							<p class="text-sm text-content-muted">on time</p>
+						{#if endReasonLabel(store.gameEndReason)}
+							<p class="text-sm text-content-muted">{endReasonLabel(store.gameEndReason)}</p>
 						{/if}
 						<button
 							type="button"
