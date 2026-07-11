@@ -31,6 +31,7 @@ function installUnlock(audio: HTMLAudioElement): void {
 	const unlock = () => {
 		window.removeEventListener('pointerdown', unlock);
 		window.removeEventListener('keydown', unlock);
+		if (!audio.paused) return; // a real play is already in flight — nothing to unlock
 		audio.muted = true;
 		const attempt = audio.play();
 		if (!attempt) {
@@ -39,8 +40,13 @@ function installUnlock(audio: HTMLAudioElement): void {
 		}
 		attempt
 			.then(() => {
-				audio.pause();
-				audio.currentTime = 0;
+				// The same gesture may have triggered a real play right after this probe
+				// (it unmutes the element) — only wind back the silent probe, never
+				// actual playback.
+				if (audio.muted) {
+					audio.pause();
+					audio.currentTime = 0;
+				}
 			})
 			.catch(() => {
 				// Still blocked — the next play after a real interaction succeeds anyway.
@@ -63,6 +69,8 @@ export function playDiceSound(): void {
 	if (!hasAudio() || !preferencesStore.soundEnabled) return;
 	try {
 		const audio = ensureDiceAudio();
+		// The gesture carrying this roll may have just fired the muted unlock probe.
+		audio.muted = false;
 		audio.currentTime = 0;
 		const attempt = audio.play();
 		if (attempt) {

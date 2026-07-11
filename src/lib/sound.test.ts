@@ -5,6 +5,7 @@ class AudioMock {
 	src: string;
 	preload = '';
 	muted = false;
+	paused = true;
 	currentTime = 0;
 	play = vi.fn(() => Promise.resolve());
 	pause = vi.fn();
@@ -85,5 +86,25 @@ describe('sound service', () => {
 		// listeners removed — a second gesture must not re-trigger the unlock
 		window.dispatchEvent(new Event('pointerdown'));
 		expect(audio.play).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not cut off a real play racing the unlock probe', async () => {
+		const { playDiceSound, preloadSounds, preferencesStore } = await loadSound();
+		preferencesStore.setSoundEnabled(true);
+		preloadSounds();
+		const audio = AudioMock.instances[0];
+
+		// The very first gesture is the one that rolls the dice: pointerdown fires
+		// the muted unlock probe, then the same gesture's handler plays for real.
+		window.dispatchEvent(new Event('pointerdown'));
+		playDiceSound();
+
+		expect(audio.muted).toBe(false); // the real play unmutes immediately
+		expect(audio.play).toHaveBeenCalledTimes(2);
+
+		// Once the probe's promise settles it must not pause the real playback.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(audio.pause).not.toHaveBeenCalled();
+		expect(audio.muted).toBe(false);
 	});
 });

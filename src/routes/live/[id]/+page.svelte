@@ -336,7 +336,7 @@
 				<button
 					type="button"
 					onclick={() => preferencesStore.setSoundEnabled(!preferencesStore.soundEnabled)}
-					aria-label={preferencesStore.soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+					aria-label="Sound effects"
 					aria-pressed={preferencesStore.soundEnabled}
 					title={preferencesStore.soundEnabled ? 'Sound on' : 'Sound off'}
 					class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:border-border-strong hover:text-content {preferencesStore.soundEnabled
