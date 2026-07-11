@@ -121,6 +121,16 @@
 		}
 	});
 
+	// In-panel banner while a no-legal-moves pass is dwelling (see LiveGameStore.passNoticeSeat).
+	const passNotice = $derived.by(() => {
+		if (live.passNoticeSeat === null) return null;
+		if (live.spectator) return `${live.passNoticeSeat} has no legal moves — turn passed.`;
+		const mine = (live.passNoticeSeat === 'White') === (live.playerColor === 'w');
+		return mine
+			? 'You have no legal moves — turn passed.'
+			: 'Opponent has no legal moves — turn passed.';
+	});
+
 	let resignTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	function resign() {
@@ -389,6 +399,7 @@
 						dice={live.currentDice}
 						animating={live.isAnimatingRoll}
 						emptyText={live.currentDice.length === 0 ? statusText : undefined}
+						statusMessage={passNotice}
 					/>
 				</div>
 			{/if}

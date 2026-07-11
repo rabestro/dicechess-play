@@ -186,12 +186,32 @@ describe('LiveGameStore pacing', () => {
 		expect(getPieceFromFen(live.currentBoardFen, 'f3')).toBe('N');
 	});
 
-	it("does not pace the player's own pass", () => {
+	it("dwells on the player's own pass with the notice up, dice still shown", async () => {
 		deliver(snapshot());
 		deliver({ TurnPlayed: { v: 1, seat: 'White', moves: [], fenAfter: START_FEN } });
 
+		// The pass dwells: notice up, catch-up not finished, the passed roll's dice visible.
+		expect(live.passNoticeSeat).toBe('White');
+		expect(live.isViewingHistory).toBe(true);
+		expect(live.currentDice.length).toBeGreaterThan(0);
+
+		await vi.advanceTimersByTimeAsync(1500);
+
+		expect(live.passNoticeSeat).toBeNull();
 		expect(live.isViewingHistory).toBe(false);
 		expect(live.currentMoveIndex).toBe(1);
+	});
+
+	it("dwells on the opponent's pass with the notice up", async () => {
+		deliver(snapshot({ dfen: `${START_FEN_BLACK} n`, activeSeat: 'Black' }));
+		deliver({ TurnPlayed: { v: 1, seat: 'Black', moves: [], fenAfter: START_FEN_BLACK } });
+
+		expect(live.passNoticeSeat).toBe('Black');
+
+		await vi.advanceTimersByTimeAsync(1500);
+
+		expect(live.passNoticeSeat).toBeNull();
+		expect(live.isViewingHistory).toBe(false);
 	});
 
 	it('paces both sides for a spectator, including a pass', async () => {
@@ -204,8 +224,25 @@ describe('LiveGameStore pacing', () => {
 		deliver({ TurnPlayed: { v: 1, seat: 'White', moves: [], fenAfter: START_FEN } });
 
 		expect(live.isViewingHistory).toBe(true);
-		await vi.advanceTimersByTimeAsync(1000);
+		expect(live.passNoticeSeat).toBe('White');
+		await vi.advanceTimersByTimeAsync(1500);
 		expect(live.isViewingHistory).toBe(false);
+		expect(live.passNoticeSeat).toBeNull();
+	});
+
+	it('clears the pass notice immediately if the game ends mid-dwell, and it stays cleared', async () => {
+		deliver(snapshot());
+		deliver({ TurnPlayed: { v: 1, seat: 'White', moves: [], fenAfter: START_FEN } });
+		expect(live.passNoticeSeat).toBe('White');
+
+		deliver({
+			GameEnded: { v: 2, over: { result: { Win: { side: 'Black' } }, termination: 'Resign' } },
+		});
+		expect(live.passNoticeSeat).toBeNull();
+
+		// The suspended dwell wakes up after 1500ms — must not resurrect the notice.
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(live.passNoticeSeat).toBeNull();
 	});
 
 	it('clears isAnimatingRoll immediately if the game ends mid-roll-reveal, and it stays cleared', async () => {
