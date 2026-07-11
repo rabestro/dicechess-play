@@ -421,8 +421,9 @@
 							: 'text-content-muted'}"
 						aria-live="polite"
 					>
-						{#if myMove}<span class="text-badge-accent">●</span>{/if}
-						{turnLine}
+						<!-- Single line: inter-block whitespace renders as a literal space and would
+						     off-center the text when the dot is absent. -->
+						{#if myMove}<span class="mr-1.5 text-badge-accent">●</span>{/if}{turnLine}
 					</p>
 				{/if}
 				<div class="order-4 md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col">
