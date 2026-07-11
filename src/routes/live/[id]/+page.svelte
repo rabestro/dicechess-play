@@ -10,6 +10,8 @@
 	import { LiveGameStore } from '$lib/live/liveGameStore.svelte';
 	import { parseSeat } from '$lib/live/seatLink';
 	import { seatDisplayName, seatDisplaySub } from '$lib/live/playerLabel';
+	import { preferencesStore } from '$lib/preferencesStore.svelte';
+	import { preloadSounds } from '$lib/sound';
 	import type { Seat } from '$lib/live/liveTypes';
 
 	const wideScreen = () =>
@@ -89,6 +91,7 @@
 		const id = page.params.id;
 		if (!id) return;
 		const { token, as } = parseSeat(page.url);
+		preloadSounds(); // fetch + arm the gesture unlock before the first roll arrives
 		live.connect(id, token, as);
 		return () => live.dispose();
 	});
@@ -134,7 +137,9 @@
 	$effect(() => () => clearTimeout(resignTimeout));
 </script>
 
-{#snippet iconBtn(kind: 'back' | 'list' | 'flag' | 'first' | 'prev' | 'next' | 'last')}
+{#snippet iconBtn(
+	kind: 'back' | 'list' | 'flag' | 'first' | 'prev' | 'next' | 'last' | 'sound-on' | 'sound-off',
+)}
 	<svg
 		viewBox="0 0 24 24"
 		class="h-[17px] w-[17px]"
@@ -161,6 +166,12 @@
 				fill="currentColor"
 				stroke="none"
 			/>
+		{:else if kind === 'sound-on'}
+			<path d="M11 5.5 6.5 9H3.5v6h3l4.5 3.5z" /><path d="M14.5 9.5a3.6 3.6 0 0 1 0 5" /><path
+				d="M17 7.5a6.5 6.5 0 0 1 0 9"
+			/>
+		{:else if kind === 'sound-off'}
+			<path d="M11 5.5 6.5 9H3.5v6h3l4.5 3.5z" /><path d="m15.5 9.5 5 5M20.5 9.5l-5 5" />
 		{:else}
 			{#if kind === 'first'}
 				<path d="M11 6l-6 6 6 6M18 6l-6 6 6 6" />
@@ -321,6 +332,18 @@
 						: 'border-border bg-surface text-content-muted hover:border-border-strong hover:text-content'}"
 				>
 					{@render iconBtn('list')}
+				</button>
+				<button
+					type="button"
+					onclick={() => preferencesStore.setSoundEnabled(!preferencesStore.soundEnabled)}
+					aria-label={preferencesStore.soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+					aria-pressed={preferencesStore.soundEnabled}
+					title={preferencesStore.soundEnabled ? 'Sound on' : 'Sound off'}
+					class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:border-border-strong hover:text-content {preferencesStore.soundEnabled
+						? 'text-content-muted'
+						: 'text-content-muted/50'}"
+				>
+					{@render iconBtn(preferencesStore.soundEnabled ? 'sound-on' : 'sound-off')}
 				</button>
 				{#if live.canResign}
 					<button

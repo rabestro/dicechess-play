@@ -76,4 +76,16 @@ describe('PreferencesStore', () => {
 		preferencesStore.setBotLobbyMode('x2');
 		expect(preferencesStore.botLobbyMode).toBe('classic');
 	});
+
+	it('should persist soundEnabled', () => {
+		expect(preferencesStore.soundEnabled).toBe(true);
+
+		preferencesStore.setSoundEnabled(false);
+		expect(preferencesStore.soundEnabled).toBe(false);
+		expect(localStorage.getItem('soundEnabled')).toBe('false');
+
+		preferencesStore.setSoundEnabled(true);
+		expect(preferencesStore.soundEnabled).toBe(true);
+		expect(localStorage.getItem('soundEnabled')).toBe('true');
+	});
 });

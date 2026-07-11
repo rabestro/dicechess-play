@@ -12,6 +12,7 @@ import {
 	resetBotDiceChessInstance,
 } from './playWithBotBot';
 import { authStore } from '../authStore.svelte';
+import { playDiceSound } from '../sound';
 
 let DiceChess = (DiceChessEngine as any).DiceChess;
 
@@ -452,7 +453,7 @@ export class PlayWithBotStore {
 		if (!this.canUserRoll) return;
 
 		this.isAnimatingRoll = true;
-		this.playDiceSound();
+		playDiceSound();
 
 		let rolled: DieState[];
 		if (this.parsedDfen.dice && this.history.maxMoveIndex === 0) {
@@ -820,7 +821,7 @@ export class PlayWithBotStore {
 			}
 		}
 
-		this.playDiceSound();
+		playDiceSound();
 
 		this.isAnimatingRoll = true;
 
@@ -1287,15 +1288,6 @@ export class PlayWithBotStore {
 		}
 
 		this.saveGameRecord(0);
-	}
-
-	private async playDiceSound() {
-		try {
-			const audio = new Audio('/sounds/dice-roll-natural.mp3');
-			await audio.play();
-		} catch (e) {
-			logger.error('Failed to play dice roll sound', e as Error);
-		}
 	}
 
 	private getLeftTimeMap(): { [playerId: string]: number } {

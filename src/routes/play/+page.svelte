@@ -9,6 +9,7 @@
 	import DicePanel from '../../components/DicePanel.svelte';
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { preferencesStore } from '$lib/preferencesStore.svelte';
+	import { preloadSounds } from '$lib/sound';
 	import { flushOutbox } from '$lib/ingest/outbox';
 	import { BOTS } from '$lib/bots';
 
@@ -111,6 +112,7 @@
 	onMount(() => {
 		// Retry games left pending from a previous session.
 		void flushOutbox();
+		preloadSounds(); // fetch + arm the gesture unlock before the first roll
 	});
 
 	let resignTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -129,7 +131,7 @@
 	$effect(() => () => clearTimeout(resignTimeout));
 </script>
 
-{#snippet iconBtn(kind: 'back' | 'list' | 'flag')}
+{#snippet iconBtn(kind: 'back' | 'list' | 'flag' | 'sound-on' | 'sound-off')}
 	<svg
 		viewBox="0 0 24 24"
 		class="h-[17px] w-[17px]"
@@ -156,6 +158,12 @@
 				fill="currentColor"
 				stroke="none"
 			/>
+		{:else if kind === 'sound-on'}
+			<path d="M11 5.5 6.5 9H3.5v6h3l4.5 3.5z" /><path d="M14.5 9.5a3.6 3.6 0 0 1 0 5" /><path
+				d="M17 7.5a6.5 6.5 0 0 1 0 9"
+			/>
+		{:else if kind === 'sound-off'}
+			<path d="M11 5.5 6.5 9H3.5v6h3l4.5 3.5z" /><path d="m15.5 9.5 5 5M20.5 9.5l-5 5" />
 		{:else}
 			<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
 		{/if}
@@ -328,6 +336,18 @@
 							: 'border-border bg-surface text-content-muted hover:border-border-strong hover:text-content'}"
 					>
 						{@render iconBtn('list')}
+					</button>
+					<button
+						type="button"
+						onclick={() => preferencesStore.setSoundEnabled(!preferencesStore.soundEnabled)}
+						aria-label={preferencesStore.soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+						aria-pressed={preferencesStore.soundEnabled}
+						title={preferencesStore.soundEnabled ? 'Sound on' : 'Sound off'}
+						class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:border-border-strong hover:text-content {preferencesStore.soundEnabled
+							? 'text-content-muted'
+							: 'text-content-muted/50'}"
+					>
+						{@render iconBtn(preferencesStore.soundEnabled ? 'sound-on' : 'sound-off')}
 					</button>
 					{#if !isOver}
 						<button
