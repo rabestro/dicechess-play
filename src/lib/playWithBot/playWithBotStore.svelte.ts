@@ -57,13 +57,7 @@ import { PlayWithBotHistory, type BotMoveHistoryState } from './playWithBotHisto
 import { PlayWithBotDice, type DieState } from './playWithBotDice.svelte';
 
 export type GameStatus =
-	| 'idle'
-	| 'rolling'
-	| 'playing'
-	| 'bot_thinking'
-	| 'victory'
-	| 'defeat'
-	| 'draw';
+	'idle' | 'rolling' | 'playing' | 'bot_thinking' | 'victory' | 'defeat' | 'draw';
 
 export class PlayWithBotStore {
 	gameStatus = $state<GameStatus>('idle');
