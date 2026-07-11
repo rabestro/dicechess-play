@@ -9,3 +9,6 @@ export const MOVE_STEP_MS = 1000;
 
 /** Dwell on a no-legal-moves turn (dice shown, notice up) before play moves on. */
 export const PASS_DWELL_MS = 1500;
+
+/** Beat between the final move landing on the board and the result being announced. */
+export const GAME_END_SUSPENSE_MS = 800;

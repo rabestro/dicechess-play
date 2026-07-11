@@ -230,22 +230,7 @@ describe('LiveGameStore pacing', () => {
 		expect(live.passNoticeSeat).toBeNull();
 	});
 
-	it('clears the pass notice immediately if the game ends mid-dwell, and it stays cleared', async () => {
-		deliver(snapshot());
-		deliver({ TurnPlayed: { v: 1, seat: 'White', moves: [], fenAfter: START_FEN } });
-		expect(live.passNoticeSeat).toBe('White');
-
-		deliver({
-			GameEnded: { v: 2, over: { result: { Win: { side: 'Black' } }, termination: 'Resign' } },
-		});
-		expect(live.passNoticeSeat).toBeNull();
-
-		// The suspended dwell wakes up after 1500ms — must not resurrect the notice.
-		await vi.advanceTimersByTimeAsync(1500);
-		expect(live.passNoticeSeat).toBeNull();
-	});
-
-	it('clears isAnimatingRoll immediately if the game ends mid-roll-reveal, and it stays cleared', async () => {
+	it('lets a mid-flight roll reveal finish, then announces after the suspense beat', async () => {
 		deliver(snapshot());
 		deliver({
 			DiceRolled: {
@@ -261,11 +246,105 @@ describe('LiveGameStore pacing', () => {
 		deliver({
 			GameEnded: { v: 2, over: { result: { Win: { side: 'White' } }, termination: 'Resign' } },
 		});
-		expect(live.isAnimatingRoll).toBe(false);
+		// The spin is not cut off and the result is not announced yet.
+		expect(live.isAnimatingRoll).toBe(true);
+		expect(live.gameStatus).not.toBe('over');
 
-		// The suspended loop wakes up after its 600ms sleep — must not resurrect the flag.
-		await vi.advanceTimersByTimeAsync(600);
+		await vi.advanceTimersByTimeAsync(600); // spin lands
 		expect(live.isAnimatingRoll).toBe(false);
+		expect(live.gameStatus).not.toBe('over'); // suspense beat still running
+
+		await vi.advanceTimersByTimeAsync(800);
+		expect(live.gameStatus).toBe('over');
+		expect(live.outcome).toBe('won');
+	});
+
+	it('lets a pass dwell finish before announcing the result', async () => {
+		deliver(snapshot());
+		deliver({ TurnPlayed: { v: 1, seat: 'White', moves: [], fenAfter: START_FEN } });
+		expect(live.passNoticeSeat).toBe('White');
+
+		deliver({
+			GameEnded: { v: 2, over: { result: { Win: { side: 'Black' } }, termination: 'Timeout' } },
+		});
+		expect(live.passNoticeSeat).toBe('White'); // dwell not cut off
+		expect(live.gameStatus).not.toBe('over');
+
+		await vi.advanceTimersByTimeAsync(1500); // dwell completes
+		expect(live.passNoticeSeat).toBeNull();
+		expect(live.gameStatus).not.toBe('over');
+
+		await vi.advanceTimersByTimeAsync(800); // suspense
+		expect(live.gameStatus).toBe('over');
+		expect(live.outcome).toBe('lost');
+	});
+
+	it('lets the winning move land on the board before the result', async () => {
+		deliver(snapshot({ dfen: `${START_FEN_BLACK} nn`, activeSeat: 'Black' }));
+		deliver({
+			TurnPlayed: { v: 1, seat: 'Black', moves: ['b8c6', 'g8f6'], fenAfter: AFTER_BLACK_KNIGHTS },
+		});
+		deliver({
+			GameEnded: {
+				v: 2,
+				over: { result: { Win: { side: 'Black' } }, termination: 'KingCaptured' },
+			},
+		});
+
+		await vi.advanceTimersByTimeAsync(1000); // first move reveals
+		expect(live.gameStatus).not.toBe('over');
+		await vi.advanceTimersByTimeAsync(1000); // final move lands
+		expect(getPieceFromFen(live.currentBoardFen, 'f6')).toBe('n');
+		expect(live.gameStatus).not.toBe('over');
+
+		await vi.advanceTimersByTimeAsync(800); // suspense
+		expect(live.gameStatus).toBe('over');
+		expect(live.outcome).toBe('lost');
+	});
+
+	it('holds a suspense beat before announcing when already caught up', async () => {
+		deliver(snapshot());
+		deliver({
+			GameEnded: { v: 1, over: { result: { Win: { side: 'White' } }, termination: 'Resign' } },
+		});
+		expect(live.gameStatus).not.toBe('over');
+
+		await vi.advanceTimersByTimeAsync(800);
+		expect(live.gameStatus).toBe('over');
+		expect(live.termination).toBe('Resign');
+	});
+
+	it('announces immediately when joining an already-finished game', () => {
+		deliver({
+			Snapshot: {
+				v: 5,
+				state: {
+					version: 5,
+					dfen: `${START_FEN} N`,
+					activeSeat: 'White',
+					dicePending: false,
+					status: {
+						Ended: { over: { result: { Win: { side: 'White' } }, termination: 'Resign' } },
+					},
+					clocks: null,
+				},
+			},
+		});
+
+		expect(live.gameStatus).toBe('over'); // no timers involved
+		expect(live.outcome).toBe('won');
+	});
+
+	it('a dispose during the suspense beat cancels the announcement', async () => {
+		deliver(snapshot());
+		deliver({
+			GameEnded: { v: 1, over: { result: { Win: { side: 'White' } }, termination: 'Resign' } },
+		});
+
+		live.dispose(); // user leaves before the beat elapses
+
+		await vi.advanceTimersByTimeAsync(5000);
+		expect(live.gameStatus).not.toBe('over');
 	});
 
 	it('dispose() halts an in-flight presentation — no sounds after leaving the page', async () => {

@@ -24,7 +24,7 @@ import type { BotMoveHistoryState } from '../playWithBot/playWithBotHistory.svel
 import type { TurnBlock } from '../types';
 import { logger } from '../utils/logger';
 import { playDiceSound } from '../sound';
-import { ROLL_ANIMATION_MS, MOVE_STEP_MS, PASS_DWELL_MS } from '../timings';
+import { ROLL_ANIMATION_MS, MOVE_STEP_MS, PASS_DWELL_MS, GAME_END_SUSPENSE_MS } from '../timings';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
@@ -84,6 +84,9 @@ export class LiveGameStore {
 	private epoch = 0;
 	// Which epoch, if any, currently has a presentLoop actively draining historyMap.
 	private pumpingEpoch: number | null = null;
+	// Set when GameEnded arrives: the result is announced only after the reveal drains
+	// to live plus a suspense beat (see scheduleGameEnd/finalizeEnd).
+	private pendingOver: Over | null = null;
 
 	historyBlocks = $derived.by<TurnBlock[]>(() =>
 		buildTurnBlocks(this.historyMap, this.maxMoveIndex),
@@ -224,6 +227,7 @@ export class LiveGameStore {
 		this.liveDice = [];
 		this.isAnimatingRoll = false;
 		this.passNoticeSeat = null;
+		this.pendingOver = null;
 		this.pendingPromotion = null;
 		this.pendingMoves = [];
 		this.confirmedFen = START_FEN;
@@ -293,7 +297,13 @@ export class LiveGameStore {
 		if ('GameEnded' in ev) {
 			if (ev.GameEnded.v <= this.version) return;
 			this.version = ev.GameEnded.v;
-			this.endGame(ev.GameEnded.over);
+			// Freeze the clocks at their server-final values and stop reconnecting right away,
+			// but let an in-flight reveal finish (the winning move should land on the board) and
+			// hold a short suspense beat before announcing the result.
+			this.settleClocks(ev.GameEnded.over.termination);
+			this.client?.close();
+			this.pendingOver = ev.GameEnded.over;
+			this.scheduleGameEnd(this.epoch);
 			return;
 		}
 		if ('Rejected' in ev) {
@@ -310,7 +320,8 @@ export class LiveGameStore {
 			this.liveFen = stripDfen(state.dfen);
 			// The server's final clocks are already settled in the snapshot; adopt them without re-zeroing.
 			this.setClocks(state.clocks, null);
-			this.endGame(state.status.Ended.over);
+			// Joining/refreshing into a finished game announces immediately — no suspense.
+			this.finalizeEnd(state.status.Ended.over);
 			return;
 		}
 		this.syncTurn(state.dfen, state.activeSeat, state.dicePending);
@@ -334,7 +345,22 @@ export class LiveGameStore {
 		}
 	}
 
-	private endGame(over: Over): void {
+	/** Runs once the reveal has drained to live: one suspense beat, then the announcement.
+	 * Epoch-guarded so a reset/dispose (or a newer game) mid-beat cancels it. */
+	private scheduleGameEnd(epoch: number): void {
+		// Mid-reveal: presentLoop re-invokes this once it has drained to live.
+		if (this.presentedIndex < this.maxMoveIndex) return;
+		void this.finishGameEnd(epoch);
+	}
+
+	private async finishGameEnd(epoch: number): Promise<void> {
+		await this.sleep(GAME_END_SUSPENSE_MS);
+		if (epoch !== this.epoch || this.pendingOver === null) return;
+		this.finalizeEnd(this.pendingOver);
+	}
+
+	private finalizeEnd(over: Over): void {
+		this.pendingOver = null;
 		this.gameStatus = 'over';
 		this.termination = over.termination;
 		this.liveDice = [];
@@ -342,9 +368,9 @@ export class LiveGameStore {
 		this.passNoticeSeat = null; // likewise a pass notice mid-dwell
 		this.pendingMoves = [];
 		this.pendingPromotion = null;
-		// Always show the final position, even if the user was browsing history or mid-catch-up
-		// when the game ended — v1 deliberately cuts off any still-animating reveal rather than
-		// letting it finish (a nicer "let the winning move land first" is a possible follow-up).
+		// Always land on the final position: on the event path the reveal has already finished
+		// (see scheduleGameEnd); this snap covers the snapshot path and a user who was browsing
+		// history when the announcement fired.
 		this.viewedIndex = null;
 		this.presentedIndex = this.maxMoveIndex;
 		this.epoch += 1;
@@ -717,6 +743,9 @@ export class LiveGameStore {
 					this.presentedIndex = nextIndex;
 				}
 			}
+			// Fully caught up: if the game already ended on the wire, the final move has now
+			// landed — run the suspense beat and announce.
+			if (this.pendingOver !== null) void this.finishGameEnd(epoch);
 		} finally {
 			// Cleared synchronously on the same tick the loop exits (rather than in a .finally()
 			// chained by the caller), so a new schedulePresentation() call can never observe a stale

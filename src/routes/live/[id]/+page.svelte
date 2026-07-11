@@ -12,6 +12,7 @@
 	import { seatDisplayName, seatDisplaySub } from '$lib/live/playerLabel';
 	import { preferencesStore } from '$lib/preferencesStore.svelte';
 	import { preloadSounds } from '$lib/sound';
+	import { endReasonLabel } from '$lib/gameOutcome';
 	import type { Seat } from '$lib/live/liveTypes';
 
 	const wideScreen = () =>
@@ -135,10 +136,25 @@
 			case 'waiting':
 				return 'Waiting for your opponent…';
 			case 'over':
+				if (live.termination === 'Aborted') return 'Game aborted.';
 				if (live.outcome === 'won') return 'You won! 🎉';
 				if (live.outcome === 'lost') return 'You lost.';
 				if (live.outcome === 'draw') return 'Draw.';
 				return live.winner ? `${live.winner} won.` : 'Game over.';
+		}
+	});
+
+	// Human wording for the wire termination enum ('by KingCaptured' read like a debug dump).
+	const endReason = $derived.by(() => {
+		switch (live.termination) {
+			case 'KingCaptured':
+				return endReasonLabel('mate');
+			case 'Resign':
+				return endReasonLabel('resign');
+			case 'Timeout':
+				return endReasonLabel('timeout');
+			default:
+				return ''; // Aborted gets its own headline; unknown values stay silent
 		}
 	});
 
@@ -410,8 +426,8 @@
 					class="order-4 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-4 md:order-none md:flex-1 md:justify-center"
 				>
 					<p class="text-lg font-bold text-content">{statusText}</p>
-					{#if live.termination}
-						<p class="text-sm text-content-muted">by {live.termination}</p>
+					{#if endReason}
+						<p class="text-sm text-content-muted">{endReason}</p>
 					{/if}
 					<a
 						href={resolve('/live')}
