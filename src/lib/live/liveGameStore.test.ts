@@ -268,6 +268,28 @@ describe('LiveGameStore pacing', () => {
 		expect(live.isAnimatingRoll).toBe(false);
 	});
 
+	it('dispose() halts an in-flight presentation — no sounds after leaving the page', async () => {
+		deliver(snapshot({ dfen: `${START_FEN_BLACK} nn`, activeSeat: 'Black' }));
+		deliver({
+			TurnPlayed: { v: 1, seat: 'Black', moves: ['b8c6', 'g8f6'], fenAfter: AFTER_BLACK_KNIGHTS },
+		});
+		deliver({
+			DiceRolled: {
+				v: 2,
+				seat: 'White',
+				dice: [2],
+				dfen: `${AFTER_BLACK_KNIGHTS} N`,
+				clocks: null,
+			},
+		}); // roll queued behind the opponent reveal — would spin+sound when reached
+
+		live.dispose(); // user navigates away mid-reveal
+
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(vi.mocked(playDiceSound)).not.toHaveBeenCalled(); // the queued roll never presents
+		expect(live.isAnimatingRoll).toBe(false);
+	});
+
 	it('cleanly invalidates an in-flight catch-up when the store reconnects to a different game', async () => {
 		deliver(snapshot({ dfen: `${START_FEN_BLACK} nn`, activeSeat: 'Black' }));
 		deliver({

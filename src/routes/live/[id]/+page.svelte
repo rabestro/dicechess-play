@@ -122,8 +122,10 @@
 	});
 
 	// In-panel banner while a no-legal-moves pass is dwelling (see LiveGameStore.passNoticeSeat).
+	// Suppressed while deliberately browsing history — the dwell belongs to the live position,
+	// not whatever past move the user scrubbed to.
 	const passNotice = $derived.by(() => {
-		if (live.passNoticeSeat === null) return null;
+		if (live.passNoticeSeat === null || live.isManuallyBrowsing) return null;
 		if (live.spectator) return `${live.passNoticeSeat} has no legal moves — turn passed.`;
 		const mine = (live.passNoticeSeat === 'White') === (live.playerColor === 'w');
 		return mine
