@@ -250,6 +250,9 @@ export class LiveGameStore {
 		this.stopClockTimer();
 		this.client?.close();
 		this.client = null;
+		// Invalidate any in-flight presentLoop: without this, leaving the page mid-reveal lets the
+		// loop keep waking (and playing roll sounds) against a store nothing renders anymore.
+		this.epoch += 1;
 	}
 
 	resign(): void {
