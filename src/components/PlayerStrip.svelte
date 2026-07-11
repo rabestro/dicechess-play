@@ -19,8 +19,10 @@
 	const low = $derived(clockMs !== undefined && isLowTime(clockMs));
 </script>
 
+<!-- min-h matches the strip's height with the clock pill (taller than the avatar),
+     so the strip doesn't jump when clock state arrives after connect. -->
 <div
-	class="flex items-center gap-2.5 rounded-xl border bg-surface px-3 py-2 transition-colors
+	class="flex min-h-[56px] items-center gap-2.5 rounded-xl border bg-surface px-3 py-2 transition-colors
 		{active ? (low ? 'border-danger/50' : 'border-primary/60') : 'border-border'}"
 >
 	<span
