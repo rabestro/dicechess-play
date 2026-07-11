@@ -24,7 +24,7 @@ import type { BotMoveHistoryState } from '../playWithBot/playWithBotHistory.svel
 import type { TurnBlock } from '../types';
 import { logger } from '../utils/logger';
 import { playDiceSound } from '../sound';
-import { ROLL_ANIMATION_MS, MOVE_STEP_MS } from '../timings';
+import { ROLL_ANIMATION_MS, MOVE_STEP_MS, PASS_DWELL_MS } from '../timings';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
@@ -56,6 +56,9 @@ export class LiveGameStore {
 	// ── Live UI state ────────────────────────────────────────────────────────
 	private liveDice = $state<DieState[]>([]);
 	isAnimatingRoll = $state<boolean>(false); // true while a roll's spin is presenting — either side's (see presentLoop)
+	// The seat whose no-legal-moves pass is currently dwelling on screen (drives the dice-panel
+	// notice, see presentLoop); null when no pass is presenting.
+	passNoticeSeat = $state<Seat | null>(null);
 	pendingPromotion = $state<{
 		orig: string;
 		dest: string;
@@ -220,6 +223,7 @@ export class LiveGameStore {
 		this.liveActiveColor = 'w';
 		this.liveDice = [];
 		this.isAnimatingRoll = false;
+		this.passNoticeSeat = null;
 		this.pendingPromotion = null;
 		this.pendingMoves = [];
 		this.confirmedFen = START_FEN;
@@ -332,6 +336,7 @@ export class LiveGameStore {
 		this.termination = over.termination;
 		this.liveDice = [];
 		this.isAnimatingRoll = false; // clears a roll-reveal that was mid-flight when the game ended
+		this.passNoticeSeat = null; // likewise a pass notice mid-dwell
 		this.pendingMoves = [];
 		this.pendingPromotion = null;
 		// Always show the final position, even if the user was browsing history or mid-catch-up
@@ -653,13 +658,15 @@ export class LiveGameStore {
 		void this.presentLoop(this.epoch);
 	}
 
-	/** Reveals new historyMap entries one at a time: a roll gets a spin (with sound), a move/pass
-	 * pauses on the old position first. Every ROLL is paced — the player's own included, matching
-	 * the offline bot mode (interaction is gated during the spin via the isAnimatingRoll checks in
-	 * legalMovesDests/handleBoardMove). The player's own MOVES and PASSES are still skipped: their
-	 * own turn already applied live and interactively as they played it (see syncTurn), so there's
-	 * nothing left to "catch up" for them; the opponent's entries (or, for a spectator, either
-	 * side's) get animated in full.
+	/** Reveals new historyMap entries one at a time: a roll gets a spin (with sound), a move
+	 * pauses on the old position first, and a no-legal-moves PASS dwells with a notice up
+	 * (passNoticeSeat drives the dice-panel banner) while the passed roll's dice stay on screen.
+	 * Every ROLL and PASS is paced — the player's own included, matching the offline bot mode
+	 * (interaction is gated during the spin via the isAnimatingRoll checks in
+	 * legalMovesDests/handleBoardMove). Only the player's own MOVES are skipped: their own turn
+	 * already applied live and interactively as they played it (see syncTurn), so there's nothing
+	 * left to "catch up" for them; the opponent's entries (or, for a spectator, either side's)
+	 * get animated in full.
 	 *
 	 * Note: if the player's own roll arrives while an opponent's earlier multi-move turn is still
 	 * being revealed, it queues behind it — legalMovesDests/handleBoardMove stay blocked (via
@@ -676,10 +683,12 @@ export class LiveGameStore {
 				if (!entry) return;
 
 				const isRoll = entry.gameMoveHistoryMove === null;
+				// PASS convention from recordTurn: a turn entry whose move has empty squares.
+				const isPass = !isRoll && entry.gameMoveHistoryMove?.from === '';
 				const alreadySeenLive = !this.spectator && entry.active_color === this.playerColor;
 
-				// Own moves/passes were played live by the player; only own ROLLS get the spin.
-				if (alreadySeenLive && !isRoll) {
+				// Own moves were played live by the player; own ROLLS and PASSES present like anyone's.
+				if (alreadySeenLive && !isRoll && !isPass) {
 					this.presentedIndex = nextIndex;
 					continue;
 				}
@@ -691,6 +700,14 @@ export class LiveGameStore {
 					await this.sleep(ROLL_ANIMATION_MS);
 					if (epoch !== this.epoch) return;
 					this.isAnimatingRoll = false;
+				} else if (isPass) {
+					// The passed roll's entry is still on display, dice visible — hold it with the
+					// notice up, then move on.
+					this.passNoticeSeat = entry.active_color === 'w' ? 'White' : 'Black';
+					await this.sleep(PASS_DWELL_MS);
+					if (epoch !== this.epoch) return; // reset()/endGame already cleared the notice
+					this.passNoticeSeat = null;
+					this.presentedIndex = nextIndex;
 				} else {
 					await this.sleep(MOVE_STEP_MS); // pause on the OLD position, then reveal
 					if (epoch !== this.epoch) return;

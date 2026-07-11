@@ -12,9 +12,18 @@
 		onRoll?: () => void;
 		/** Shown instead of the placeholder slots when there are no dice (live status). */
 		emptyText?: string;
+		/** In-panel notice (e.g. "no legal moves — turn passed"); rendered under the dice. */
+		statusMessage?: string | null;
 	}
 
-	let { dice, animating = false, canRoll = false, onRoll, emptyText }: Props = $props();
+	let {
+		dice,
+		animating = false,
+		canRoll = false,
+		onRoll,
+		emptyText,
+		statusMessage = null,
+	}: Props = $props();
 </script>
 
 <div
@@ -45,6 +54,15 @@
 		{#if emptyText}
 			<p class="text-center text-sm text-content-muted">{emptyText}</p>
 		{/if}
+	{/if}
+
+	{#if statusMessage}
+		<p
+			role="status"
+			class="rounded-lg border border-badge-accent/50 bg-badge-accent/10 px-3 py-2 text-center text-sm font-semibold text-badge-accent"
+		>
+			{statusMessage}
+		</p>
 	{/if}
 
 	{#if canRoll && onRoll}
