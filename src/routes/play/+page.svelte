@@ -152,9 +152,48 @@
 	}
 
 	$effect(() => () => clearTimeout(resignTimeout));
+
+	function onKeydown(event: KeyboardEvent) {
+		// Disable keyboard navigation during active game play to prevent accidental jumps.
+		if (!isOver) return;
+
+		const el = document.activeElement;
+		if (
+			el &&
+			(el.tagName === 'INPUT' ||
+				el.tagName === 'TEXTAREA' ||
+				el.tagName === 'SELECT' ||
+				el.hasAttribute('contenteditable'))
+		) {
+			return;
+		}
+
+		switch (event.key) {
+			case 'ArrowLeft':
+				store.setMoveIndex(store.currentMoveIndex - 1);
+				event.preventDefault();
+				break;
+			case 'ArrowRight':
+				store.setMoveIndex(store.currentMoveIndex + 1);
+				event.preventDefault();
+				break;
+			case 'Home':
+				store.setMoveIndex(0);
+				event.preventDefault();
+				break;
+			case 'End':
+				store.setMoveIndex(store.maxMoveIndex);
+				event.preventDefault();
+				break;
+		}
+	}
 </script>
 
-{#snippet iconBtn(kind: 'back' | 'list' | 'flag' | 'sound-on' | 'sound-off')}
+<svelte:window onkeydown={onKeydown} />
+
+{#snippet iconBtn(
+	kind: 'back' | 'list' | 'flag' | 'first' | 'prev' | 'next' | 'last' | 'sound-on' | 'sound-off',
+)}
 	<svg
 		viewBox="0 0 24 24"
 		class="h-[17px] w-[17px]"
@@ -188,7 +227,17 @@
 		{:else if kind === 'sound-off'}
 			<path d="M11 5.5 6.5 9H3.5v6h3l4.5 3.5z" /><path d="m15.5 9.5 5 5M20.5 9.5l-5 5" />
 		{:else}
-			<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
+			{#if kind === 'first'}
+				<path d="M11 6l-6 6 6 6M18 6l-6 6 6 6" />
+			{:else if kind === 'prev'}
+				<path d="M15 6l-6 6 6 6" />
+			{:else if kind === 'next'}
+				<path d="M9 6l6 6-6 6" />
+			{:else if kind === 'last'}
+				<path d="M6 6l6 6-6 6M13 6l6 6-6 6" />
+			{:else}
+				<path d="M6 20V4M6 5h11l-2 3 2 3H6" />
+			{/if}
 		{/if}
 	</svg>
 {/snippet}
@@ -311,6 +360,7 @@
 						currentMoveIndex={store.currentMoveIndex}
 						maxMoveIndex={store.maxMoveIndex}
 						onSetMove={(i) => store.setMoveIndex(i)}
+						keyboardNavEnabled={isOver}
 					/>
 				</aside>
 			{/if}
@@ -345,6 +395,49 @@
 								onCancel={() => store.cancelPromotion()}
 							/>
 						{/if}
+					</div>
+
+					<!-- History navigation buttons under the board -->
+					<div class="flex items-center justify-center gap-2 w-full">
+						<button
+							type="button"
+							aria-label="First move"
+							onclick={() => store.setMoveIndex(0)}
+							disabled={store.currentMoveIndex === 0}
+							class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							{@render iconBtn('first')}
+						</button>
+						<button
+							type="button"
+							aria-label="Previous move"
+							onclick={() => store.setMoveIndex(store.currentMoveIndex - 1)}
+							disabled={store.currentMoveIndex === 0}
+							class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							{@render iconBtn('prev')}
+						</button>
+						<span class="px-2 text-xs font-mono font-bold text-content-muted tabular-nums">
+							{store.currentMoveIndex} / {store.maxMoveIndex}
+						</span>
+						<button
+							type="button"
+							aria-label="Next move"
+							onclick={() => store.setMoveIndex(store.currentMoveIndex + 1)}
+							disabled={store.currentMoveIndex === store.maxMoveIndex}
+							class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							{@render iconBtn('next')}
+						</button>
+						<button
+							type="button"
+							aria-label="Last move"
+							onclick={() => store.setMoveIndex(store.maxMoveIndex)}
+							disabled={store.currentMoveIndex === store.maxMoveIndex}
+							class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border text-content hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+						>
+							{@render iconBtn('last')}
+						</button>
 					</div>
 
 					<PlayerStrip
