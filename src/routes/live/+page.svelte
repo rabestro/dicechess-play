@@ -66,7 +66,7 @@
 		>
 			{creating ? 'Creating…' : 'Create game'}
 		</button>
-		{#if error}<p class="text-sm text-red-500">{error}</p>{/if}
+		{#if error}<p class="text-sm text-danger">{error}</p>{/if}
 	{:else}
 		<p class="text-sm text-content-muted">
 			Time control: <span class="text-content font-bold">{chosenLabel}</span>
