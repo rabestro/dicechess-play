@@ -304,6 +304,7 @@
 					currentMoveIndex={live.currentMoveIndex}
 					maxMoveIndex={live.maxMoveIndex}
 					onSetMove={(i) => setMove(i)}
+					keyboardNavEnabled={live.gameStatus === 'over' || live.spectator}
 				/>
 			</aside>
 		{/if}

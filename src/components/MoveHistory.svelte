@@ -7,9 +7,13 @@
 		currentMoveIndex: number;
 		maxMoveIndex: number;
 		onSetMove: (index: number) => void;
+		// Whether ← / → currently scrub history on the caller's route (both routes gate
+		// keyboard nav post-game/spectator) — the hint below must not advertise a dead shortcut.
+		keyboardNavEnabled: boolean;
 	}
 
-	let { historyBlocks, currentMoveIndex, maxMoveIndex, onSetMove }: Props = $props();
+	let { historyBlocks, currentMoveIndex, maxMoveIndex, onSetMove, keyboardNavEnabled }: Props =
+		$props();
 
 	let scrollContainer = $state<HTMLElement | undefined>();
 	$effect(() => {
@@ -34,7 +38,9 @@
 >
 	<div class="flex flex-col gap-1 z-10 pb-2 border-b border-border">
 		<h3 class="text-content font-extrabold uppercase tracking-[0.2em] text-sm">Game History</h3>
-		<p class="text-xs text-content-muted font-mono">Use ← / → arrows to navigate</p>
+		{#if keyboardNavEnabled}
+			<p class="text-xs text-content-muted font-mono">Use ← / → arrows to navigate</p>
+		{/if}
 		<div class="text-xs font-mono font-bold text-primary mt-1">
 			Move {currentMoveIndex} of {maxMoveIndex}
 		</div>

@@ -228,6 +228,7 @@
 						{currentMoveIndex}
 						{maxMoveIndex}
 						onSetMove={(i) => setMove(i)}
+						keyboardNavEnabled={true}
 					/>
 				</aside>
 			</div>
