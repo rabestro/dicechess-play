@@ -19,13 +19,17 @@ export default defineConfig({
 				theme_color: '#020617',
 				background_color: '#020617',
 				display: 'standalone',
-				orientation: 'portrait-primary',
+				// No orientation lock: the board is playable in portrait or landscape
+				// (e.g. tablets), so pinning to portrait-primary only hurt those users.
+				orientation: 'any',
 				start_url: '/',
 				scope: '/',
 				categories: ['games', 'entertainment'],
 				icons: [
-					{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-					{ src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+					{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+					{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+					{ src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+					{ src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
 				],
 			},
 			workbox: {

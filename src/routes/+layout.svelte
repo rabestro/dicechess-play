@@ -7,6 +7,12 @@
 	import ToastContainer from '../components/ToastContainer.svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { pwaInfo } from 'virtual:pwa-info';
+	import { useRegisterSW } from 'virtual:pwa-register/svelte';
+
+	// registerType: 'autoUpdate' (vite.config.ts) — registering is enough, the
+	// service worker reloads the page itself once a new version activates.
+	useRegisterSW();
 
 	let { children }: { children: Snippet } = $props();
 
@@ -31,6 +37,13 @@
 		{ path: '/me', label: 'Profile' },
 	] as const;
 </script>
+
+<svelte:head>
+	{#if pwaInfo}
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -- build-generated from our own vite.config.ts, not user input -->
+		{@html pwaInfo.webManifest.linkTag}
+	{/if}
+</svelte:head>
 
 {#snippet navIcon(path: string)}
 	<svg
