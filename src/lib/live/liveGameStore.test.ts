@@ -106,20 +106,55 @@ describe('LiveGameStore pacing', () => {
 			TurnPlayed: { v: 1, seat: 'Black', moves: ['b8c6', 'g8f6'], fenAfter: AFTER_BLACK_KNIGHTS },
 		});
 
-		// Nothing revealed yet — still showing the pre-turn position.
+		// Nothing revealed yet — still showing the pre-turn position, no move to highlight either.
 		expect(getPieceFromFen(live.currentBoardFen, 'b8')).toBe('n');
 		expect(live.isViewingHistory).toBe(true);
+		expect(live.lastMove).toBeUndefined();
 
 		await vi.advanceTimersByTimeAsync(1000);
 		expect(getPieceFromFen(live.currentBoardFen, 'b8')).toBeNull();
 		expect(getPieceFromFen(live.currentBoardFen, 'c6')).toBe('n');
 		expect(getPieceFromFen(live.currentBoardFen, 'g8')).toBe('n'); // second move not revealed yet
 		expect(live.isViewingHistory).toBe(true);
+		expect(live.lastMove).toEqual(['b8', 'c6']); // matches the just-revealed micro-move
 
 		await vi.advanceTimersByTimeAsync(1000);
 		expect(getPieceFromFen(live.currentBoardFen, 'g8')).toBeNull();
 		expect(getPieceFromFen(live.currentBoardFen, 'f6')).toBe('n');
 		expect(live.isViewingHistory).toBe(false);
+		// Fully caught up: falls through to the live historyMap[maxMoveIndex] entry.
+		expect(live.lastMove).toEqual(['g8', 'f6']);
+	});
+
+	it('shows the historical move while manually browsing, undefined on the roll entry', async () => {
+		deliver(snapshot({ dfen: `${START_FEN_BLACK} nn`, activeSeat: 'Black' }));
+		deliver({
+			TurnPlayed: { v: 1, seat: 'Black', moves: ['b8c6', 'g8f6'], fenAfter: AFTER_BLACK_KNIGHTS },
+		});
+		await vi.advanceTimersByTimeAsync(2000); // let the whole turn reveal
+
+		live.setMoveIndex(0); // the seeding roll entry — no move played yet
+		expect(live.lastMove).toBeUndefined();
+
+		live.setMoveIndex(1); // b8-c6
+		expect(live.lastMove).toEqual(['b8', 'c6']);
+
+		live.setMoveIndex(2); // g8-f6
+		expect(live.lastMove).toEqual(['g8', 'f6']);
+
+		live.setMoveIndex(live.maxMoveIndex); // back to live
+		expect(live.lastMove).toEqual(['g8', 'f6']);
+	});
+
+	it('has no move to highlight on a pass entry', async () => {
+		deliver(snapshot({ dfen: `${START_FEN_BLACK} n`, activeSeat: 'Black' }));
+		deliver({ TurnPlayed: { v: 1, seat: 'Black', moves: [], fenAfter: START_FEN_BLACK } });
+
+		expect(live.passNoticeSeat).toBe('Black');
+		expect(live.lastMove).toBeUndefined();
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(live.lastMove).toBeUndefined();
 	});
 
 	it("paces the player's own dice roll: spin + sound, no moves until it lands", async () => {

@@ -15,6 +15,8 @@ export interface BoardStore {
 	legalMovesDests: Map<Key, Key[]>;
 	/** True while the user is browsing a past position instead of the live/current one. */
 	isViewingHistory: boolean;
+	/** [from, to] of the move to highlight; undefined for a roll/pass or before any move exists. */
+	lastMove?: Key[];
 	/** Called by chessground after the user drops a piece. */
 	handleBoardMove(orig: string, dest: string): void;
 }

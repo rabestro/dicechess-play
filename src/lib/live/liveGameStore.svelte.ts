@@ -25,6 +25,7 @@ import type { TurnBlock } from '../types';
 import { logger } from '../utils/logger';
 import { playDiceSound } from '../sound';
 import { ROLL_ANIMATION_MS, MOVE_STEP_MS, PASS_DWELL_MS, GAME_END_SUSPENSE_MS } from '../timings';
+import { lastMoveKeys } from '../lastMove';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
@@ -116,6 +117,20 @@ export class LiveGameStore {
 			source = this.historyMap[String(this.presentedIndex)]?.dices ?? this.liveDice;
 		}
 		return source.map((d) => ({ ...d }));
+	});
+
+	/** [from, to] to highlight on the board — same index as currentBoardFen, except live: an own
+	 * move applies to liveFen optimistically before the server's TurnPlayed lands it in historyMap
+	 * (see completeMove/recordTurn), so pendingMoves (not yet confirmed) takes priority there. */
+	lastMove = $derived.by<Key[] | undefined>(() => {
+		if (this.viewedIndex !== null) return lastMoveKeys(this.historyMap[String(this.viewedIndex)]);
+		if (this.presentedIndex < this.maxMoveIndex)
+			return lastMoveKeys(this.historyMap[String(this.presentedIndex)]);
+		if (this.pendingMoves.length > 0) {
+			const uci = this.pendingMoves[this.pendingMoves.length - 1];
+			return [uci.slice(0, 2) as Key, uci.slice(2, 4) as Key];
+		}
+		return lastMoveKeys(this.historyMap[String(this.maxMoveIndex)]);
 	});
 
 	/** True while the user is browsing a past position, or the paced reveal hasn't caught up to live. */
