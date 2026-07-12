@@ -1,7 +1,37 @@
 <script lang="ts">
-	import { toastStore } from '../lib/toastStore.svelte';
+	import { toastStore, type ToastType } from '../lib/toastStore.svelte';
 	import { fly, fade } from 'svelte/transition';
+
+	// No dedicated "info" token exists, so it stays neutral (surface/border/content) —
+	// same convention GameHistoryCard/GameEndModal use for their non-win/loss tone.
+	const toneClass: Record<ToastType, string> = {
+		success: 'border-success/30 bg-success/10 text-success',
+		error: 'border-danger/30 bg-danger/10 text-danger',
+		info: 'border-border bg-surface text-content',
+	};
 </script>
+
+{#snippet toastIcon(type: ToastType)}
+	<svg
+		viewBox="0 0 24 24"
+		class="h-5 w-5 shrink-0"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.8"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
+	>
+		<circle cx="12" cy="12" r="9" />
+		{#if type === 'success'}
+			<path d="M8 12.5l2.5 2.5L16 9" />
+		{:else if type === 'error'}
+			<path d="M9 9l6 6M15 9l-6 6" />
+		{:else}
+			<path d="M12 11v5" /><circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
+		{/if}
+	</svg>
+{/snippet}
 
 <div
 	class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4 md:px-0"
@@ -10,30 +40,31 @@
 		<div
 			in:fly={{ y: 20, duration: 300 }}
 			out:fade={{ duration: 200 }}
-			class="pointer-events-auto flex items-center justify-between p-4 rounded-lg shadow-xl border backdrop-blur-md text-white font-medium
-                {toast.type === 'success'
-				? 'bg-green-900/90 border-green-700/50'
-				: toast.type === 'error'
-					? 'bg-red-900/90 border-red-700/50'
-					: 'bg-blue-900/90 border-blue-700/50'}"
+			class="pointer-events-auto flex items-center justify-between gap-3 rounded-lg border p-4 font-medium shadow-xl backdrop-blur-md {toneClass[
+				toast.type
+			]}"
 		>
 			<div class="flex items-center gap-3">
-				{#if toast.type === 'success'}
-					<span class="text-xl">✅</span>
-				{:else if toast.type === 'error'}
-					<span class="text-xl">❌</span>
-				{:else}
-					<span class="text-xl">ℹ️</span>
-				{/if}
+				{@render toastIcon(toast.type)}
 				<span>{toast.text}</span>
 			</div>
 			<button
 				type="button"
-				class="opacity-60 hover:opacity-100 transition-opacity ml-4"
+				class="shrink-0 opacity-60 transition-opacity hover:opacity-100"
 				onclick={() => toastStore.remove(toast.id)}
 				aria-label="Close"
 			>
-				✕
+				<svg
+					viewBox="0 0 24 24"
+					class="h-4 w-4"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+					aria-hidden="true"
+				>
+					<path d="M6 6l12 12M18 6L6 18" />
+				</svg>
 			</button>
 		</div>
 	{/each}
