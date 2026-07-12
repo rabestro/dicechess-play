@@ -72,7 +72,8 @@
 		};
 	});
 
-	// Waiting: poll our seek until it's accepted, then go to the board as White.
+	// Waiting: poll our seek until it's accepted, then go to the board as whichever seat the
+	// server's accept-time coin flip actually gave us (never assume White — see play-api #95).
 	$effect(() => {
 		const w = waiting;
 		if (!w) return;
@@ -80,7 +81,8 @@
 		const tick = async () => {
 			try {
 				const s = await seekStatus(w.id, w.secret);
-				if (alive && s.matched && s.gameId && s.token) goToBoard(s.gameId, s.token, 'White');
+				if (alive && s.matched && s.gameId && s.token && s.seat)
+					goToBoard(s.gameId, s.token, s.seat);
 			} catch {
 				/* transient — keep waiting */
 			}
@@ -125,7 +127,9 @@
 		error = null;
 		try {
 			const match = await acceptSeek(seek.id, getGuestId());
-			goToBoard(match.gameId, match.token, 'Black');
+			// Never assume Black: the server coin-flips creator/accepter to White/Black on accept
+			// (see play-api #95) — match.seat is the only authoritative source.
+			goToBoard(match.gameId, match.token, match.seat);
 		} catch {
 			// Lost the race (someone took it) or it expired — refresh the list.
 			error = 'That seek was just taken — pick another.';

@@ -98,17 +98,23 @@ export interface CreatedSeek {
 	secret: string;
 }
 
-/** A creator's status poll: `matched` is false while open; once matched it carries the game + the creator's seat token. */
+/** A creator's status poll: `matched` is false while open; once matched it carries the game, the creator's seat
+ * token, and the seat that token names (randomly assigned at accept time — never assume White).
+ */
 export interface SeekState {
 	matched: boolean;
 	gameId: string | null;
 	token: string | null;
+	seat: Seat | null;
 }
 
-/** The accept response: the seated game id plus the accepter's seat token. */
+/** The accept response: the seated game id, the accepter's seat token, and the seat it names (randomly assigned —
+ * never assume Black).
+ */
 export interface SeekMatch {
 	gameId: string;
 	token: string;
+	seat: Seat;
 }
 
 // ── Live games listing (mirror of play-api's GET /games) ─────────────────────
