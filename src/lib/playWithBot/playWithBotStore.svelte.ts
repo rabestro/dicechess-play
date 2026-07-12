@@ -14,6 +14,7 @@ import {
 import { authStore } from '../authStore.svelte';
 import { playDiceSound } from '../sound';
 import { ROLL_ANIMATION_MS, PASS_DWELL_MS } from '../timings';
+import { lastMoveKeys } from '../lastMove';
 
 let DiceChess = (DiceChessEngine as any).DiceChess;
 
@@ -160,6 +161,17 @@ export class PlayWithBotStore {
 				? (this.historyMap[String(this.viewedIndex)]?.dices ?? this.dice.currentDice)
 				: this.dice.currentDice;
 		return source.map((d) => ({ ...d }));
+	});
+
+	/** [from, to] to highlight on the board — every move (own or bot's) writes its historyMap
+	 * entry synchronously (see completeMoveLogic), so unlike the live store there's no separate
+	 * "pending, not yet confirmed" state to prefer. */
+	lastMove = $derived.by<Key[] | undefined>(() => {
+		const entry =
+			this.viewedIndex !== null
+				? this.historyMap[String(this.viewedIndex)]
+				: this.historyMap[String(this.maxMoveIndex)];
+		return lastMoveKeys(entry);
 	});
 
 	isViewingHistory = $derived(this.viewedIndex !== null);

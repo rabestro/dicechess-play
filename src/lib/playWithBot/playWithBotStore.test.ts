@@ -244,3 +244,51 @@ describe('PlayWithBotStore history scrubbing (issue #55)', () => {
 		expect(diceSuffix).toBe('ppp');
 	});
 });
+
+describe('PlayWithBotStore lastMove (issue #75)', () => {
+	let store: PlayWithBotStore;
+	let mock: ReturnType<typeof createMockDiceChess>;
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		mock = createMockDiceChess();
+		setDiceChessInstance(mock);
+		store = new PlayWithBotStore();
+	});
+
+	afterEach(() => {
+		store.endSession();
+		resetDiceChessInstance();
+		vi.useRealTimers();
+	});
+
+	async function startAndRollPlayerTurn() {
+		store.customDfen = `${START_FEN} PPP`;
+		store.startNewGame('white', 'greedy');
+		const rolled = store.rollDice();
+		await vi.advanceTimersByTimeAsync(600);
+		await rolled;
+	}
+
+	it('is undefined before any move (a fresh roll)', async () => {
+		await startAndRollPlayerTurn();
+		expect(store.lastMove).toBeUndefined();
+	});
+
+	it('highlights the move just played, live', async () => {
+		await startAndRollPlayerTurn();
+		store.handleBoardMove('e2', 'e4');
+		expect(store.lastMove).toEqual(['e2', 'e4']);
+	});
+
+	it('follows history navigation: no highlight on the roll, the move on its own entry', async () => {
+		await startAndRollPlayerTurn();
+		store.handleBoardMove('e2', 'e4'); // historyMap['1'], maxMoveIndex 1
+
+		store.setMoveIndex(0); // the roll entry — no move yet
+		expect(store.lastMove).toBeUndefined();
+
+		store.setMoveIndex(1); // the move entry
+		expect(store.lastMove).toEqual(['e2', 'e4']);
+	});
+});

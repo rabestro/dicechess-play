@@ -26,6 +26,7 @@
 		fen={store.currentBoardFen}
 		orientation={toCg(store.playerColor)}
 		turnColor={toCg(store.activeColor)}
+		lastMove={store.lastMove}
 		movable={{
 			free: false,
 			color: canMove ? toCg(store.playerColor) : undefined,
