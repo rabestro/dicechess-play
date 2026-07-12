@@ -18,7 +18,9 @@ export async function listGames(): Promise<LiveGames> {
 	return (await res.json()) as LiveGames;
 }
 
-/** Post an open seek (the guest is seated White when accepted); returns its id + the creator's secret. */
+/** Post an open seek; returns its id + the creator's secret. The eventual seat is decided at accept
+ * time (randomly) — poll status for it, never assume White.
+ */
 export async function createSeek(
 	creator: string,
 	timeControl: TimeControl | null,
@@ -41,7 +43,9 @@ export async function seekStatus(id: string, secret: string): Promise<SeekState>
 	return (await res.json()) as SeekState;
 }
 
-/** Accept an open seek (the guest is seated Black); returns the game id + the accepter's seat token. */
+/** Accept an open seek; returns the game id, the accepter's seat token, and the seat it names (randomly
+ * assigned server-side — never assume Black).
+ */
 export async function acceptSeek(id: string, accepter: string): Promise<SeekMatch> {
 	const res = await fetch(`${apiBase()}/lobby/seeks/${id}/accept`, {
 		method: 'POST',
