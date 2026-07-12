@@ -26,6 +26,7 @@ import { logger } from '../utils/logger';
 import { playDiceSound } from '../sound';
 import { ROLL_ANIMATION_MS, MOVE_STEP_MS, PASS_DWELL_MS, GAME_END_SUSPENSE_MS } from '../timings';
 import { lastMoveKeys } from '../lastMove';
+import { toastStore } from '../toastStore.svelte';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DiceChess = (DiceChessEngine as any).DiceChess;
@@ -324,7 +325,10 @@ export class LiveGameStore {
 		if ('Rejected' in ev) {
 			if (ev.Rejected.v <= this.version) return;
 			this.version = ev.Rejected.v;
-			if (ev.Rejected.seat === this.mySeat) this.rollback();
+			if (ev.Rejected.seat === this.mySeat) {
+				this.rollback();
+				toastStore.error("Move rejected — reverted to the board's last confirmed position.");
+			}
 			return;
 		}
 	}
@@ -462,7 +466,10 @@ export class LiveGameStore {
 		if (this.gameStatus !== 'playing' || this.liveActiveColor !== this.playerColor) return;
 		// Don't move optimistically while disconnected — the SubmitTurn would be dropped and the
 		// local board would diverge from the server.
-		if (this.connection !== 'open') return;
+		if (this.connection !== 'open') {
+			toastStore.error('Reconnecting… your move will go through once back online.');
+			return;
+		}
 		const piece = getPieceFromFen(this.liveFen, orig);
 		if (!piece) return;
 
