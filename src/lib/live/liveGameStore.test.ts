@@ -3,12 +3,19 @@ import { LiveGameStore } from './liveGameStore.svelte';
 import type { PublicGameState, ServerEvent } from './liveTypes';
 import { getPieceFromFen } from '../../utils/fenUtils';
 import { playDiceSound } from '../sound';
+import { toastStore } from '../toastStore.svelte';
 
 // The store triggers real audio through the shared sound service; stub it so tests can
 // assert WHEN a roll sounds (aligned with its presented spin) without touching Audio.
 vi.mock('../sound', () => ({
 	playDiceSound: vi.fn(),
 	preloadSounds: vi.fn(),
+}));
+
+// Stub the toast surface so tests can assert WHEN a rejection/connection-drop notice fires,
+// without pulling in the real store's DOM-free but stateful toast queue.
+vi.mock('../toastStore.svelte', () => ({
+	toastStore: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
 // Minimal WebSocket stand-in: the store opens one via LiveClient; we drive events through it.
@@ -478,5 +485,94 @@ describe('LiveGameStore pacing', () => {
 
 		// The second pump must have actually started, not been silently dropped by a stale pumpingEpoch.
 		expect(live.isAnimatingRoll).toBe(true);
+	});
+});
+
+describe('LiveGameStore connection feedback (issue #76)', () => {
+	let live: LiveGameStore;
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.clearAllMocks();
+		vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+		MockWebSocket.last = null;
+		live = new LiveGameStore();
+		live.connect('g', 'tok', 'white');
+		MockWebSocket.last!.onopen?.();
+	});
+
+	afterEach(() => {
+		live.dispose();
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+	});
+
+	const deliver = (ev: ServerEvent) =>
+		MockWebSocket.last!.onmessage?.({ data: JSON.stringify(ev) });
+
+	it("toasts and reverts when the local player's move is rejected", () => {
+		deliver(snapshot());
+		deliver({
+			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
+		});
+		const confirmedFenBefore = live.currentBoardFen;
+
+		deliver({ Rejected: { v: 2, seat: 'White', reason: 'IllegalMove' } });
+
+		expect(vi.mocked(toastStore.error)).toHaveBeenCalledTimes(1);
+		expect(live.currentBoardFen).toBe(confirmedFenBefore); // rolled back, not left diverged
+	});
+
+	it("does not toast when a REJECTION is for the opponent's seat", () => {
+		deliver(snapshot());
+		deliver({ Rejected: { v: 1, seat: 'Black', reason: 'IllegalMove' } });
+
+		expect(vi.mocked(toastStore.error)).not.toHaveBeenCalled();
+	});
+
+	it('toasts and drops a board-move attempt made while reconnecting', async () => {
+		deliver(snapshot());
+		deliver({
+			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
+		});
+		await vi.advanceTimersByTimeAsync(600); // let the own-roll spin land — see issue #70
+		const fenBefore = live.currentBoardFen;
+
+		MockWebSocket.last!.onclose?.(); // unexpected drop -> connection goes to 'connecting'
+		expect(live.connection).toBe('connecting');
+
+		live.handleBoardMove('b1', 'c3'); // a legal knight move, were the connection open
+
+		expect(vi.mocked(toastStore.error)).toHaveBeenCalledWith(
+			'Reconnecting… your move will go through once back online.',
+		);
+		expect(live.currentBoardFen).toBe(fenBefore); // no optimistic move applied
+	});
+
+	it('toasts a distinct reload message once reconnect attempts are exhausted', async () => {
+		deliver(snapshot());
+		deliver({
+			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
+		});
+		await vi.advanceTimersByTimeAsync(600);
+
+		// LiveClient.handleDrop gives up after MAX_ATTEMPTS (10): the 11th drop finds attempts
+		// already at 10 and flips to 'closed' instead of scheduling another retry. Each drop's
+		// teardownSocket() nulls the CURRENT mock's onclose (so it can't double-fire), and the
+		// scheduled reconnect only constructs a fresh MockWebSocket once its backoff timer fires
+		// — so each iteration must advance past that backoff before the next onclose can land.
+		for (let i = 0; i < 11 && live.connection !== 'closed'; i++) {
+			MockWebSocket.last!.onclose?.();
+			await vi.advanceTimersByTimeAsync(6000); // past the longest backoff step + jitter
+		}
+		expect(live.connection).toBe('closed');
+
+		live.handleBoardMove('b1', 'c3');
+
+		// Distinct from the still-retrying 'connecting' message: nothing will bring this move
+		// through without a manual reload (see issue #76 review — Gemini caught the ambiguity).
+		expect(vi.mocked(toastStore.error)).toHaveBeenCalledWith(
+			'Disconnected — reload the page to reconnect.',
+		);
 	});
 });

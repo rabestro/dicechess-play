@@ -160,6 +160,18 @@
 		}
 	});
 
+	// A dropped connection is otherwise invisible whenever dice are on the table (statusText only
+	// surfaces via the dice panel's EMPTY state) — this badge is independent of dice/turn state.
+	// Skipped for the very first connect: DicePanel's "Connecting…" empty-state already covers it,
+	// and the badge would be redundant before there's anything else on screen.
+	const connectionBadge = $derived.by(() => {
+		if (live.gameStatus === 'over') return null;
+		if (live.connection === 'closed') return 'Disconnected';
+		if (live.connection === 'connecting' && live.gameStatus !== 'connecting')
+			return 'Reconnecting…';
+		return null;
+	});
+
 	// Human wording for the wire termination enum ('by KingCaptured' read like a debug dump).
 	const endReason = $derived.by(() => {
 		switch (live.termination) {
@@ -443,12 +455,27 @@
 						{#if confirmResign}Resign?{/if}
 					</button>
 				{/if}
-				{#if live.spectator}
-					<span
-						class="ml-auto rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-bold text-content-muted"
-					>
-						Spectating
-					</span>
+				{#if connectionBadge || live.spectator}
+					<div class="ml-auto flex items-center gap-1.5">
+						{#if connectionBadge}
+							<span
+								class="rounded-lg border px-2.5 py-1.5 text-xs font-bold {live.connection ===
+								'closed'
+									? 'border-danger/50 bg-danger/15 text-danger'
+									: 'border-badge-accent/50 bg-badge-accent/15 text-badge-accent'}"
+								role="status"
+							>
+								{connectionBadge}
+							</span>
+						{/if}
+						{#if live.spectator}
+							<span
+								class="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-bold text-content-muted"
+							>
+								Spectating
+							</span>
+						{/if}
+					</div>
 				{/if}
 			</div>
 
