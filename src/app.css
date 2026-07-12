@@ -4,8 +4,9 @@
 	/* Semantic Status Tokens (theme-aware — values defined per theme below) */
 	--color-danger: var(--danger);
 	--color-badge-accent: var(--badge-accent);
-	/* "Alive" indicator (the lobby's LIVE tiles) — one green that reads on every theme's surfaces. */
-	--color-success: #22c55e;
+	/* "Alive" indicator (the lobby's LIVE tiles) — a green tuned per theme to stay >=4.5:1
+	   against --bg-surface (the flat #22c55e was ~2.3:1 on the light theme). */
+	--color-success: var(--success);
 
 	/* Fixed Domain Tokens */
 	--color-piece-white: #ffffff;
@@ -51,6 +52,7 @@
 
 	--danger: #f87171; /* red-400 */
 	--badge-accent: #fbbf24; /* amber-400 */
+	--success: #22c55e;
 }
 
 [data-theme='light'] {
@@ -72,6 +74,7 @@
 
 	--danger: #dc2626; /* red-600 */
 	--badge-accent: #d97706; /* amber-600 */
+	--success: #178640; /* darker than the shared green — 4.5:1 needs it here, not just a bright accent */
 }
 
 [data-theme='dracula'] {
@@ -84,7 +87,7 @@
 	--border-strong: #bd93f9;
 
 	--text-primary: #f8f8f2;
-	--text-muted: #6272a4;
+	--text-muted: #afb8d1; /* lightened from the Dracula comment color (#6272a4 was ~1.9:1 on bg-surface) */
 
 	--accent: #ff79c6;
 	--accent-hover: #bd93f9;
@@ -94,6 +97,7 @@
 
 	--danger: #ff5555;
 	--badge-accent: #ffb86c;
+	--success: #25d465; /* slightly lightened from the shared green to clear 4.5:1 here */
 }
 
 [data-theme='nord'] {
@@ -116,6 +120,7 @@
 
 	--danger: #bf616a;
 	--badge-accent: #ebcb8b;
+	--success: #23cc61; /* slightly lightened from the shared green to clear 4.5:1 here */
 }
 
 [data-theme='solarized-dark'] {
@@ -128,7 +133,7 @@
 	--border-strong: #839496;
 
 	--text-primary: #93a1a1;
-	--text-muted: #657b83;
+	--text-muted: #8a9ea5; /* lightened from #657b83, which was ~2.9:1 on bg-surface */
 
 	--accent: #2aa198;
 	--accent-hover: #268bd2;
@@ -138,6 +143,7 @@
 
 	--danger: #dc322f;
 	--badge-accent: #b58900;
+	--success: #22c55e;
 }
 
 [data-theme='tokyo-night'] {
@@ -150,7 +156,7 @@
 	--border-strong: #7aa2f7;
 
 	--text-primary: #a9b1d6;
-	--text-muted: #565f89;
+	--text-muted: #8990b5; /* lightened from #565f89, which was ~2.35:1 on bg-surface */
 
 	--accent: #7aa2f7;
 	--accent-hover: #bb9af7;
@@ -160,6 +166,7 @@
 
 	--danger: #f7768e;
 	--badge-accent: #e0af68;
+	--success: #22c55e;
 }
 
 [data-theme='gruvbox'] {
@@ -172,7 +179,7 @@
 	--border-strong: #d5c4a1;
 
 	--text-primary: #ebdbb2;
-	--text-muted: #a89984;
+	--text-muted: #afa28e; /* lightened from #a89984, which was ~4.17:1 on bg-surface (just under AA) */
 
 	--accent: #fe8019;
 	--accent-hover: #fabd2f;
@@ -182,6 +189,7 @@
 
 	--danger: #fb4934;
 	--badge-accent: #fabd2f;
+	--success: #22c55e;
 }
 
 body {
