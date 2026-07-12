@@ -467,7 +467,13 @@ export class LiveGameStore {
 		// Don't move optimistically while disconnected — the SubmitTurn would be dropped and the
 		// local board would diverge from the server.
 		if (this.connection !== 'open') {
-			toastStore.error('Reconnecting… your move will go through once back online.');
+			// 'closed' means reconnect attempts are exhausted (see LiveClient.handleDrop) — nothing
+			// will bring the move through without a manual reload, unlike a still-retrying 'connecting'.
+			toastStore.error(
+				this.connection === 'closed'
+					? 'Disconnected — reload the page to reconnect.'
+					: 'Reconnecting… your move will go through once back online.',
+			);
 			return;
 		}
 		const piece = getPieceFromFen(this.liveFen, orig);

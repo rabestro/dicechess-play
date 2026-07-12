@@ -530,7 +530,7 @@ describe('LiveGameStore connection feedback (issue #76)', () => {
 		expect(vi.mocked(toastStore.error)).not.toHaveBeenCalled();
 	});
 
-	it('toasts and drops a board-move attempt made while disconnected', async () => {
+	it('toasts and drops a board-move attempt made while reconnecting', async () => {
 		deliver(snapshot());
 		deliver({
 			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
@@ -543,7 +543,36 @@ describe('LiveGameStore connection feedback (issue #76)', () => {
 
 		live.handleBoardMove('b1', 'c3'); // a legal knight move, were the connection open
 
-		expect(vi.mocked(toastStore.error)).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(toastStore.error)).toHaveBeenCalledWith(
+			'Reconnecting… your move will go through once back online.',
+		);
 		expect(live.currentBoardFen).toBe(fenBefore); // no optimistic move applied
+	});
+
+	it('toasts a distinct reload message once reconnect attempts are exhausted', async () => {
+		deliver(snapshot());
+		deliver({
+			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
+		});
+		await vi.advanceTimersByTimeAsync(600);
+
+		// LiveClient.handleDrop gives up after MAX_ATTEMPTS (10): the 11th drop finds attempts
+		// already at 10 and flips to 'closed' instead of scheduling another retry. Each drop's
+		// teardownSocket() nulls the CURRENT mock's onclose (so it can't double-fire), and the
+		// scheduled reconnect only constructs a fresh MockWebSocket once its backoff timer fires
+		// — so each iteration must advance past that backoff before the next onclose can land.
+		for (let i = 0; i < 11 && live.connection !== 'closed'; i++) {
+			MockWebSocket.last!.onclose?.();
+			await vi.advanceTimersByTimeAsync(6000); // past the longest backoff step + jitter
+		}
+		expect(live.connection).toBe('closed');
+
+		live.handleBoardMove('b1', 'c3');
+
+		// Distinct from the still-retrying 'connecting' message: nothing will bring this move
+		// through without a manual reload (see issue #76 review — Gemini caught the ambiguity).
+		expect(vi.mocked(toastStore.error)).toHaveBeenCalledWith(
+			'Disconnected — reload the page to reconnect.',
+		);
 	});
 });
