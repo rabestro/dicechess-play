@@ -180,8 +180,11 @@
 		</div>
 		{#if isLiveEnabled() && !waiting}
 			<div class="flex flex-wrap items-center gap-4">
-				<a href={resolve('/live')} class="text-sm text-content-muted underline hover:text-content">
-					Or play a friend by link →
+				<a
+					href={resolve('/live')}
+					class="rounded-xl px-4 py-2 font-bold text-content-muted transition-colors hover:bg-surface hover:text-content"
+				>
+					Play a friend by link →
 				</a>
 				<button
 					type="button"
