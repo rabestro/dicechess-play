@@ -179,13 +179,18 @@
 			{/if}
 		</div>
 		{#if isLiveEnabled() && !waiting}
-			<button
-				type="button"
-				onclick={() => (createOpen = !createOpen)}
-				class="rounded-xl border border-border bg-surface px-4 py-2 font-bold text-content-muted transition-colors hover:text-content"
-			>
-				{createOpen ? '× Close' : '+ Create a seek'}
-			</button>
+			<div class="flex items-center gap-4">
+				<a href={resolve('/live')} class="text-sm text-content-muted underline hover:text-content">
+					Or play a friend by link →
+				</a>
+				<button
+					type="button"
+					onclick={() => (createOpen = !createOpen)}
+					class="rounded-xl border border-border bg-surface px-4 py-2 font-bold text-content-muted transition-colors hover:text-content"
+				>
+					{createOpen ? '× Close' : '+ Create a seek'}
+				</button>
+			</div>
 		{/if}
 	</div>
 
@@ -365,10 +370,6 @@
 				{/each}
 			</div>
 		{/if}
-
-		<a href={resolve('/live')} class="text-sm text-content-muted underline hover:text-content">
-			Or play a friend by link →
-		</a>
 	{/if}
 </section>
 
