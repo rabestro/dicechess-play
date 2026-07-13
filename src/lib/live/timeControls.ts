@@ -6,9 +6,7 @@ export interface TimeControlPreset {
 }
 
 /** The time-control choices offered when creating a game or a seek. The first preset is the
- * default (both pickers start at index 0), so it must be a timed control — with Unlimited first,
- * a quickly-created game silently had no clocks. Unlimited stays available as a deliberate,
- * last choice. */
+ * default (both pickers start at index 0). */
 export const timeControlPresets: readonly TimeControlPreset[] = [
 	{ label: '5 + 3', value: { Fischer: { initialSeconds: 300, incrementSeconds: 3 } } },
 	{ label: '3 + 2', value: { Fischer: { initialSeconds: 180, incrementSeconds: 2 } } },
@@ -18,9 +16,6 @@ export const timeControlPresets: readonly TimeControlPreset[] = [
 	{ label: '10 + 5', value: { Fischer: { initialSeconds: 600, incrementSeconds: 5 } } },
 	{ label: '10 + 10', value: { Fischer: { initialSeconds: 600, incrementSeconds: 10 } } },
 	{ label: '15 + 10', value: { Fischer: { initialSeconds: 900, incrementSeconds: 10 } } },
-	{ label: '30s / move', value: { PerMove: { secondsPerMove: 30 } } },
-	{ label: '60s / move', value: { PerMove: { secondsPerMove: 60 } } },
-	{ label: 'Unlimited', value: null },
 ];
 
 export interface TimeControlGroup {
@@ -35,8 +30,6 @@ export const timeControlGroups: readonly TimeControlGroup[] = (
 	[
 		['Blitz', ['3 + 2', '5 + 3', '5 + 5', '5 min']],
 		['Rapid', ['10 + 5', '10 + 10', '15 + 10', '10 min']],
-		['Per move', ['30s / move', '60s / move']],
-		['No clock', ['Unlimited']],
 	] as [string, string[]][]
 ).map(([label, labels]) => ({
 	label,

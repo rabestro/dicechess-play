@@ -8,10 +8,6 @@ describe('timeControlPresets', () => {
 		expect(timeControlPresets[0].value).not.toBeNull();
 	});
 
-	it('still offers Unlimited as an explicit choice', () => {
-		expect(timeControlPresets.some((p) => p.value === null)).toBe(true);
-	});
-
 	it('labels every preset consistently with timeControlLabel', () => {
 		for (const p of timeControlPresets) {
 			expect(timeControlLabel(p.value)).toBe(p.label);
