@@ -510,6 +510,39 @@ describe('LiveGameStore connection feedback (issue #76)', () => {
 	const deliver = (ev: ServerEvent) =>
 		MockWebSocket.last!.onmessage?.({ data: JSON.stringify(ev) });
 
+	it('updates lastMove immediately when applying an optimistic board move', async () => {
+		deliver(snapshot());
+		deliver({
+			DiceRolled: { v: 1, seat: 'White', dice: [2], dfen: `${START_FEN} N`, clocks: null },
+		});
+		await vi.advanceTimersByTimeAsync(600); // let spin land
+
+		expect(live.lastMove).toBeUndefined();
+
+		live.handleBoardMove('b1', 'c3');
+
+		// pendingMoves should drive lastMove immediately, before the server confirms
+		expect(live.lastMove).toEqual(['b1', 'c3']);
+
+		// And when the server confirms, it stays correct
+		deliver({
+			TurnPlayed: {
+				v: 2,
+				seat: 'White',
+				moves: ['b1c3'],
+				fenAfter: 'rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR b KQkq - 1 1',
+			},
+		});
+		expect(live.lastMove).toEqual(['b1', 'c3']);
+	});
+
+	it('updates hasClocks correctly when initialized with clocks from a snapshot', () => {
+		expect(live.hasClocks).toBe(false);
+		deliver(snapshot({ clocks: { white: 60000, black: 60000 } }));
+		expect(live.hasClocks).toBe(true);
+		expect(live.whiteClockMs).toBe(60000);
+	});
+
 	it("toasts and reverts when the local player's move is rejected", () => {
 		deliver(snapshot());
 		deliver({
