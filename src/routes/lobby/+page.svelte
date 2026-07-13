@@ -179,7 +179,7 @@
 			{/if}
 		</div>
 		{#if isLiveEnabled() && !waiting}
-			<div class="flex items-center gap-4">
+			<div class="flex flex-wrap items-center gap-4">
 				<a href={resolve('/live')} class="text-sm text-content-muted underline hover:text-content">
 					Or play a friend by link →
 				</a>
