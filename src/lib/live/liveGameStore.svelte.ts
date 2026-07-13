@@ -148,15 +148,15 @@ export class LiveGameStore {
 	private mySeat = $state<Seat | null>(null);
 	private client: LiveClient | null = null;
 	private version = -1;
-	private pendingMoves: string[] = []; // optimistic UCI buffer for the turn in progress
+	private pendingMoves = $state<string[]>([]); // optimistic UCI buffer for the turn in progress
 	private confirmedFen = START_FEN; // last server-confirmed position, for rollback
 	private confirmedDice: DieState[] = [];
 
 	// ── clocks ─────────────────────────────────────────────────────────────────
 	private tick = $state(0); // bumped by a timer so the ticking clock re-renders between server events
-	private clockBaseMs: Clocks | null = null; // remaining per side as of `clockSince`; null = unlimited
+	private clockBaseMs = $state<Clocks | null>(null); // remaining per side as of `clockSince`; null = unlimited
 	private clockSince = 0; // Date.now() when clockBaseMs was captured
-	private tickingSeat: Seat | null = null; // the side running down now (none between turns / when over)
+	private tickingSeat = $state<Seat | null>(null); // the side running down now (none between turns / when over)
 	private clockTimer: ReturnType<typeof setInterval> | null = null;
 
 	/** True while a player (not a spectator) is in a live game. */
