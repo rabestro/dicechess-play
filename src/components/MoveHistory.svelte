@@ -78,7 +78,7 @@
 										? 'bg-primary/20 ring-1 ring-primary shadow-md'
 										: 'bg-dice-surface'}"
 								>
-									{#each turn.whiteDice.diceChars as char}
+									{#each turn.whiteDice.diceChars as char, i (i)}
 										<img
 											src={getPieceImage(char)}
 											alt={char}
@@ -125,7 +125,7 @@
 										? 'bg-primary/20 ring-1 ring-primary shadow-md'
 										: 'bg-dice-surface'}"
 								>
-									{#each turn.blackDice.diceChars as char}
+									{#each turn.blackDice.diceChars as char, i (i)}
 										<img
 											src={getPieceImage(char)}
 											alt={char}
