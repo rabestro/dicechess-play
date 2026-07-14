@@ -1,6 +1,5 @@
 // src/lib/playWithBot/playWithBotStore.svelte.ts
 
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { logger } from '../utils/logger';
 import { getPieceFromFen, deriveChessgroundDests, buildDfen } from '../../utils/fenUtils';
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
@@ -541,30 +540,31 @@ export class PlayWithBotStore {
 	}
 
 	/** Cached legal moves for Chessground board — recomputed eagerly after state mutations */
-	legalMovesDests = $derived.by<SvelteMap<Key, Key[]>>(() => {
-		if (this.isViewingHistory) return new SvelteMap();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
+		if (this.isViewingHistory) return new Map();
 		if (
 			this.gameStatus !== 'playing' ||
 			this.liveActiveColor !== this.playerColor ||
 			this.activeDrawOffer !== null
 		) {
-			return new SvelteMap();
+			return new Map();
 		}
 
 		const availableDice = this.availableDiceValues;
 
 		if (availableDice.length === 0) {
-			return new SvelteMap();
+			return new Map();
 		}
 
 		try {
 			const fullFen = this.liveBoardFen;
 			const uciMoves =
 				DiceChess.getLegalUciMoves(buildDfen(fullFen, availableDice, this.liveActiveColor)) || [];
-			return new SvelteMap(deriveChessgroundDests(uciMoves));
+			return deriveChessgroundDests(uciMoves);
 		} catch (e) {
 			logger.error('Error calculating legal moves', e as Error);
-			return new SvelteMap();
+			return new Map();
 		}
 	});
 
@@ -618,7 +618,8 @@ export class PlayWithBotStore {
 						.map((m) => m[4].toLowerCase());
 
 					if (apiPromos.length > 0) {
-						availablePieces = Array.from(new SvelteSet(apiPromos));
+						// eslint-disable-next-line svelte/prefer-svelte-reactivity
+						availablePieces = Array.from(new Set(apiPromos));
 					}
 				}
 			} catch (e) {

@@ -1,4 +1,3 @@
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Key } from '@lichess-org/chessground/types';
 import {
 	getPieceFromFen,
@@ -203,18 +202,19 @@ export class LiveGameStore {
 		return Math.max(0, base);
 	}
 
-	legalMovesDests = $derived.by<SvelteMap<Key, Key[]>>(() => {
-		if (this.isViewingHistory) return new SvelteMap();
-		if (this.isAnimatingRoll) return new SvelteMap(); // own roll: no moves until the spin lands
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
+		if (this.isViewingHistory) return new Map();
+		if (this.isAnimatingRoll) return new Map(); // own roll: no moves until the spin lands
 		if (this.gameStatus !== 'playing' || this.liveActiveColor !== this.playerColor)
-			return new SvelteMap();
+			return new Map();
 		const dice = this.availableDiceValues;
-		if (dice.length === 0) return new SvelteMap();
+		if (dice.length === 0) return new Map();
 		try {
 			const uci = DiceChess.getLegalUciMoves(buildDfen(this.liveFen, dice)) || [];
-			return new SvelteMap(deriveChessgroundDests(uci));
+			return deriveChessgroundDests(uci);
 		} catch {
-			return new SvelteMap();
+			return new Map();
 		}
 	});
 
@@ -533,7 +533,8 @@ export class LiveGameStore {
 			const promos = legal
 				.filter((m) => m.startsWith(orig + dest) && m.length === 5)
 				.map((m) => m[4].toLowerCase());
-			if (promos.length > 0) return Array.from(new SvelteSet(promos));
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
+			if (promos.length > 0) return Array.from(new Set(promos));
 		} catch {
 			/* fall through to the default set */
 		}
