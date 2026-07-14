@@ -202,6 +202,7 @@ export class LiveGameStore {
 		return Math.max(0, base);
 	}
 
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	legalMovesDests = $derived.by<Map<Key, Key[]>>(() => {
 		if (this.isViewingHistory) return new Map();
 		if (this.isAnimatingRoll) return new Map(); // own roll: no moves until the spin lands
@@ -532,6 +533,7 @@ export class LiveGameStore {
 			const promos = legal
 				.filter((m) => m.startsWith(orig + dest) && m.length === 5)
 				.map((m) => m[4].toLowerCase());
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			if (promos.length > 0) return Array.from(new Set(promos));
 		} catch {
 			/* fall through to the default set */

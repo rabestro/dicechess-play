@@ -40,7 +40,7 @@
 		<!-- Provide a cg-board context so the piece classes load SVGs correctly -->
 		<div class="flex flex-wrap justify-center gap-4 cg-wrap cg-board-wrap is2d">
 			<cg-board class="!static !w-auto !h-auto !bg-transparent flex flex-wrap justify-center gap-4">
-				{#each piecesToRender as p}
+				{#each piecesToRender as p (p)}
 					<button
 						onclick={() => onSelect(p)}
 						class="w-16 h-16 md:w-20 md:h-20 hover:scale-110 hover:bg-surface-hover transition-all duration-200 rounded-lg flex items-center justify-center relative cursor-pointer outline-none focus:ring-2 focus:ring-primary/60"
