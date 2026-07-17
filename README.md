@@ -32,28 +32,39 @@ The engine and chessground are published on GitHub Packages, so `npm install` ne
 
 ```
 src/
-├── routes/
-│   ├── +layout.svelte        themed shell (theme switcher, toasts)
-│   ├── +page.svelte          landing → "Play vs a bot"
-│   ├── leaderboard/+page.svelte  bot rating ladder (play-api GET /leaderboard)
-│   └── play/+page.svelte     the game: lobby → board → dice → result
-├── components/               board + UI (ported from lab, thin store-driven board)
-│   ├── Board.svelte          thin wrapper over chessground bound to the play store
+├── routes/                    SPA pages (ssr/prerender disabled in +layout.ts)
+│   ├── +layout.svelte         themed shell: nav, theme switcher, toasts, zen chrome
+│   ├── +page.svelte           landing — the ways to play
+│   ├── play/                  vs-bot game (client-authoritative; engine in a Web Worker)
+│   ├── lobby/                 seek list + live-board wall (polls play-api)
+│   ├── live/ · live/[id]/     friend-link entry · server-authoritative live board (WebSocket)
+│   ├── games/ · games/[id]/   local game history · replay
+│   ├── leaderboard/           bot rating ladder (play-api GET /leaderboard)
+│   └── me/                    guest profile + restore code
+├── components/                shared UI
+│   ├── Board.svelte           thin chessground wrapper driven by either game store
 │   ├── lib/Chessground.svelte
-│   ├── MoveHistory.svelte · PawnPromotionSelector.svelte · ToastContainer.svelte
+│   ├── PlayerStrip · DicePanel · MoveHistory · GameEndModal · BotBadge
+│   └── GameHistoryCard · MiniBoard · TimeControlPicker · PawnPromotionSelector · ToastContainer
 ├── lib/
-│   ├── playWithBot/          ported game core (store + engine bot/dice/history/worker)
-│   ├── leaderboard/leaderboardApi.ts  rating-ladder read client (play-api wire mirror)
-│   ├── localGamesDB.ts       IndexedDB outbox (pending → synced)
-│   ├── authStore.svelte.ts   GUEST stub (no accounts in phase 1)
-│   ├── stores/themeStore.svelte.ts
-│   └── ingest/               → analytics POST /api/games
-│       ├── types.ts          GameIngestWire contract (verbatim from observer/sync)
-│       ├── guestIdentity.ts  per-browser guest:<uuidv7> + restore code
-│       ├── mapper.ts         LocalGameRecord → GameIngestWire (UUIDv5 id, dice decode)
-│       ├── gatewayClient.ts  POST to the ingest gateway (token never in browser)
-│       └── outbox.ts         flush pending games → gateway
-└── utils/                    fenUtils · pieceImages · formatters
+│   ├── playWithBot/           bot-play core: store, engine worker, dice/history, opening book
+│   ├── live/                  live-play client: liveGameStore, liveClient (WS + reconnect),
+│   │                          liveApi/lobbyApi (REST), liveTypes (play-api wire mirror),
+│   │                          dfen/board/clock/seat/timeControl/playerLabel helpers
+│   ├── leaderboard/           leaderboardApi — rating-ladder read client (play-api wire mirror)
+│   ├── ingest/                → analytics POST /api/games
+│   │   ├── types.ts           GameIngestWire contract (verbatim copy — see the file head)
+│   │   ├── guestIdentity.ts   per-browser guest:<uuidv7> + restore code
+│   │   ├── mapper.ts          LocalGameRecord → GameIngestWire (UUIDv5 id, dice decode)
+│   │   ├── gatewayClient.ts   POST to the ingest gateway (token never in browser)
+│   │   └── outbox.ts          flush pending games → gateway
+│   ├── history/               move-history reconstruction for replays
+│   ├── stats/                 local player W-D-L record
+│   ├── stores/                singleton rune stores: themeStore (7 themes) · localGamesStore · chromeStore
+│   ├── localGamesDB.ts        IndexedDB via idb (sync_status: pending → synced | quarantined)
+│   ├── timings.ts             presentation pacing shared by BOTH game surfaces — never fork per surface
+│   └── bots.ts · gameOutcome.ts · sound.ts · preferencesStore · toastStore · authStore (guest stub)
+└── utils/                     fenUtils · pieceImages · formatters
 ```
 
 ## How recording works
