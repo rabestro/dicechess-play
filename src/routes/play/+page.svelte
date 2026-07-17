@@ -379,6 +379,7 @@
 					<PlayerStrip
 						name={bot?.label ?? 'Bot'}
 						sub="bot · {botColorName}"
+						bot
 						active={botActive}
 						thinking={store.gameStatus === 'bot_thinking'}
 						clockMs={hasClocks ? store.botTimeLeft : undefined}

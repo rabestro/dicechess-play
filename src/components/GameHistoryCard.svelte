@@ -4,6 +4,7 @@
 	import { botLabel } from '$lib/bots';
 	import { playerOutcome, outcomeLabel, endReasonLabel, type GameOutcome } from '$lib/gameOutcome';
 	import { formatDate } from '../utils/formatters';
+	import BotBadge from './BotBadge.svelte';
 
 	interface Props {
 		game: LocalGameRecord;
@@ -50,7 +51,10 @@
 	<div class="flex items-center justify-between gap-3">
 		<div class="flex flex-col gap-0.5 min-w-0">
 			<span class="text-[11px] font-black uppercase tracking-widest text-content-muted/60">vs</span>
-			<span class="font-bold text-content text-lg truncate" title={opponent}>{opponent}</span>
+			<span class="flex min-w-0 items-center gap-1.5">
+				<span class="font-bold text-content text-lg truncate" title={opponent}>{opponent}</span>
+				<BotBadge />
+			</span>
 			<span class="text-xs text-content-muted">You played {playedColor}</span>
 		</div>
 		<span
