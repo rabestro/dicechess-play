@@ -35,6 +35,7 @@ src/
 ├── routes/
 │   ├── +layout.svelte        themed shell (theme switcher, toasts)
 │   ├── +page.svelte          landing → "Play vs a bot"
+│   ├── leaderboard/+page.svelte  bot rating ladder (play-api GET /leaderboard)
 │   └── play/+page.svelte     the game: lobby → board → dice → result
 ├── components/               board + UI (ported from lab, thin store-driven board)
 │   ├── Board.svelte          thin wrapper over chessground bound to the play store
@@ -42,6 +43,7 @@ src/
 │   ├── MoveHistory.svelte · PawnPromotionSelector.svelte · ToastContainer.svelte
 ├── lib/
 │   ├── playWithBot/          ported game core (store + engine bot/dice/history/worker)
+│   ├── leaderboard/leaderboardApi.ts  rating-ladder read client (play-api wire mirror)
 │   ├── localGamesDB.ts       IndexedDB outbox (pending → synced)
 │   ├── authStore.svelte.ts   GUEST stub (no accounts in phase 1)
 │   ├── stores/themeStore.svelte.ts

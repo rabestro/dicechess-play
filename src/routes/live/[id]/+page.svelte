@@ -10,7 +10,7 @@
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { LiveGameStore } from '$lib/live/liveGameStore.svelte';
 	import { parseSeat } from '$lib/live/seatLink';
-	import { seatDisplayName, seatDisplaySub } from '$lib/live/playerLabel';
+	import { publicPlayer, seatDisplayName, seatDisplaySub } from '$lib/live/playerLabel';
 	import { preferencesStore } from '$lib/preferencesStore.svelte';
 	import { preloadSounds } from '$lib/sound';
 	import { endReasonLabel } from '$lib/gameOutcome';
@@ -115,6 +115,7 @@
 	const seatName = (seat: Seat): string =>
 		seatDisplayName(live.players, seat, bottomSeat, live.spectator);
 	const seatSub = (seat: Seat): string => seatDisplaySub(live.players, seat, live.spectator);
+	const seatIsBot = (seat: Seat): boolean => publicPlayer(live.players, seat)?.kind === 'Bot';
 
 	// The board is the primary element: hide the app chrome while on the live board.
 	$effect(() => {
@@ -323,6 +324,7 @@
 				<PlayerStrip
 					name={seatName(topSeat)}
 					sub={seatSub(topSeat)}
+					bot={seatIsBot(topSeat)}
 					active={isActiveSeat(topSeat)}
 					clockMs={clockMs(topSeat)}
 				/>
@@ -396,6 +398,7 @@
 				<PlayerStrip
 					name={seatName(bottomSeat)}
 					sub={seatSub(bottomSeat)}
+					bot={seatIsBot(bottomSeat)}
 					active={isActiveSeat(bottomSeat)}
 					clockMs={clockMs(bottomSeat)}
 				/>

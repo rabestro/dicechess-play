@@ -15,6 +15,7 @@
 	import { formatClock } from '$lib/live/clockFormat';
 	import { seekOffer } from '$lib/live/playerLabel';
 	import { timeControlLabel, timeControlPresets } from '$lib/live/timeControls';
+	import BotBadge from '../../components/BotBadge.svelte';
 	import MiniBoard from '../../components/MiniBoard.svelte';
 	import TimeControlPicker from '../../components/TimeControlPicker.svelte';
 	import type { LiveGame, PublicPlayer, Seek } from '$lib/live/liveTypes';
@@ -144,20 +145,12 @@
 	}
 </script>
 
-{#snippet botBadge(sizeClass: string = 'text-[10px]')}
-	<span
-		class="shrink-0 rounded bg-primary/15 px-1 py-px {sizeClass} font-bold uppercase tracking-wide text-primary"
-	>
-		bot
-	</span>
-{/snippet}
-
 {#snippet playerLine(p: PublicPlayer | undefined | null, clockMs: number | undefined)}
 	<div class="flex items-center justify-between gap-2 min-w-0">
 		<span class="flex items-center gap-1.5 min-w-0 text-sm">
 			<b class="truncate text-content">{playerName(p)}</b>
 			{#if isBot(p)}
-				{@render botBadge()}
+				<BotBadge />
 			{/if}
 		</span>
 		{#if clockMs !== undefined}
@@ -185,6 +178,12 @@
 					class="rounded-xl px-4 py-2 font-bold text-content-muted transition-colors hover:bg-surface hover:text-content"
 				>
 					Play a friend by link →
+				</a>
+				<a
+					href={resolve('/leaderboard')}
+					class="rounded-xl px-4 py-2 font-bold text-content-muted transition-colors hover:bg-surface hover:text-content"
+				>
+					Bot leaderboard →
 				</a>
 				<button
 					type="button"
@@ -304,7 +303,7 @@
 										></span>
 										<span class="truncate">{playerName(game.players?.black)}</span>
 										{#if isBot(game.players?.black)}
-											{@render botBadge('text-[9px]')}
+											<BotBadge sizeClass="text-[9px]" />
 										{/if}
 									</span>
 								</div>
@@ -316,7 +315,7 @@
 										></span>
 										<span class="truncate">{playerName(game.players?.white)}</span>
 										{#if isBot(game.players?.white)}
-											{@render botBadge('text-[9px]')}
+											<BotBadge sizeClass="text-[9px]" />
 										{/if}
 									</span>
 								</div>
@@ -358,7 +357,7 @@
 							<span class="flex items-center gap-1.5 min-w-0 my-1.5">
 								<b class="truncate text-sm text-content">{offer.name}</b>
 								{#if offer.bot}
-									{@render botBadge()}
+									<BotBadge />
 								{/if}
 							</span>
 							<span class="block mt-auto sm:mt-2">

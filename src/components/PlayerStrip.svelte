@@ -2,10 +2,13 @@
 	// One player's HUD row on the game screen: identity on the left, clock on the right.
 	// The clock is optional (bot games and unlimited live games have none).
 	import { formatClock, isLowTime } from '$lib/live/clockFormat';
+	import BotBadge from './BotBadge.svelte';
 
 	interface Props {
 		name: string;
 		sub: string;
+		/** This seat is a machine — renders the BOT badge next to the name (transparency, D.3). */
+		bot?: boolean;
 		/** This side is to move — highlights the strip (and clock, when present). */
 		active?: boolean;
 		/** Replaces `sub` with an animated thinking indicator (bot games). */
@@ -14,7 +17,7 @@
 		clockMs?: number;
 	}
 
-	let { name, sub, active = false, thinking = false, clockMs }: Props = $props();
+	let { name, sub, bot = false, active = false, thinking = false, clockMs }: Props = $props();
 
 	const low = $derived(clockMs !== undefined && isLowTime(clockMs));
 </script>
@@ -42,7 +45,12 @@
 		</svg>
 	</span>
 	<span class="flex min-w-0 flex-col leading-tight">
-		<b class="truncate text-sm font-semibold text-content">{name}</b>
+		<span class="flex min-w-0 items-center gap-1.5">
+			<b class="truncate text-sm font-semibold text-content">{name}</b>
+			{#if bot}
+				<BotBadge />
+			{/if}
+		</span>
 		{#if thinking}
 			<small class="animate-pulse text-[11px] text-content-muted italic">thinking…</small>
 		{:else}
