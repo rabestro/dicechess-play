@@ -100,11 +100,13 @@
 		type="button"
 		aria-haspopup="listbox"
 		aria-expanded={open}
-		aria-label="Select theme"
 		onclick={() => (open ? closeMenu() : openMenu())}
 		onkeydown={onTriggerKeydown}
 		class="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-xs font-bold text-content-muted outline-none transition-colors hover:text-content focus-visible:border-primary"
 	>
+		<!-- No aria-label: it would override the content and hide the current theme from screen
+		     readers. The name is composed from content instead — "Theme: <current>". -->
+		<span class="sr-only">Theme:</span>
 		<span>{currentLabel}</span>
 		<svg
 			viewBox="0 0 24 24"
