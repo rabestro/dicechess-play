@@ -17,14 +17,16 @@
 	const COLORS = ['white', 'black', 'random'] as const;
 
 	/** Bot-game time controls map onto the store's minutes-limit + seconds-bonus model.
-	 * No clock first: a casual bot game shouldn't surprise anyone with a flag fall. */
+	 * Unlimited first: a casual bot game shouldn't surprise anyone with a flag fall.
+	 * "Unlimited" (not "No clock") to match the term used across the live/lobby surface
+	 * and the server's TimeControl ADT variant. */
 	const TIME_PRESETS: {
 		label: string;
 		group: string;
 		limit: number | null;
 		bonus: number;
 	}[] = [
-		{ label: 'No clock', group: 'Casual', limit: null, bonus: 0 },
+		{ label: 'Unlimited', group: 'Casual', limit: null, bonus: 0 },
 		{ label: '3 + 2', group: 'Blitz', limit: 3, bonus: 2 },
 		{ label: '5 min', group: 'Blitz', limit: 5, bonus: 0 },
 		{ label: '5 + 3', group: 'Blitz', limit: 5, bonus: 3 },
@@ -92,7 +94,7 @@
 	const botActive = $derived(!isOver && store.activeColor !== store.playerColor);
 	const youActive = $derived(!isOver && store.activeColor === store.playerColor);
 	const hasClocks = $derived(store.timeLimit !== null);
-	const timeLabel = $derived(TIME_PRESETS[selectedTime]?.label ?? 'No clock');
+	const timeLabel = $derived(TIME_PRESETS[selectedTime]?.label ?? 'Unlimited');
 
 	function startGame() {
 		const t = TIME_PRESETS[selectedTime];
