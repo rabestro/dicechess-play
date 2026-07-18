@@ -53,7 +53,7 @@
 	};
 
 	let selectedAlgo = $state('greedy');
-	let selectedColor = $state<(typeof COLORS)[number]>('white');
+	let selectedColor = $state<(typeof COLORS)[number]>('random');
 	let selectedTime = $state(storedTimeIndex());
 	// Color/time live behind a disclosure so the default path is bot → Start game. It opens
 	// pre-expanded when a stored clock applies, keeping the never-an-unseen-clock rule intact
@@ -304,9 +304,8 @@
 			<button
 				type="button"
 				onclick={() => (settingsOpen = !settingsOpen)}
-				aria-label="Game settings"
 				aria-expanded={settingsOpen}
-				aria-controls="game-settings"
+				aria-controls={settingsOpen ? 'game-settings' : undefined}
 				class="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-bold text-content-muted transition-colors hover:text-content"
 			>
 				<span>Game settings</span>
