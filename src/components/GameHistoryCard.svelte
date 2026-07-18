@@ -56,7 +56,7 @@
 					Classic
 				</span>
 			{/if}
-			<span class="text-xs text-content-muted font-medium whitespace-nowrap">
+			<span class="text-xs text-content-muted font-medium text-right">
 				{formatDate(game.start_time)}
 			</span>
 		</div>
