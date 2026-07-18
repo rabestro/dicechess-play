@@ -172,26 +172,30 @@
 			{/if}
 		</div>
 		{#if isLiveEnabled() && !waiting}
-			<div class="flex flex-wrap items-center gap-4">
-				<a
-					href={resolve('/live')}
-					class="rounded-xl px-4 py-2 font-bold text-content-muted transition-colors hover:bg-surface hover:text-content"
-				>
-					Play a friend by link →
-				</a>
-				<a
-					href={resolve('/leaderboard')}
-					class="rounded-xl px-4 py-2 font-bold text-content-muted transition-colors hover:bg-surface hover:text-content"
-				>
-					Bot leaderboard →
-				</a>
+			<!-- Phones stack this as primary-action-first (full-width button, quiet links under it);
+			     from sm up it lays out as the usual single row with the button on the right. -->
+			<div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
 				<button
 					type="button"
 					onclick={() => (createOpen = !createOpen)}
-					class="rounded-xl border border-border bg-surface px-4 py-2 font-bold text-content-muted transition-colors hover:text-content"
+					class="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-center font-bold text-content-muted transition-colors hover:text-content sm:order-last sm:w-auto sm:py-2"
 				>
 					{createOpen ? '× Close' : '+ Create a seek'}
 				</button>
+				<div class="flex flex-wrap items-center gap-2 sm:gap-4">
+					<a
+						href={resolve('/live')}
+						class="rounded-xl px-2 py-2 text-sm font-bold text-content-muted transition-colors hover:bg-surface hover:text-content sm:px-4 sm:text-base"
+					>
+						Play a friend by link →
+					</a>
+					<a
+						href={resolve('/leaderboard')}
+						class="rounded-xl px-2 py-2 text-sm font-bold text-content-muted transition-colors hover:bg-surface hover:text-content sm:px-4 sm:text-base"
+					>
+						Bot leaderboard →
+					</a>
+				</div>
 			</div>
 		{/if}
 	</div>
