@@ -6,7 +6,7 @@
 		{
 			path: '/play',
 			title: 'Play a bot',
-			sub: '6 levels, instant',
+			sub: '5 levels, instant',
 			icon: 'bot',
 		},
 		{
