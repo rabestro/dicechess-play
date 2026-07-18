@@ -16,8 +16,11 @@
 
 	let { children }: { children: Snippet } = $props();
 
-	const isActive = (path: string) =>
+	const matches = (path: string) =>
 		page.url.pathname === path || page.url.pathname.startsWith(`${path}/`);
+	// /live (friend-by-link setup and live boards) has no nav item of its own: it is part of
+	// the lobby hub, so the Lobby entry stays lit there.
+	const isActive = (path: string) => matches(path) || (path === '/lobby' && matches('/live'));
 
 	const themes: { value: Theme; label: string }[] = [
 		{ value: 'dark', label: 'Dark' },
@@ -31,7 +34,6 @@
 
 	const links = [
 		{ path: '/play', label: 'Play' },
-		{ path: '/live', label: 'Live' },
 		{ path: '/lobby', label: 'Lobby' },
 		{ path: '/games', label: 'Games' },
 		{ path: '/me', label: 'Profile' },
@@ -58,10 +60,6 @@
 	>
 		{#if path === '/play'}
 			<path d="M4 11l8-6.5 8 6.5" /><path d="M6 10v9h12v-9" />
-		{:else if path === '/live'}
-			<circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" /><path
-				d="M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 7.5a6.4 6.4 0 0 1 0 9"
-			/>
 		{:else if path === '/lobby'}
 			<circle cx="9" cy="8" r="3" /><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /><path
 				d="M16 6.4a3 3 0 0 1 0 5.4M17 14.3c2.4.5 4 2.3 4 4.7"
