@@ -11,6 +11,8 @@ export interface BotCatalogEntry {
 	label: string;
 	/** Difficulty level (1 = easiest). */
 	level: number;
+	/** Withdrawn from the new-game picker; stays in the catalog so history labels resolve. */
+	retired?: boolean;
 }
 
 export const BOTS: readonly BotCatalogEntry[] = [
@@ -19,8 +21,13 @@ export const BOTS: readonly BotCatalogEntry[] = [
 	{ id: 'greedy', label: 'Greedy', level: 3 },
 	{ id: 'aggressive', label: 'Aggressive', level: 5 },
 	{ id: 'aggressive-book', label: 'Aggressive + Book', level: 5 },
-	{ id: 'monte-carlo', label: 'Monte-Carlo', level: 6 },
+	// Retired: the only bot that thinks for seconds while the rest reply instantly,
+	// and its play barely edges out Aggressive — not worth the wait it causes.
+	{ id: 'monte-carlo', label: 'Monte-Carlo', level: 6, retired: true },
 ];
+
+/** The bots offered for a new game — instant movers only. */
+export const PLAYABLE_BOTS: readonly BotCatalogEntry[] = BOTS.filter((b) => !b.retired);
 
 const BOT_BY_ID = new Map(BOTS.map((b) => [b.id, b]));
 

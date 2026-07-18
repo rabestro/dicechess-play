@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BOTS, botAlgorithm, botLabel } from './bots';
+import { BOTS, PLAYABLE_BOTS, botAlgorithm, botLabel } from './bots';
 
 describe('botAlgorithm', () => {
 	it('strips the bot: prefix', () => {
@@ -26,5 +26,16 @@ describe('botLabel', () => {
 			expect(botLabel(bot.id)).toBe(bot.label);
 			expect(botLabel(`bot:${bot.id}`)).toBe(bot.label);
 		}
+	});
+});
+
+describe('PLAYABLE_BOTS', () => {
+	it('excludes retired bots from the new-game picker', () => {
+		expect(PLAYABLE_BOTS.map((b) => b.id)).not.toContain('monte-carlo');
+		expect(PLAYABLE_BOTS.length).toBeGreaterThan(0);
+	});
+
+	it('keeps retired bots resolvable for history labels', () => {
+		expect(botLabel('bot:monte-carlo')).toBe('Monte-Carlo');
 	});
 });
