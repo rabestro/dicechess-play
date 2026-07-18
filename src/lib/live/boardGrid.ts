@@ -1,5 +1,5 @@
 // Pure helper for the lobby's mini-board tiles: expand a FEN/DFEN board field into 64 cells.
-// Rendering stays dependency-free (unicode pieces on a CSS grid) — a chessground instance per
+// Rendering stays dependency-free (piece SVGs on a CSS grid) — a chessground instance per
 // tile would be far heavier than these static, poll-refreshed previews need.
 
 /** The 64 squares of a FEN (or DFEN) position, a1-h8 read as rows from rank 8 down: piece letters

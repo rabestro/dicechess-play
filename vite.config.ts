@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { svelteTesting } from '@testing-library/svelte/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { defineConfig } from 'vite';
 
@@ -8,6 +9,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [
 		sveltekit(),
+		// Test-mode only: points Svelte imports at the client build so component
+		// tests can mount (vitest otherwise resolves the SSR build and mount() throws).
+		svelteTesting(),
 		tailwindcss(),
 		SvelteKitPWA({
 			registerType: 'autoUpdate',

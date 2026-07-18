@@ -1,8 +1,9 @@
 <script lang="ts">
-	// A static, dependency-free board preview for lobby tiles: unicode pieces on a CSS grid,
-	// re-rendered on each poll. Interactive boards stay chessground's job (see Board.svelte).
+	// A static, dependency-free board preview for lobby tiles: the same cburnett piece SVGs
+	// as the interactive board, laid out on a plain CSS grid re-rendered on each poll.
+	// Interactive boards stay chessground's job (see Board.svelte).
 	import { boardGrid } from '$lib/live/boardGrid';
-	import { PIECE_TO_UNICODE } from '../utils/fenUtils';
+	import { getPieceImage } from '$lib/utils/getPieceImage';
 
 	let { fen, faded = false }: { fen: string | undefined; faded?: boolean } = $props();
 
@@ -12,11 +13,12 @@
 <div class="mini-board" class:faded aria-hidden="true">
 	{#each cells as piece, i (i)}
 		<span
-			class="flex aspect-square items-center justify-center leading-none
-				{(Math.floor(i / 8) + i) % 2 === 0 ? 'bg-[#f0d9b5]' : 'bg-[#b58863]'}
-				{piece && piece === piece.toUpperCase() ? 'mini-white' : 'mini-black'}"
+			class="flex aspect-square items-center justify-center
+				{(Math.floor(i / 8) + i) % 2 === 0 ? 'bg-[#f0d9b5]' : 'bg-[#b58863]'}"
 		>
-			{piece ? PIECE_TO_UNICODE[piece] : ''}
+			{#if piece}
+				<img class="h-full w-full" src={getPieceImage(piece)} alt="" draggable="false" />
+			{/if}
 		</span>
 	{/each}
 </div>
@@ -30,17 +32,6 @@
 		border-radius: 6px;
 		overflow: hidden;
 		user-select: none;
-		container-type: inline-size;
-	}
-	.mini-board span {
-		font-size: 9.5cqw;
-	}
-	.mini-white {
-		color: #fbfbf7;
-		text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
-	}
-	.mini-black {
-		color: #23201c;
 	}
 	.faded {
 		opacity: 0.35;
