@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { resolve } from '$app/paths';
 	import { playWithBotStore as store } from '$lib/playWithBot';
 	import Board from '../../components/Board.svelte';
 	import MoveHistory from '../../components/MoveHistory.svelte';
@@ -496,14 +495,15 @@
 					: ''}"
 			>
 				<div class="order-1 flex items-center gap-1.5 md:order-none">
-					<a
-						href={resolve('/')}
+					<button
+						type="button"
+						onclick={() => store.endSession()}
 						aria-label="Leave game"
 						title="Leave"
 						class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-content-muted transition-colors hover:border-border-strong hover:text-content"
 					>
 						{@render iconBtn('back')}
-					</a>
+					</button>
 					<button
 						type="button"
 						onclick={() => (showHistory = !showHistory)}
