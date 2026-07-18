@@ -14,6 +14,7 @@
 	import { preferencesStore } from '$lib/preferencesStore.svelte';
 	import { preloadSounds } from '$lib/sound';
 	import { endReasonLabel } from '$lib/gameOutcome';
+	import { toastStore } from '$lib/toastStore.svelte';
 	import type { Seat } from '$lib/live/liveTypes';
 
 	const wideScreen = () =>
@@ -187,16 +188,22 @@
 		}
 	});
 
-	// In-panel banner while a no-legal-moves pass is dwelling (see LiveGameStore.passNoticeSeat).
-	// Suppressed while deliberately browsing history — the dwell belongs to the live position,
-	// not whatever past move the user scrubbed to.
-	const passNotice = $derived.by(() => {
-		if (live.passNoticeSeat === null || live.isManuallyBrowsing) return null;
-		if (live.spectator) return `${live.passNoticeSeat} has no legal moves — turn passed.`;
-		const mine = (live.passNoticeSeat === 'White') === (live.playerColor === 'w');
-		return mine
-			? 'You have no legal moves — turn passed.'
-			: 'Opponent has no legal moves — turn passed.';
+	// A no-legal-moves pass is announced as a toast — the same surface the bot game uses —
+	// so both game surfaces notify identically. Fires once per dwell (LiveGameStore nulls
+	// passNoticeSeat between passes); being transient, it needs no history-browsing gate.
+	$effect(() => {
+		const seat = live.passNoticeSeat;
+		if (seat === null) return;
+		if (live.spectator) {
+			toastStore.info(`${seat} has no legal moves — turn passed.`);
+			return;
+		}
+		const mine = (seat === 'White') === (live.playerColor === 'w');
+		toastStore.info(
+			mine
+				? 'You have no legal moves — turn passed.'
+				: 'Opponent has no legal moves — turn passed.',
+		);
 	});
 
 	let resignTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -516,7 +523,6 @@
 						dice={live.currentDice}
 						animating={live.isAnimatingRoll}
 						emptyText={live.currentDice.length === 0 ? statusText : undefined}
-						statusMessage={passNotice}
 					/>
 				</div>
 			{/if}
