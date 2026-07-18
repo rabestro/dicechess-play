@@ -1,9 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import type { Snippet } from 'svelte';
-	import { themeStore } from '$lib/stores/themeStore.svelte';
-	import type { Theme } from '$lib/stores/themeStore.svelte';
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
+	import ThemeMenu from '../components/ThemeMenu.svelte';
 	import ToastContainer from '../components/ToastContainer.svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -21,16 +20,6 @@
 	// /live (friend-by-link setup and live boards) has no nav item of its own: it is part of
 	// the lobby hub, so the Lobby entry stays lit there.
 	const isActive = (path: string) => matches(path) || (path === '/lobby' && matches('/live'));
-
-	const themes: { value: Theme; label: string }[] = [
-		{ value: 'dark', label: 'Dark' },
-		{ value: 'light', label: 'Light' },
-		{ value: 'dracula', label: 'Dracula' },
-		{ value: 'nord', label: 'Nord' },
-		{ value: 'solarized-dark', label: 'Solarized' },
-		{ value: 'tokyo-night', label: 'Tokyo Night' },
-		{ value: 'gruvbox', label: 'Gruvbox' },
-	];
 
 	const links = [
 		{ path: '/play', label: 'Play' },
@@ -121,16 +110,7 @@
 					</nav>
 				</div>
 
-				<select
-					aria-label="Select theme"
-					class="bg-surface border border-border text-xs font-bold text-content-muted rounded-md px-2 py-1 outline-none focus:border-primary transition-colors cursor-pointer"
-					value={themeStore.theme}
-					onchange={(e) => themeStore.setTheme(e.currentTarget.value as Theme)}
-				>
-					{#each themes as t (t.value)}
-						<option value={t.value}>{t.label}</option>
-					{/each}
-				</select>
+				<ThemeMenu />
 			</div>
 		</header>
 	{/if}
