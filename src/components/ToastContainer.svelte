@@ -33,8 +33,12 @@
 	</svg>
 {/snippet}
 
+<!-- The always-mounted polite live region: screen readers announce toasts as they are
+     appended. aria-atomic=false keeps toasts already on screen from re-announcing. -->
 <div
 	class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4 md:px-0"
+	aria-live="polite"
+	aria-atomic="false"
 >
 	{#each toastStore.toasts as toast (toast.id)}
 		<div
