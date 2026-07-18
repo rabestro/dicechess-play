@@ -528,6 +528,18 @@
 					>
 						{@render iconBtn(preferencesStore.soundEnabled ? 'sound-on' : 'sound-off')}
 					</button>
+					{#if !isOver && store.playerCanOfferDraw}
+						<button
+							type="button"
+							onclick={() => store.offerDraw()}
+							disabled={!store.canUserOfferDraw}
+							aria-label="Offer a draw"
+							title="Offer a draw"
+							class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-sm font-bold text-content-muted transition-colors hover:border-border-strong hover:text-content disabled:opacity-30 disabled:cursor-not-allowed"
+						>
+							½
+						</button>
+					{/if}
 					{#if !isOver}
 						<button
 							type="button"
@@ -576,6 +588,34 @@
 							class="text-sm text-content-muted underline transition-colors hover:text-content"
 						>
 							Change opponent
+						</button>
+					</div>
+				{:else if store.activeDrawOffer === 'bot'}
+					<!-- Non-modal by design: the board (and its history-scrub nav) stays interactive
+					     so the player can check the live position before deciding — see the
+					     scrubbing guard's comment in the store for why draw offers never block it. -->
+					<div
+						class="order-4 flex-col items-center gap-3 rounded-2xl border border-badge-accent/40 bg-badge-accent/5 p-4 md:order-none md:flex-1 md:justify-center {showHistory
+							? 'hidden md:flex'
+							: 'flex'}"
+					>
+						<p class="text-lg font-bold text-content">The bot offers a draw</p>
+						<p class="text-center text-sm text-content-muted">
+							Accept to end the game as a draw, or decline to keep playing.
+						</p>
+						<button
+							type="button"
+							onclick={() => store.acceptBotDraw()}
+							class="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
+						>
+							Accept draw
+						</button>
+						<button
+							type="button"
+							onclick={() => store.declineBotDraw()}
+							class="w-full rounded-xl border border-border bg-surface py-2.5 font-bold text-content-muted transition-colors hover:text-content"
+						>
+							Decline
 						</button>
 					</div>
 				{:else}

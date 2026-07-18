@@ -456,6 +456,15 @@ export class PlayWithBotStore {
 			authStore.user.balance >= this.bet,
 	);
 
+	/** Mirrors offerDraw()'s own guard, so the UI can disable/hide the button instead of letting
+	 * a click silently no-op. */
+	canUserOfferDraw = $derived(
+		this.playerCanOfferDraw &&
+			this.liveActiveColor === this.playerColor &&
+			this.gameStatus === 'playing' &&
+			this.activeDrawOffer === null,
+	);
+
 	async rollDice() {
 		if (!this.canUserRoll) return;
 

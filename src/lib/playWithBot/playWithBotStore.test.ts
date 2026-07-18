@@ -37,7 +37,9 @@ function createMockDiceChess() {
 		parts[1] = parts[1] === 'w' ? 'b' : 'w';
 		return parts.join(' ');
 	});
-	return { applyMove, getLegalUciMoves, getBestMove, endTurn };
+	// Defaults to "no" so tests unrelated to draw offers are unaffected; override per-test.
+	const shouldBotAcceptDraw = vi.fn((_dfen: string, _options?: unknown) => false);
+	return { applyMove, getLegalUciMoves, getBestMove, endTurn, shouldBotAcceptDraw };
 }
 
 describe('PlayWithBotStore history scrubbing (issue #55)', () => {
@@ -290,5 +292,119 @@ describe('PlayWithBotStore lastMove (issue #75)', () => {
 
 		store.setMoveIndex(1); // the move entry
 		expect(store.lastMove).toEqual(['e2', 'e4']);
+	});
+});
+
+describe('PlayWithBotStore draw offers', () => {
+	let store: PlayWithBotStore;
+	let mock: ReturnType<typeof createMockDiceChess>;
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		mock = createMockDiceChess();
+		setDiceChessInstance(mock);
+		store = new PlayWithBotStore();
+	});
+
+	afterEach(() => {
+		store.endSession();
+		resetDiceChessInstance();
+		vi.useRealTimers();
+	});
+
+	async function startAndRollPlayerTurn() {
+		store.customDfen = `${START_FEN} PPP`;
+		store.startNewGame('white', 'greedy');
+		const rolled = store.rollDice();
+		await vi.advanceTimersByTimeAsync(600);
+		await rolled;
+	}
+
+	it("offers canUserOfferDraw only on the player's own turn, mid-game, with no offer already in flight", async () => {
+		expect(store.canUserOfferDraw).toBe(false); // idle, before any game starts
+
+		await startAndRollPlayerTurn();
+		expect(store.gameStatus).toBe('playing');
+		expect(store.canUserOfferDraw).toBe(true);
+
+		store.activeDrawOffer = 'bot';
+		expect(store.canUserOfferDraw).toBe(false);
+		store.activeDrawOffer = null;
+	});
+
+	it('offerDraw() puts the offer in flight immediately, disabling a second offer', async () => {
+		await startAndRollPlayerTurn();
+
+		const offered = store.offerDraw();
+		expect(store.activeDrawOffer).toBe('player');
+		expect(store.playerCanOfferDraw).toBe(false);
+		expect(store.canUserOfferDraw).toBe(false);
+
+		await vi.advanceTimersByTimeAsync(1200);
+		await offered;
+	});
+
+	it('ends the game as a draw when the bot accepts the offer', async () => {
+		mock.shouldBotAcceptDraw.mockReturnValue(true);
+		await startAndRollPlayerTurn();
+
+		const offered = store.offerDraw();
+		await vi.advanceTimersByTimeAsync(1200);
+		await offered;
+
+		expect(store.activeDrawOffer).toBeNull();
+		expect(store.gameStatus).toBe('draw');
+		expect(store.gameEndReason).toBe('agreement');
+	});
+
+	it("keeps the game going, and the player's offer spent, when the bot declines", async () => {
+		mock.shouldBotAcceptDraw.mockReturnValue(false);
+		await startAndRollPlayerTurn();
+
+		const offered = store.offerDraw();
+		await vi.advanceTimersByTimeAsync(1200);
+		await offered;
+
+		expect(store.activeDrawOffer).toBeNull();
+		expect(store.gameStatus).toBe('playing');
+		// One offer per game: declining doesn't refund the player's chance to ask again.
+		expect(store.playerCanOfferDraw).toBe(false);
+		expect(store.canUserOfferDraw).toBe(false);
+	});
+
+	it('acceptBotDraw() ends the game as a draw when the bot is the one offering', async () => {
+		await startAndRollPlayerTurn();
+		store.activeDrawOffer = 'bot';
+
+		store.acceptBotDraw();
+
+		expect(store.activeDrawOffer).toBeNull();
+		expect(store.gameStatus).toBe('draw');
+		expect(store.gameEndReason).toBe('agreement');
+	});
+
+	it("declineBotDraw() resumes the game and restores the player's own offer chance", async () => {
+		await startAndRollPlayerTurn();
+		store.activeDrawOffer = 'bot';
+		store.playerCanOfferDraw = false; // simulate the player having already used their own offer
+		const botTurnSpy = vi.spyOn(store, 'botTurn').mockResolvedValue();
+
+		store.declineBotDraw();
+
+		expect(store.activeDrawOffer).toBeNull();
+		expect(store.gameStatus).toBe('playing');
+		expect(store.playerCanOfferDraw).toBe(true);
+		expect(botTurnSpy).toHaveBeenCalled();
+	});
+
+	it('ignores acceptBotDraw()/declineBotDraw() when there is no bot offer pending', async () => {
+		await startAndRollPlayerTurn();
+		expect(store.activeDrawOffer).toBeNull();
+
+		store.acceptBotDraw();
+		expect(store.gameStatus).toBe('playing');
+
+		store.declineBotDraw();
+		expect(store.gameStatus).toBe('playing');
 	});
 });
