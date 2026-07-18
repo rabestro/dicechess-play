@@ -44,8 +44,16 @@
 	/>
 </svelte:head>
 
-<section class="mx-auto flex w-full max-w-3xl flex-col gap-5 py-6">
-	<div class="flex flex-wrap items-end justify-between gap-2">
+<!-- Container matches the lobby (its reciprocal page, reached from the lobby's
+     "Bot leaderboard →" link); the app <main> already supplies vertical padding. -->
+<section class="mx-auto flex max-w-4xl flex-col gap-5">
+	<div class="flex flex-col gap-2">
+		<a
+			href={resolve('/lobby')}
+			class="w-fit text-sm font-semibold text-content-muted transition-colors hover:text-content"
+		>
+			← Back to the lobby
+		</a>
 		<div class="flex flex-col gap-1">
 			<h2 class="text-2xl font-bold text-content">Bot Leaderboard</h2>
 			<p class="text-sm text-content-muted">
@@ -143,13 +151,4 @@
 			and join the ladder.
 		</p>
 	{/if}
-
-	<p class="text-center">
-		<a
-			href={resolve('/lobby')}
-			class="text-sm font-semibold text-content-muted transition-colors hover:text-content"
-		>
-			← Back to the lobby
-		</a>
-	</p>
 </section>
