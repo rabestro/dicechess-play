@@ -420,7 +420,7 @@
 		>
 			<div class="order-1 flex items-center gap-1.5 md:order-none">
 				<a
-					href={resolve('/live')}
+					href={resolve('/lobby')}
 					aria-label="Leave game"
 					title="Leave"
 					class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-content-muted transition-colors hover:border-border-strong hover:text-content"
