@@ -414,7 +414,7 @@
 					: 'flex'}"
 			>
 				<div
-					class="flex w-full max-w-[min(560px,calc(100dvh-10rem))] flex-col gap-2.5 md:max-w-[calc(100dvh-11rem)]"
+					class="flex w-full max-w-[min(560px,max(200px,calc(100dvh-24rem)))] flex-col gap-2.5 md:max-w-[calc(100dvh-15rem)]"
 				>
 					<PlayerStrip
 						name={bot?.label ?? 'Bot'}
