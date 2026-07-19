@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toastStore } from './toastStore.svelte';
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+	toastStore.toasts = [];
+	vi.useFakeTimers();
+});
 afterEach(() => {
 	// Drain any pending dismissal timers so tests don't leak toasts into each other.
 	vi.runAllTimers();
