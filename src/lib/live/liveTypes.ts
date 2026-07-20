@@ -55,10 +55,21 @@ export interface PublicGameState {
 	players?: Players | null;
 }
 
+// One completed turn, replayed to a (re)joining client in a Snapshot so its move history starts at
+// move 1 rather than at connect time. `dice` is the roll; `moves` are the UCI micro-moves played
+// (empty for a forced pass); `fenAfter` is the resulting position (mirrors TurnPlayed.fenAfter).
+export interface SnapshotTurn {
+	seat: Seat;
+	dice: number[];
+	moves: string[];
+	fenAfter: string;
+}
+
 // Server -> client events on the game WebSocket, discriminated by the (single) case-name key,
 // each carrying a monotonic version `v`.
 export type ServerEvent =
-	| { Snapshot: { v: number; state: PublicGameState } }
+	// Optional so a pre-history server still parses; the current server always sends it.
+	| { Snapshot: { v: number; state: PublicGameState; history?: SnapshotTurn[] } }
 	| { DiceRolled: { v: number; seat: Seat; dice: number[]; dfen: string; clocks: Clocks | null } }
 	| { TurnPlayed: { v: number; seat: Seat; moves: string[]; fenAfter: string } }
 	| { GameEnded: { v: number; over: Over } }

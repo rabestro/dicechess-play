@@ -132,7 +132,19 @@
 			>
 				<p>Dice Chess — Play · anonymous, free.</p>
 				<p class="text-[10px] text-content-muted/60">
-					AGPL-3.0 · powered by the open-source Dice Chess engine
+					<a
+						class="hover:text-content hover:underline"
+						href="https://github.com/rabestro/dicechess-play/blob/main/LICENSE"
+					>
+						AGPL-3.0
+					</a>
+					· powered by the open-source
+					<a
+						class="hover:text-content hover:underline"
+						href="https://jc.id.lv/dicechess-engine-scala/"
+					>
+						Dice Chess engine
+					</a>
 				</p>
 			</div>
 		</footer>

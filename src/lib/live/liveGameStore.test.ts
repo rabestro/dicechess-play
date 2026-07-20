@@ -488,6 +488,163 @@ describe('LiveGameStore pacing', () => {
 	});
 });
 
+describe('LiveGameStore snapshot history replay (#132)', () => {
+	let live: LiveGameStore;
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.clearAllMocks();
+		vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+		MockWebSocket.last = null;
+		live = new LiveGameStore();
+	});
+
+	afterEach(() => {
+		live.dispose();
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+	});
+
+	const deliver = (ev: ServerEvent) =>
+		MockWebSocket.last!.onmessage?.({ data: JSON.stringify(ev) });
+
+	it('reconstructs a turn played before the client joined, presented already caught up (no animation)', () => {
+		live.connect('g', 'tok', null); // spectator joining mid-game
+		MockWebSocket.last!.onopen?.();
+
+		deliver({
+			Snapshot: {
+				v: 2,
+				state: {
+					version: 2,
+					dfen: `${AFTER_WHITE_KNIGHTS} n`,
+					activeSeat: 'Black',
+					dicePending: true,
+					status: { Active: {} },
+					clocks: null,
+				},
+				history: [
+					{ seat: 'White', dice: [3, 6], moves: ['b1c3', 'g1f3'], fenAfter: AFTER_WHITE_KNIGHTS },
+				],
+			},
+		});
+
+		// No backlog to animate: a join presents fully caught up immediately.
+		expect(live.isViewingHistory).toBe(false);
+		expect(live.currentMoveIndex).toBe(3); // White's roll + 2 moves, then Black's current roll
+		expect(getPieceFromFen(live.currentBoardFen, 'c3')).toBe('N');
+		expect(getPieceFromFen(live.currentBoardFen, 'f3')).toBe('N');
+		// The replayed roll's raw dice values [3, 6] must decode to White's piece letters (B, K),
+		// not the bare numbers — the dice panel renders `value` as a piece image.
+		expect(live.historyMap['0']?.dices.map((d) => d.value)).toEqual(['B', 'K']);
+
+		// The replayed turn is fully scrubbable, back to the opening position.
+		live.setMoveIndex(0);
+		expect(live.currentBoardFen).toBe(START_FEN);
+		live.setMoveIndex(1);
+		expect(getPieceFromFen(live.currentBoardFen, 'c3')).toBe('N');
+		expect(getPieceFromFen(live.currentBoardFen, 'f3')).toBeNull();
+		live.setMoveIndex(2);
+		expect(getPieceFromFen(live.currentBoardFen, 'f3')).toBe('N');
+	});
+
+	it('reconstructs a forced pass played before the client joined', () => {
+		live.connect('g', 'tok', null);
+		MockWebSocket.last!.onopen?.();
+
+		deliver({
+			Snapshot: {
+				v: 2,
+				state: {
+					version: 2,
+					dfen: `${START_FEN_BLACK} n`,
+					activeSeat: 'Black',
+					dicePending: true,
+					status: { Active: {} },
+					clocks: null,
+				},
+				history: [{ seat: 'White', dice: [1], moves: [], fenAfter: START_FEN }],
+			},
+		});
+
+		expect(live.isViewingHistory).toBe(false);
+		expect(live.historyMap['1']?.gameMoveHistoryMove).toEqual({ from: '', to: '', promotion: '' });
+	});
+
+	it('joining right at the start of a game (no history) behaves exactly as before', () => {
+		live.connect('g', 'tok', 'white');
+		MockWebSocket.last!.onopen?.();
+
+		deliver(snapshot());
+
+		expect(live.isViewingHistory).toBe(false);
+		expect(live.currentMoveIndex).toBe(0);
+		expect(live.currentBoardFen).toBe(START_FEN);
+	});
+
+	it('a reconnect resync (a second Snapshot on the same store) does not duplicate history', () => {
+		live.connect('g', 'tok', null);
+		MockWebSocket.last!.onopen?.();
+
+		const resync: ServerEvent = {
+			Snapshot: {
+				v: 2,
+				state: {
+					version: 2,
+					dfen: `${AFTER_WHITE_KNIGHTS} n`,
+					activeSeat: 'Black',
+					dicePending: true,
+					status: { Active: {} },
+					clocks: null,
+				},
+				history: [
+					{ seat: 'White', dice: [3, 6], moves: ['b1c3', 'g1f3'], fenAfter: AFTER_WHITE_KNIGHTS },
+				],
+			},
+		};
+
+		deliver(resync);
+		expect(live.currentMoveIndex).toBe(3);
+
+		// LiveClient reattaches a dropped connection transparently (no reset() in between) and the
+		// server always resends the full history on the resync Snapshot — replaying it must rebuild
+		// historyMap, not append onto what's already there.
+		deliver(resync);
+		expect(live.currentMoveIndex).toBe(3);
+		expect(getPieceFromFen(live.currentBoardFen, 'c3')).toBe('N');
+		expect(getPieceFromFen(live.currentBoardFen, 'f3')).toBe('N');
+	});
+
+	it('joining an already-finished game still reconstructs its move history', () => {
+		live.connect('g', 'tok', null);
+		MockWebSocket.last!.onopen?.();
+
+		deliver({
+			Snapshot: {
+				v: 3,
+				state: {
+					version: 3,
+					dfen: AFTER_WHITE_KNIGHTS,
+					activeSeat: 'Black',
+					dicePending: false,
+					status: {
+						Ended: { over: { result: { Win: { side: 'White' } }, termination: 'Resign' } },
+					},
+					clocks: null,
+				},
+				history: [
+					{ seat: 'White', dice: [3, 6], moves: ['b1c3', 'g1f3'], fenAfter: AFTER_WHITE_KNIGHTS },
+				],
+			},
+		});
+
+		expect(live.gameStatus).toBe('over');
+		expect(live.currentMoveIndex).toBe(2);
+		live.setMoveIndex(0);
+		expect(live.currentBoardFen).toBe(START_FEN);
+	});
+});
+
 describe('LiveGameStore connection feedback (issue #76)', () => {
 	let live: LiveGameStore;
 
