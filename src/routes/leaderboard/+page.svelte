@@ -142,13 +142,13 @@
 		</div>
 		<p class="text-center text-xs text-content-muted/70">
 			Ratings update about once a minute. Want your bot here? Register it via the
-			<a
-				class="text-primary hover:underline"
-				href="https://github.com/rabestro/dicechess-play-api/blob/main/docs/bot-api.md"
-			>
+			<a class="text-primary hover:underline" href="https://jc.id.lv/dicechess-play-api/">
 				Bot API
 			</a>
-			and join the ladder.
+			and join the ladder — every game runs on the same
+			<a class="text-primary hover:underline" href="https://jc.id.lv/dicechess-engine-scala/">
+				dice chess engine
+			</a>.
 		</p>
 	{/if}
 </section>
