@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { createGame, isLiveEnabled } from '$lib/live/liveApi';
 	import { buildJoinUrl } from '$lib/live/seatLink';
-	import { getGuestId } from '$lib/ingest/guestIdentity';
+	import { getGuestUuid } from '$lib/ingest/guestIdentity';
 	import { timeControlPresets } from '$lib/live/timeControls';
 	import TimeControlPicker from '../../components/TimeControlPicker.svelte';
 
@@ -18,7 +18,7 @@
 		creating = true;
 		error = null;
 		try {
-			const guest = getGuestId();
+			const guest = getGuestUuid();
 			const preset = timeControlPresets[selected];
 			const res = await createGame(guest, guest, preset.value);
 			chosenLabel = preset.label;
