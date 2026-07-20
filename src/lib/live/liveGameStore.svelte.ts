@@ -17,6 +17,7 @@ import type {
 	PublicGameState,
 	Seat,
 	ServerEvent,
+	SnapshotTurn,
 } from './liveTypes';
 import * as DiceChessEngine from '@rabestro/dicechess-engine';
 import { buildTurnBlocks } from '../playWithBot/turnBlocks';
@@ -32,6 +33,17 @@ import { toastStore } from '../toastStore.svelte';
 const DiceChess = (DiceChessEngine as any).DiceChess;
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+// Canonical piece letter per die value 1-6 (mirrors fenUtils' DICE_MAP), for turning a
+// SnapshotTurn's raw `dice: number[]` back into the piece-letter DieState the UI (and getDieValue)
+// expects. Unlike a live DiceRolled, a replayed turn's dice have no dfen to read the letters from
+// directly — its dfen has already moved on to the position after the turn.
+const DIE_VALUE_LETTERS = ['p', 'n', 'b', 'r', 'q', 'k'];
+
+function dieStateFromValue(value: number, color: 'w' | 'b'): DieState {
+	const letter = DIE_VALUE_LETTERS[value - 1] ?? String(value);
+	return { value: color === 'w' ? letter.toUpperCase() : letter, allowed: true, used: false };
+}
 
 export type LiveStatus = 'connecting' | 'waiting' | 'playing' | 'over';
 export type LiveOutcome = 'won' | 'lost' | 'draw';
@@ -284,7 +296,7 @@ export class LiveGameStore {
 	private applyEvent(ev: ServerEvent): void {
 		if ('Snapshot' in ev) {
 			this.version = ev.Snapshot.v;
-			this.syncState(ev.Snapshot.state);
+			this.syncState(ev.Snapshot.state, ev.Snapshot.history ?? []);
 			return;
 		}
 		if ('DiceRolled' in ev) {
@@ -334,7 +346,7 @@ export class LiveGameStore {
 		}
 	}
 
-	private syncState(state: PublicGameState): void {
+	private syncState(state: PublicGameState, history: SnapshotTurn[] = []): void {
 		this.players = state.players ?? null;
 		if ('Ended' in state.status) {
 			this.liveFen = stripDfen(state.dfen);
@@ -344,8 +356,16 @@ export class LiveGameStore {
 			this.finalizeEnd(state.status.Ended.over);
 			return;
 		}
+		// A (re)joining client gets every turn played so far — reconstruct it before adopting the
+		// current roll, so a spectator or reconnecting player sees the whole game, not just what
+		// happens from here on (#132).
+		if (history.length > 0) this.replayHistory(history);
 		this.syncTurn(state.dfen, state.activeSeat, state.dicePending);
+		this.appendRollEntry(this.liveFen, this.liveActiveColor, this.liveDice);
 		this.setClocks(state.clocks, state.dicePending ? state.activeSeat : null);
+		// The replayed backlog (plus the current roll) is already known — present it as caught up
+		// immediately; only events from here on animate.
+		this.presentedIndex = this.maxMoveIndex;
 	}
 
 	/** Adopt the authoritative position + dice for the side to move. */
@@ -358,11 +378,6 @@ export class LiveGameStore {
 		this.liveDice = dicePending ? dice.map((value) => ({ value, allowed: true, used: false })) : [];
 		this.confirmedDice = this.liveDice.map((d) => ({ ...d }));
 		this.gameStatus = dicePending && activeSeat === this.mySeat ? 'playing' : 'waiting';
-
-		// Initialize history if it's empty
-		if (Object.keys(this.historyMap).length === 0) {
-			this.initHistory(fen6, this.liveActiveColor, this.liveDice);
-		}
 	}
 
 	/** Runs once the reveal has drained to live: one suspense beat, then the announcement.
@@ -590,16 +605,37 @@ export class LiveGameStore {
 		this.viewedIndex = index === this.maxMoveIndex ? null : index;
 	}
 
-	private initHistory(fen: string, color: 'w' | 'b', dice: DieState[]): void {
-		this.historyMap = {
-			'0': {
-				fen,
-				active_color: color,
-				dices: dice.map((d) => ({ ...d })),
-				gameMoveHistoryMove: null,
-			},
+	/** Appends a ROLL entry (`gameMoveHistoryMove: null`) at the next index — index 0 when historyMap
+	 * is still empty (a brand-new game's opening roll), otherwise right after the last recorded turn
+	 * (a joining client's current pending roll, appended once `replayHistory` has caught historyMap
+	 * up to it). */
+	private appendRollEntry(fen: string, color: 'w' | 'b', dice: DieState[]): void {
+		const nextIndex = Object.keys(this.historyMap).length === 0 ? 0 : this.maxMoveIndex + 1;
+		this.historyMap[String(nextIndex)] = {
+			fen,
+			active_color: color,
+			dices: dice.map((d) => ({ ...d })),
+			gameMoveHistoryMove: null,
 		};
-		this.maxMoveIndex = 0;
+		this.maxMoveIndex = nextIndex;
+	}
+
+	/** Reconstructs every completed turn from a joining Snapshot's `history` into historyMap, starting
+	 * at index 0 from the game's known opening position. Each SnapshotTurn is a roll plus the moves
+	 * played on it (or none, for a forced pass) — the same shape `recordRoll`/`recordTurn` build
+	 * incrementally as DiceRolled/TurnPlayed events arrive live, but replayed here without pacing
+	 * (schedulePresentation), since a joining client shouldn't animate a backlog it never saw roll in. */
+	private replayHistory(history: SnapshotTurn[]): void {
+		let fen = START_FEN;
+		for (const turn of history) {
+			const color: 'w' | 'b' = turn.seat === 'White' ? 'w' : 'b';
+			const diceState = turn.dice.map((value) => dieStateFromValue(value, color));
+			this.appendRollEntry(fen, color, diceState);
+			this.appendTurnEntries(fen, color, diceState, turn.moves);
+			// Chain from the server's authoritative post-turn position (not the local replay's
+			// derived fen) so per-turn engine differences can't compound across a long backlog.
+			fen = stripDfen(turn.fenAfter);
+		}
 	}
 
 	private recordRoll(fen: string, color: 'w' | 'b', dice: string[]): void {
@@ -618,28 +654,39 @@ export class LiveGameStore {
 	private recordTurn(moves: string[], seat: Seat): void {
 		if (Object.keys(this.historyMap).length === 0) return;
 		const color: 'w' | 'b' = seat === 'White' ? 'w' : 'b';
+		this.appendTurnEntries(this.confirmedFen, color, this.confirmedDice, moves);
+		this.schedulePresentation();
+	}
 
-		const currentFen = this.confirmedFen;
-
+	/** Applies a turn's UCI micro-moves onto `boardFen`/`dice`, pushing one historyMap entry per move
+	 * (or one PASS entry if `moves` is empty) starting at `this.maxMoveIndex + 1`. Shared by the live
+	 * incremental path (`recordTurn`, replaying on top of the current confirmed position/dice) and
+	 * `replayHistory` (replaying a joining client's backlog, turn by turn from the opening position).
+	 * Returns the resulting board fen, so a caller chaining multiple turns can feed it back in. */
+	private appendTurnEntries(
+		boardFen: string,
+		color: 'w' | 'b',
+		dice: DieState[],
+		moves: string[],
+	): string {
 		if (moves.length === 0) {
 			// A legitimate pass turn (the rolled dice had no legal move) — record it with the
 			// PASS convention buildTurnBlocks expects instead of silently dropping the turn.
 			const nextIndex = this.maxMoveIndex + 1;
 			this.historyMap[String(nextIndex)] = {
-				fen: currentFen,
+				fen: boardFen,
 				active_color: color,
-				dices: this.confirmedDice.map((d) => ({ ...d })),
+				dices: dice.map((d) => ({ ...d })),
 				gameMoveHistoryMove: { from: '', to: '', promotion: '' },
 			};
 			this.maxMoveIndex = nextIndex;
-			this.schedulePresentation();
-			return;
+			return boardFen;
 		}
 
-		const dice = this.confirmedDice.map((d) => getDieValue(d));
-		let currentDfen = buildDfen(currentFen, dice, color);
-		const tempDiceState = this.confirmedDice.map((d) => ({ ...d }));
-		let boardFen = currentFen;
+		const diceValues = dice.map((d) => getDieValue(d));
+		let currentDfen = buildDfen(boardFen, diceValues, color);
+		const tempDiceState = dice.map((d) => ({ ...d }));
+		let nextBoardFen = boardFen;
 
 		for (const move of moves) {
 			if (move.length < 4) continue;
@@ -647,7 +694,7 @@ export class LiveGameStore {
 			const dest = move.slice(2, 4);
 			const promo = move.slice(4) || undefined;
 
-			const piece = getPieceFromFen(boardFen, from);
+			const piece = getPieceFromFen(nextBoardFen, from);
 			if (piece) {
 				const dieVal = getDieValue(piece);
 				const dieIndex = tempDiceState.findIndex(
@@ -671,21 +718,21 @@ export class LiveGameStore {
 				}
 			}
 
-			const nextDfen = DiceChess.applyMove(currentDfen, from, dest, promo);
-			if (!nextDfen) {
+			const applied = DiceChess.applyMove(currentDfen, from, dest, promo);
+			if (!applied) {
 				logger.error(
-					'recordTurn: local replay rejected a server-confirmed move; history truncated',
+					'appendTurnEntries: local replay rejected a server-confirmed move; history truncated',
 					{
 						move,
 						moves,
-						seat,
+						color,
 						lastRecordedIndex: this.maxMoveIndex,
 					},
 				);
 				break;
 			}
 
-			const nextBoardFen = nextDfen.split(/\s+/).slice(0, 6).join(' ');
+			nextBoardFen = applied.split(/\s+/).slice(0, 6).join(' ');
 			const nextIndex = this.maxMoveIndex + 1;
 
 			this.historyMap[String(nextIndex)] = {
@@ -700,11 +747,10 @@ export class LiveGameStore {
 			};
 
 			this.maxMoveIndex = nextIndex;
-			currentDfen = nextDfen;
-			boardFen = nextBoardFen;
+			currentDfen = applied;
 		}
 
-		this.schedulePresentation();
+		return nextBoardFen;
 	}
 
 	private sleep(ms: number): Promise<void> {
