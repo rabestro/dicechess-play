@@ -581,6 +581,68 @@ describe('LiveGameStore snapshot history replay (#132)', () => {
 		expect(live.currentMoveIndex).toBe(0);
 		expect(live.currentBoardFen).toBe(START_FEN);
 	});
+
+	it('a reconnect resync (a second Snapshot on the same store) does not duplicate history', () => {
+		live.connect('g', 'tok', null);
+		MockWebSocket.last!.onopen?.();
+
+		const resync: ServerEvent = {
+			Snapshot: {
+				v: 2,
+				state: {
+					version: 2,
+					dfen: `${AFTER_WHITE_KNIGHTS} n`,
+					activeSeat: 'Black',
+					dicePending: true,
+					status: { Active: {} },
+					clocks: null,
+				},
+				history: [
+					{ seat: 'White', dice: [3, 6], moves: ['b1c3', 'g1f3'], fenAfter: AFTER_WHITE_KNIGHTS },
+				],
+			},
+		};
+
+		deliver(resync);
+		expect(live.currentMoveIndex).toBe(3);
+
+		// LiveClient reattaches a dropped connection transparently (no reset() in between) and the
+		// server always resends the full history on the resync Snapshot — replaying it must rebuild
+		// historyMap, not append onto what's already there.
+		deliver(resync);
+		expect(live.currentMoveIndex).toBe(3);
+		expect(getPieceFromFen(live.currentBoardFen, 'c3')).toBe('N');
+		expect(getPieceFromFen(live.currentBoardFen, 'f3')).toBe('N');
+	});
+
+	it('joining an already-finished game still reconstructs its move history', () => {
+		live.connect('g', 'tok', null);
+		MockWebSocket.last!.onopen?.();
+
+		deliver({
+			Snapshot: {
+				v: 3,
+				state: {
+					version: 3,
+					dfen: AFTER_WHITE_KNIGHTS,
+					activeSeat: 'Black',
+					dicePending: false,
+					status: {
+						Ended: { over: { result: { Win: { side: 'White' } }, termination: 'Resign' } },
+					},
+					clocks: null,
+				},
+				history: [
+					{ seat: 'White', dice: [3, 6], moves: ['b1c3', 'g1f3'], fenAfter: AFTER_WHITE_KNIGHTS },
+				],
+			},
+		});
+
+		expect(live.gameStatus).toBe('over');
+		expect(live.currentMoveIndex).toBe(2);
+		live.setMoveIndex(0);
+		expect(live.currentBoardFen).toBe(START_FEN);
+	});
 });
 
 describe('LiveGameStore connection feedback (issue #76)', () => {

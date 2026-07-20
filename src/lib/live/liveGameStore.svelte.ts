@@ -4,6 +4,7 @@ import {
 	deriveChessgroundDests,
 	buildDfen,
 	getDieValue,
+	DICE_TO_CHAR_MAP,
 } from '../../utils/fenUtils';
 import type { DieState } from '../playWithBot/playWithBotDice.svelte';
 import { LiveClient, randomClientSeed, type ConnStatus } from './liveClient';
@@ -34,15 +35,13 @@ const DiceChess = (DiceChessEngine as any).DiceChess;
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-// Canonical piece letter per die value 1-6 (mirrors fenUtils' DICE_MAP), for turning a
-// SnapshotTurn's raw `dice: number[]` back into the piece-letter DieState the UI (and getDieValue)
-// expects. Unlike a live DiceRolled, a replayed turn's dice have no dfen to read the letters from
-// directly — its dfen has already moved on to the position after the turn.
-const DIE_VALUE_LETTERS = ['p', 'n', 'b', 'r', 'q', 'k'];
-
+// Turns a SnapshotTurn's raw `dice: number[]` back into the piece-letter DieState the UI (and
+// getDieValue) expects, via fenUtils' DICE_TO_CHAR_MAP — the same table buildDfen uses. Unlike a
+// live DiceRolled, a replayed turn's dice have no dfen to read the letters from directly: its dfen
+// has already moved on to the position after the turn.
 function dieStateFromValue(value: number, color: 'w' | 'b'): DieState {
-	const letter = DIE_VALUE_LETTERS[value - 1] ?? String(value);
-	return { value: color === 'w' ? letter.toUpperCase() : letter, allowed: true, used: false };
+	const letter = DICE_TO_CHAR_MAP[value] ?? String(value);
+	return { value: color === 'w' ? letter : letter.toLowerCase(), allowed: true, used: false };
 }
 
 export type LiveStatus = 'connecting' | 'waiting' | 'playing' | 'over';
@@ -296,7 +295,7 @@ export class LiveGameStore {
 	private applyEvent(ev: ServerEvent): void {
 		if ('Snapshot' in ev) {
 			this.version = ev.Snapshot.v;
-			this.syncState(ev.Snapshot.state, ev.Snapshot.history ?? []);
+			this.syncState(ev.Snapshot.state, ev.Snapshot.history);
 			return;
 		}
 		if ('DiceRolled' in ev) {
@@ -346,8 +345,15 @@ export class LiveGameStore {
 		}
 	}
 
-	private syncState(state: PublicGameState, history: SnapshotTurn[] = []): void {
+	private syncState(state: PublicGameState, history?: SnapshotTurn[]): void {
 		this.players = state.players ?? null;
+		// Every Snapshot — a fresh join or a reconnect's resync alike — carries the server's full
+		// authoritative turn history, so always rebuild historyMap from it rather than appending.
+		// LiveClient reattaches a dropped connection transparently, without the page re-running
+		// connect()/reset() (see liveClient.ts), so the store's historyMap from before the drop is
+		// still there when a resync Snapshot arrives — appending onto it would duplicate every turn.
+		if (history !== undefined) this.rebuildHistory(history);
+
 		if ('Ended' in state.status) {
 			this.liveFen = stripDfen(state.dfen);
 			// The server's final clocks are already settled in the snapshot; adopt them without re-zeroing.
@@ -356,16 +362,27 @@ export class LiveGameStore {
 			this.finalizeEnd(state.status.Ended.over);
 			return;
 		}
-		// A (re)joining client gets every turn played so far — reconstruct it before adopting the
-		// current roll, so a spectator or reconnecting player sees the whole game, not just what
-		// happens from here on (#132).
-		if (history.length > 0) this.replayHistory(history);
+
 		this.syncTurn(state.dfen, state.activeSeat, state.dicePending);
-		this.appendRollEntry(this.liveFen, this.liveActiveColor, this.liveDice);
+		// The current pending roll isn't part of `history` (the server only lists completed turns) —
+		// append it as the next entry. The historyMap-empty fallback covers a pre-history server that
+		// sent no `history` field at all on a fresh connect.
+		if (history !== undefined || Object.keys(this.historyMap).length === 0) {
+			this.appendRollEntry(this.liveFen, this.liveActiveColor, this.liveDice);
+		}
 		this.setClocks(state.clocks, state.dicePending ? state.activeSeat : null);
 		// The replayed backlog (plus the current roll) is already known — present it as caught up
 		// immediately; only events from here on animate.
 		this.presentedIndex = this.maxMoveIndex;
+	}
+
+	/** Rebuilds historyMap from scratch using a Snapshot's authoritative `history` — every completed
+	 * turn so far. Called on every Snapshot (never just when historyMap is empty), so a reconnect's
+	 * resync can never duplicate turns onto what's already there (#132 follow-up). */
+	private rebuildHistory(history: SnapshotTurn[]): void {
+		this.historyMap = {};
+		this.maxMoveIndex = 0;
+		if (history.length > 0) this.replayHistory(history);
 	}
 
 	/** Adopt the authoritative position + dice for the side to move. */
