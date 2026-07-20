@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getGuestId, setGuestId, resetGuestId } from './guestIdentity';
+import { getGuestId, getGuestUuid, setGuestId, resetGuestId } from './guestIdentity';
 
 const VALID_CODE = 'guest:0190a000-1111-7222-8333-444455556666';
 
@@ -55,5 +55,11 @@ describe('guestIdentity', () => {
 		expect(after).toMatch(/^guest:[0-9a-f-]{36}$/i);
 		expect(after).not.toBe(before);
 		expect(getGuestId()).toBe(after);
+	});
+
+	it('getGuestUuid strips the guest: prefix getGuestId carries', () => {
+		expect(setGuestId(VALID_CODE)).toBe(true);
+		expect(getGuestUuid()).toBe('0190a000-1111-7222-8333-444455556666');
+		expect(`guest:${getGuestUuid()}`).toBe(getGuestId());
 	});
 });

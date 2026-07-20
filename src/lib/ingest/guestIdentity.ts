@@ -41,6 +41,17 @@ export function getGuestId(): string {
 	return fresh;
 }
 
+/** The bare uuid — `getGuestId()` without its `guest:` prefix. play-api's `POST /games`,
+ * `/lobby/seeks`, and `/lobby/seeks/{id}/accept` wrap whatever id they're given in their own
+ * `Principal.Guest(id)`, whose `externalId` prepends `guest:` itself; passing the already-prefixed
+ * `getGuestId()` there double-prefixes it (`guest:guest:<uuid>`, see dicechess-play-api#14). Use
+ * this instead for `createGame`/`createSeek`/`acceptSeek`; `getGuestId()` stays canonical everywhere
+ * else (ingest, the /me restore code).
+ */
+export function getGuestUuid(): string {
+	return getGuestId().slice('guest:'.length);
+}
+
 /** Restore a guest identity from a code copied on another device. Returns false if malformed. */
 export function setGuestId(code: string): boolean {
 	const trimmed = code.trim();

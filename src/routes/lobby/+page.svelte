@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { getGuestId } from '$lib/ingest/guestIdentity';
+	import { getGuestUuid } from '$lib/ingest/guestIdentity';
 	import { isLiveEnabled } from '$lib/live/liveApi';
 	import {
 		listSeeks,
@@ -102,7 +102,7 @@
 		error = null;
 		try {
 			const preset = timeControlPresets[selected];
-			const created = await createSeek(getGuestId(), preset.value);
+			const created = await createSeek(getGuestUuid(), preset.value);
 			waiting = { id: created.seekId, secret: created.secret, label: preset.label };
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to create seek';
@@ -127,7 +127,7 @@
 		accepting = true;
 		error = null;
 		try {
-			const match = await acceptSeek(seek.id, getGuestId());
+			const match = await acceptSeek(seek.id, getGuestUuid());
 			// Never assume Black: the server coin-flips creator/accepter to White/Black on accept
 			// (see play-api #95) — match.seat is the only authoritative source.
 			goToBoard(match.gameId, match.token, match.seat);
