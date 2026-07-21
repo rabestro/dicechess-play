@@ -27,8 +27,11 @@
 			if (!white || !black) throw new Error('Server did not return both seat tokens');
 			shareUrl = buildJoinUrl(location.origin, res.gameId, black.token, 'Black');
 			boardUrl = `${resolve('/live/[id]', { id: res.gameId })}?seat=${encodeURIComponent(white.token)}&as=white`;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to create game';
+		} catch {
+			// Any failure here — unreachable server, a bad response, a malformed body — means the same
+			// thing to the player: live play isn't working right now. Show one honest, non-technical
+			// message instead of a raw fetch exception or status code.
+			error = 'Live play is unavailable right now — try again in a minute.';
 		} finally {
 			creating = false;
 		}
