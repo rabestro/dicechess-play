@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { isLiveEnabled } from '$lib/live/liveApi';
 	import { fetchLeaderboard, type LeaderRow } from '$lib/leaderboard/leaderboardApi';
+	import { winRate } from '$lib/stats/playerRecord';
 	import BotBadge from '../../components/BotBadge.svelte';
 
 	// The bot rating ladder (D.3): a read-only board over play-api's public GET /leaderboard.
@@ -99,7 +100,8 @@
 						<th scope="col" class="px-4 py-3">Bot</th>
 						<th scope="col" class="px-4 py-3 text-right">Rating</th>
 						<th scope="col" class="hidden px-4 py-3 text-right sm:table-cell">Games</th>
-						<th scope="col" class="px-4 py-3 text-right">W · D · L</th>
+						<th scope="col" class="hidden px-4 py-3 text-right sm:table-cell">W · D · L</th>
+						<th scope="col" class="px-4 py-3 text-right">Win %</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -130,10 +132,15 @@
 							>
 								{leader.games}
 							</td>
-							<td class="px-4 py-3 text-right font-mono text-xs tabular-nums text-content-muted">
+							<td
+								class="hidden px-4 py-3 text-right font-mono text-xs tabular-nums text-content-muted sm:table-cell"
+							>
 								<span class="text-primary">{leader.wins}</span>
 								· {leader.draws} ·
 								<span class="text-danger">{leader.losses}</span>
+							</td>
+							<td class="px-4 py-3 text-right font-mono font-bold tabular-nums text-content">
+								{Math.round(winRate(leader) * 100)}%
 							</td>
 						</tr>
 					{/each}
