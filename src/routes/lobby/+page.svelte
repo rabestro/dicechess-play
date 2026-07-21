@@ -35,6 +35,8 @@
 	let accepting = $state(false);
 	let createOpen = $state(false);
 	let loaded = $state(false); // first successful poll landed — until then, no "empty hall" flash
+	const POLL_FAILURES_BEFORE_UNAVAILABLE = 2;
+	let unavailable = $state(false); // play-api looks unreachable — shown instead of the wall/loading text
 
 	// The wall: the hottest game becomes the TV tile, the rest follow, open seeks close the row.
 	const tvGame = $derived(games.at(0));
@@ -52,17 +54,23 @@
 	$effect(() => {
 		if (waiting || !isLiveEnabled()) return;
 		let alive = true;
+		// Consecutive failed polls — one blip doesn't mean the server is down, so a single miss
+		// stays silent (keep showing the last-known wall); only a run of them flips `unavailable`.
+		let pollFailures = 0;
 		const tick = async () => {
 			try {
 				const [nextSeeks, nextGames] = await Promise.all([listSeeks(), listGames()]);
-				if (alive) {
-					seeks = nextSeeks;
-					games = nextGames.games;
-					totalGames = nextGames.total;
-					loaded = true;
-				}
+				if (!alive) return;
+				seeks = nextSeeks;
+				games = nextGames.games;
+				totalGames = nextGames.total;
+				loaded = true;
+				pollFailures = 0;
+				unavailable = false;
 			} catch {
-				/* transient — keep the last wall */
+				if (!alive) return;
+				pollFailures += 1;
+				if (pollFailures >= POLL_FAILURES_BEFORE_UNAVAILABLE) unavailable = true;
 			}
 		};
 		tick();
@@ -104,8 +112,11 @@
 			const preset = timeControlPresets[selected];
 			const created = await createSeek(getGuestUuid(), preset.value);
 			waiting = { id: created.seekId, secret: created.secret, label: preset.label };
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to create seek';
+		} catch {
+			// Any failure here — unreachable server, a bad response — means the same thing to the
+			// player: the lobby isn't working right now. One honest, non-technical message instead of
+			// a raw fetch exception or status code.
+			error = 'The lobby is unavailable right now — try again in a minute.';
 		} finally {
 			creating = false;
 		}
@@ -239,7 +250,14 @@
 
 		{#if error}<p class="text-sm text-danger">{error}</p>{/if}
 
-		{#if !loaded}
+		{#if unavailable}
+			<div
+				class="rounded-2xl border border-danger/40 bg-danger/10 p-6 text-center text-danger"
+				role="alert"
+			>
+				The lobby is unavailable right now — try again in a minute.
+			</div>
+		{:else if !loaded}
 			<p class="px-2 py-14 text-center text-sm text-content-muted">Looking around the hall…</p>
 		{:else if games.length === 0 && seeks.length === 0}
 			<div
