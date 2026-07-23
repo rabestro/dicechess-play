@@ -42,6 +42,31 @@ export const timeControlGroups: readonly TimeControlGroup[] = (
 	}),
 }));
 
+export interface BotTimeControlPreset {
+	label: string;
+	value: TimeControl; // never null: a catalog game is never unlimited (ADR-0014)
+}
+
+/** The 6 presets offered when starting a game against a catalog bot (ADR-0014) — a curated subset,
+ * not a 1:1 mirror of `timeControlPresets` (no unlimited; fewer, rounder options). */
+export const botTimeControlPresets: readonly BotTimeControlPreset[] = [
+	{ label: '1 + 1', value: { Fischer: { initialSeconds: 60, incrementSeconds: 1 } } },
+	{ label: '3 + 3', value: { Fischer: { initialSeconds: 180, incrementSeconds: 3 } } },
+	{ label: '5 min', value: { SuddenDeath: { initialSeconds: 300 } } },
+	{ label: '5 + 5', value: { Fischer: { initialSeconds: 300, incrementSeconds: 5 } } },
+	{ label: '10 min', value: { SuddenDeath: { initialSeconds: 600 } } },
+	{ label: '10 + 10', value: { Fischer: { initialSeconds: 600, incrementSeconds: 10 } } },
+];
+
+/** Index of the default preset (5 + 5) — looked up by label, so a reorder can't silently point the
+ * default at the wrong entry (fails fast at module load instead). */
+export const defaultBotTimeControlIndex: number = (() => {
+	const index = botTimeControlPresets.findIndex((p) => p.label === '5 + 5');
+	if (index === -1)
+		throw new Error('botTimeControlPresets: no "5 + 5" preset — the default is broken');
+	return index;
+})();
+
 /** A short human label for any time control (e.g. to show a seek's control in the lobby list). Tolerates a
  * missing control (treated as Unlimited) so a malformed response can never throw. */
 export function timeControlLabel(tc: TimeControl | null | undefined): string {

@@ -201,6 +201,12 @@
 						Play a friend by link →
 					</a>
 					<a
+						href={resolve('/bots')}
+						class="rounded-xl px-2 py-2 text-sm font-bold text-content-muted transition-colors hover:bg-surface hover:text-content sm:px-4 sm:text-base"
+					>
+						Play a bot →
+					</a>
+					<a
 						href={resolve('/leaderboard')}
 						class="rounded-xl px-2 py-2 text-sm font-bold text-content-muted transition-colors hover:bg-surface hover:text-content sm:px-4 sm:text-base"
 					>

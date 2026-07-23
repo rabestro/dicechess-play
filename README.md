@@ -40,18 +40,21 @@ src/
 │   ├── live/ · live/[id]/     friend-link entry · server-authoritative live board (WebSocket)
 │   ├── games/ · games/[id]/   local game history · replay
 │   ├── leaderboard/           bot rating ladder (play-api GET /leaderboard)
+│   ├── bots/                  human-play bot catalog (play-api GET /lobby/bots, ADR-0014)
 │   └── me/                    guest profile + restore code
 ├── components/                shared UI
 │   ├── Board.svelte           thin chessground wrapper driven by either game store
 │   ├── lib/Chessground.svelte
 │   ├── PlayerStrip · DicePanel · MoveHistory · GameEndModal · BotBadge
-│   └── GameHistoryCard · MiniBoard · TimeControlPicker · PawnPromotionSelector · ToastContainer
+│   ├── GameHistoryCard · MiniBoard · TimeControlPicker · PawnPromotionSelector · ToastContainer
+│   └── BotCatalogCard · BotTimeControlPicker — the /bots page's card (click → wake → config → start)
 ├── lib/
 │   ├── playWithBot/           bot-play core: store, engine worker, dice/history, opening book
 │   ├── live/                  live-play client: liveGameStore, liveClient (WS + reconnect),
 │   │                          liveApi/lobbyApi (REST), liveTypes (play-api wire mirror),
 │   │                          dfen/board/clock/seat/timeControl/playerLabel helpers
 │   ├── leaderboard/           leaderboardApi — rating-ladder read client (play-api wire mirror)
+│   ├── catalog/               catalogApi — bot-catalog read/wake/play-bot client (play-api wire mirror)
 │   ├── ingest/                → analytics POST /api/games
 │   │   ├── types.ts           GameIngestWire contract (verbatim copy — see the file head)
 │   │   ├── guestIdentity.ts   per-browser guest:<uuidv7> + restore code
