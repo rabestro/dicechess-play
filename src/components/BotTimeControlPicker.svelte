@@ -2,10 +2,14 @@
 	// A flat sibling of TimeControlPicker (which is hardwired to the grouped lobby presets): the
 	// catalog's 6 presets don't need Blitz/Rapid grouping, and this only reads `.label`, so it stays
 	// decoupled from whichever preset shape the caller passes.
+	// name scopes the native radio group to one instance — HTML groups radios by name across the
+	// WHOLE document, not per component, so two pickers on the same page (one per catalog card)
+	// would otherwise fight over a single shared selection (review).
 	let {
 		presets,
+		name,
 		selected = $bindable(0),
-	}: { presets: readonly { label: string }[]; selected?: number } = $props();
+	}: { presets: readonly { label: string }[]; name: string; selected?: number } = $props();
 </script>
 
 <fieldset class="flex flex-col gap-1.5">
@@ -18,13 +22,7 @@
 					? 'border-primary bg-primary text-primary-content'
 					: 'border-border bg-surface text-content-muted hover:text-content'}"
 			>
-				<input
-					type="radio"
-					name="botTimeControl"
-					value={index}
-					bind:group={selected}
-					class="sr-only"
-				/>
+				<input type="radio" {name} value={index} bind:group={selected} class="sr-only" />
 				{preset.label}
 			</label>
 		{/each}

@@ -104,7 +104,11 @@
 		</div>
 	{:else}
 		<div class="flex flex-col gap-3">
-			<BotTimeControlPicker presets={botTimeControlPresets} bind:selected={selectedTimeControl} />
+			<BotTimeControlPicker
+				presets={botTimeControlPresets}
+				name="botTimeControl-{bot.team}-{bot.name}"
+				bind:selected={selectedTimeControl}
+			/>
 
 			<fieldset class="flex flex-col gap-1.5">
 				<legend class="text-[10px] font-bold tracking-widest text-content-muted/80 uppercase">
