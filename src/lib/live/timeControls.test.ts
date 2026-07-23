@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { timeControlGroups, timeControlLabel, timeControlPresets } from './timeControls';
+import {
+	botTimeControlPresets,
+	defaultBotTimeControlIndex,
+	timeControlGroups,
+	timeControlLabel,
+	timeControlPresets,
+} from './timeControls';
 
 describe('timeControlPresets', () => {
 	it('defaults (index 0) to a timed control so new games get clocks', () => {
@@ -12,6 +18,23 @@ describe('timeControlPresets', () => {
 		for (const p of timeControlPresets) {
 			expect(timeControlLabel(p.value)).toBe(p.label);
 		}
+	});
+});
+
+describe('botTimeControlPresets', () => {
+	it('has exactly 6 presets, none of them unlimited (ADR-0014: catalog games are never unlimited)', () => {
+		expect(botTimeControlPresets).toHaveLength(6);
+		for (const p of botTimeControlPresets) expect(p.value).not.toBeNull();
+	});
+
+	it('labels every preset consistently with timeControlLabel', () => {
+		for (const p of botTimeControlPresets) {
+			expect(timeControlLabel(p.value)).toBe(p.label);
+		}
+	});
+
+	it('defaults to the 5 + 5 preset', () => {
+		expect(botTimeControlPresets[defaultBotTimeControlIndex].label).toBe('5 + 5');
 	});
 });
 
