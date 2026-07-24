@@ -118,6 +118,13 @@
 	const seatSub = (seat: Seat): string => seatDisplaySub(live.players, seat, live.spectator);
 	const seatIsBot = (seat: Seat): boolean => publicPlayer(live.players, seat)?.kind === 'Bot';
 
+	// A finished game's primary action depends on who the OPPONENT was (never the viewer's own
+	// seat — a spectator has no opponent of their own, hence the !live.spectator guard): rematching
+	// a bot returns to the catalog (wake re-confirms it, since its webhook may have gone quiet
+	// since); rematching a human goes back to the lobby to find a new one. Previously this was a
+	// hardcoded link to /live (play-a-friend) regardless of context.
+	const opponentIsBot = $derived(!live.spectator && seatIsBot(topSeat));
+
 	// The board is the primary element: hide the app chrome while on the live board.
 	$effect(() => {
 		chromeStore.zen = true;
@@ -287,10 +294,16 @@
 	onDismiss={() => (endModalDismissed = true)}
 >
 	<a
-		href={resolve('/live')}
+		href={resolve(opponentIsBot ? '/bots' : '/lobby')}
 		class="w-full rounded-xl bg-primary py-2.5 text-center font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
 	>
-		New game
+		{opponentIsBot ? 'Play another bot →' : 'New game →'}
+	</a>
+	<a
+		href={resolve('/lobby')}
+		class="text-sm font-semibold text-content-muted transition-colors hover:text-content"
+	>
+		← Back to the lobby
 	</a>
 </GameEndModal>
 
@@ -505,10 +518,16 @@
 						<p class="text-sm text-content-muted">{endReason}</p>
 					{/if}
 					<a
-						href={resolve('/live')}
+						href={resolve(opponentIsBot ? '/bots' : '/lobby')}
 						class="w-full rounded-xl bg-primary py-2.5 text-center font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
 					>
-						New game
+						{opponentIsBot ? 'Play another bot →' : 'New game →'}
+					</a>
+					<a
+						href={resolve('/lobby')}
+						class="text-sm font-semibold text-content-muted transition-colors hover:text-content"
+					>
+						← Back to the lobby
 					</a>
 				</div>
 			{:else}
