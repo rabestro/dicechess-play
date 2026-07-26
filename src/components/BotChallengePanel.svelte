@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { getGuestUuid } from '$lib/ingest/guestIdentity';
 	import { PlayBotError, playBot, wakeBot } from '$lib/catalog/catalogApi';
 	import { buildJoinUrl } from '$lib/live/seatLink';
@@ -17,6 +18,12 @@
 	let selectedTimeControl = $state(defaultBotTimeControlIndex);
 	let preferredColor = $state<ColorChoice>('random');
 	let error = $state<string | null>(null);
+	// Guards the async start() flow below: if the panel unmounts (visitor navigates away) while
+	// playBot is in flight, the resolved/rejected continuation must not redirect or touch state.
+	let destroyed = false;
+	onDestroy(() => {
+		destroyed = true;
+	});
 
 	const colorOptions: readonly { value: ColorChoice; label: string }[] = [
 		{ value: 'random', label: 'Random' },
@@ -47,10 +54,12 @@
 				timeControl: botTimeControlPresets[selectedTimeControl].value,
 				...(preferredColor === 'random' ? {} : { preferredColor }),
 			});
+			if (destroyed) return;
 			// Full navigation: the board page connects fresh from the seat token in the URL — same
 			// pattern the lobby's seek-accept flow uses (see lobby/+page.svelte's goToBoard).
 			window.location.href = buildJoinUrl(location.origin, match.gameId, match.token, match.seat);
 		} catch (e) {
+			if (destroyed) return;
 			// 409 (an unfinished catalog game already in progress) is worth naming specifically — the
 			// visitor can go finish it. Every other failure collapses to one honest message, same
 			// philosophy as the lobby's create/accept: there's nothing more useful to say.

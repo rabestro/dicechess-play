@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { getGuestUuid } from '$lib/ingest/guestIdentity';
 	import { isLiveEnabled } from '$lib/live/liveApi';
@@ -37,6 +38,13 @@
 	let loaded = $state(false); // first successful poll landed — until then, no "empty hall" flash
 	const POLL_FAILURES_BEFORE_UNAVAILABLE = 2;
 	let unavailable = $state(false); // play-api looks unreachable — shown instead of the wall/loading text
+	// Guards accept()'s post-await navigation below: if the page unmounts (visitor navigates away)
+	// while acceptSeek is in flight, the resolved/rejected continuation must not redirect or touch
+	// state. The waiting-poll effect's own `alive` closure already covers its goToBoard call.
+	let destroyed = false;
+	onDestroy(() => {
+		destroyed = true;
+	});
 
 	// The wall: the hottest game becomes the TV tile, the rest follow, open seeks close the row.
 	const tvGame = $derived(games.at(0));
@@ -139,10 +147,12 @@
 		error = null;
 		try {
 			const match = await acceptSeek(seek.id, getGuestUuid());
+			if (destroyed) return;
 			// Never assume Black: the server coin-flips creator/accepter to White/Black on accept
 			// (see play-api #95) — match.seat is the only authoritative source.
 			goToBoard(match.gameId, match.token, match.seat);
 		} catch {
+			if (destroyed) return;
 			// Lost the race (someone took it) or it expired — refresh the list.
 			error = 'That table was just taken — pick another.';
 			try {
