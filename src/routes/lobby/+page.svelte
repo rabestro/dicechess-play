@@ -144,7 +144,7 @@
 			goToBoard(match.gameId, match.token, match.seat);
 		} catch {
 			// Lost the race (someone took it) or it expired — refresh the list.
-			error = 'That seek was just taken — pick another.';
+			error = 'That table was just taken — pick another.';
 			try {
 				seeks = await listSeeks();
 			} catch {
@@ -178,7 +178,7 @@
 			<h2 class="text-2xl font-bold text-content">Lobby</h2>
 			{#if isLiveEnabled() && !waiting}
 				<span class="font-mono text-xs uppercase tracking-wider text-content-muted tabular-nums">
-					games {totalGames} · seeks {seeks.length}
+					games {totalGames} · tables {seeks.length}
 				</span>
 			{/if}
 		</div>
@@ -191,7 +191,7 @@
 					onclick={() => (createOpen = !createOpen)}
 					class="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-center font-bold text-content-muted transition-colors hover:text-content sm:order-last sm:w-auto sm:py-2"
 				>
-					{createOpen ? '× Close' : '+ Create a seek'}
+					{createOpen ? '× Close' : '+ Open a table'}
 				</button>
 				<div class="flex flex-wrap items-center gap-2 sm:gap-4">
 					<a
@@ -204,7 +204,7 @@
 						href={resolve('/bots')}
 						class="rounded-xl px-2 py-2 text-sm font-bold text-content-muted transition-colors hover:bg-surface hover:text-content sm:px-4 sm:text-base"
 					>
-						Play a bot →
+						Challenge a rated bot →
 					</a>
 					<a
 						href={resolve('/leaderboard')}
@@ -249,7 +249,7 @@
 					disabled={creating}
 					class="rounded-xl bg-primary px-6 py-3 text-lg font-bold text-primary-content shadow-lg shadow-primary/30 transition-colors hover:bg-primary-hover disabled:opacity-60"
 				>
-					{creating ? 'Creating…' : 'Create a seek'}
+					{creating ? 'Opening…' : 'Open a table'}
 				</button>
 			</div>
 		{/if}
@@ -270,9 +270,7 @@
 				class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-border px-6 py-14 text-center"
 			>
 				<p class="font-bold text-content">The hall is empty right now.</p>
-				<p class="text-sm text-content-muted">
-					Create a seek above — your table will be waiting here.
-				</p>
+				<p class="text-sm text-content-muted">Open a table above — it will be waiting here.</p>
 			</div>
 		{:else}
 			<div class="board-wall">

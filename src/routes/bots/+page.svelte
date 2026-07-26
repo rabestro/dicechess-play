@@ -33,15 +33,15 @@
 </script>
 
 <svelte:head>
-	<title>Play a Bot — Dice Chess</title>
+	<title>Rated bots — Dice Chess</title>
 	<meta
 		name="description"
-		content="Pick a bot and start a timed game — configure the clock and your colour, then play."
+		content="Pick a rated bot and start a timed game — configure the clock and your color, then play."
 	/>
 </svelte:head>
 
-<!-- Container matches the lobby (its reciprocal page, reached from the lobby's "Play a bot →"
-     link); the app <main> already supplies vertical padding. -->
+<!-- Container matches the lobby (its reciprocal page, reached from the lobby's "Challenge a rated
+     bot →" link); the app <main> already supplies vertical padding. -->
 <section class="mx-auto flex max-w-4xl flex-col gap-5">
 	<div class="flex flex-col gap-2">
 		<a
@@ -51,9 +51,10 @@
 			← Back to the lobby
 		</a>
 		<div class="flex flex-col gap-1">
-			<h2 class="text-2xl font-bold text-content">Play a Bot</h2>
+			<h2 class="text-2xl font-bold text-content">Rated bots</h2>
 			<p class="text-sm text-content-muted">
-				Pick a bot below — clicking wakes it and confirms it's ready before you configure a game.
+				Pick a rated bot below — clicking wakes it and confirms it's ready before you configure a
+				game.
 			</p>
 		</div>
 	</div>

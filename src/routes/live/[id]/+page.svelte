@@ -297,7 +297,7 @@
 		href={resolve(opponentIsBot ? '/bots' : '/lobby')}
 		class="w-full rounded-xl bg-primary py-2.5 text-center font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
 	>
-		{opponentIsBot ? 'Play another bot →' : 'New game →'}
+		{opponentIsBot ? 'Play another bot →' : 'Find another game →'}
 	</a>
 	<a
 		href={resolve('/lobby')}
@@ -521,7 +521,7 @@
 						href={resolve(opponentIsBot ? '/bots' : '/lobby')}
 						class="w-full rounded-xl bg-primary py-2.5 text-center font-bold text-primary-content shadow-md transition-colors hover:bg-primary-hover"
 					>
-						{opponentIsBot ? 'Play another bot →' : 'New game →'}
+						{opponentIsBot ? 'Play another bot →' : 'Find another game →'}
 					</a>
 					<a
 						href={resolve('/lobby')}

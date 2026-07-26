@@ -272,7 +272,7 @@
 
 {#if inLobby}
 	<section class="max-w-md mx-auto flex flex-col gap-6">
-		<h2 class="text-2xl font-bold text-content">New game</h2>
+		<h2 class="text-2xl font-bold text-content">Practice game</h2>
 
 		<div class="flex flex-col gap-2">
 			<span class="text-sm font-bold text-content-muted">Opponent</span>

@@ -94,7 +94,7 @@
 			aria-pressed={filters.source === 'lobby'}
 			class={pillClass(filters.source === 'lobby')}
 		>
-			In the lobby
+			Online
 		</button>
 	</div>
 

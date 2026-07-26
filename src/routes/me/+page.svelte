@@ -121,7 +121,7 @@
 		</div>
 	{/if}
 
-	<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">In the lobby</h3>
+	<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Online</h3>
 
 	{#if !isLiveEnabled()}
 		<div class="rounded-2xl border border-border bg-surface p-6 text-center text-content-muted">

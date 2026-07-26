@@ -135,9 +135,7 @@
 <section class="flex flex-col gap-6">
 	<div class="flex flex-col gap-1">
 		<h2 class="text-2xl font-bold text-content">Your games</h2>
-		<p class="text-sm text-content-muted">
-			Every game you've played — on this device and in the lobby.
-		</p>
+		<p class="text-sm text-content-muted">Every game you've played — on this device and online.</p>
 	</div>
 
 	<GamesFilterBar {filters} {options} onChange={updateFilters} />

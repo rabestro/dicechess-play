@@ -1,30 +1,31 @@
 <script lang="ts">
-	// Landing page — three ways to play, straight to the point.
+	// Landing page — the first decision is always "who do I play?"; everything else
+	// (level, rating, time control) is a detail on the next screen.
 	import { resolve } from '$app/paths';
 
 	const ways = [
 		{
 			path: '/play',
-			title: 'Play a bot',
-			sub: '5 levels, instant',
+			title: 'Play the computer',
+			sub: 'Practice levels, instant — works even offline.',
 			icon: 'bot',
 		},
 		{
-			path: '/live',
-			title: 'Play a friend',
-			sub: 'share a link',
-			icon: 'link',
+			path: '/bots',
+			title: 'Challenge a rated bot',
+			sub: 'Community engines with ratings — they actually think.',
+			icon: 'rated',
 		},
 		{
 			path: '/lobby',
-			title: 'Open lobby',
-			sub: 'humans & online bots',
+			title: 'Play a human',
+			sub: 'Join an open table in the lobby.',
 			icon: 'users',
 		},
 	] as const;
 </script>
 
-{#snippet wayIcon(icon: 'bot' | 'link' | 'users')}
+{#snippet wayIcon(icon: 'bot' | 'rated' | 'users')}
 	<svg
 		viewBox="0 0 24 24"
 		class="h-6 w-6"
@@ -49,9 +50,10 @@
 				fill="currentColor"
 				stroke="none"
 			/>
-		{:else if icon === 'link'}
-			<path d="M9.5 14.5l5-5" /><path d="M8 12l-1.6 1.6a3.4 3.4 0 0 0 4.8 4.8L13 16.5" /><path
-				d="M16 12l1.6-1.6a3.4 3.4 0 0 0-4.8-4.8L11 7.5"
+		{:else if icon === 'rated'}
+			<path
+				d="M12 3.5l2.5 5.4 5.8.6-4.4 4 1.3 5.8L12 16.6l-5.2 2.7 1.3-5.8-4.4-4 5.8-.6L12 3.5Z"
+				stroke-linejoin="round"
 			/>
 		{:else}
 			<circle cx="9" cy="8" r="3" /><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /><path
@@ -92,6 +94,27 @@
 				</span>
 			</a>
 		{/each}
+	</div>
+
+	<div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+		<a
+			href={resolve('/live')}
+			class="font-semibold text-content-muted transition-colors hover:text-content"
+		>
+			Invite a friend by link →
+		</a>
+		<a
+			href={resolve('/lobby')}
+			class="font-semibold text-content-muted transition-colors hover:text-content"
+		>
+			Watch live games →
+		</a>
+		<a
+			href={resolve('/leaderboard')}
+			class="font-semibold text-content-muted transition-colors hover:text-content"
+		>
+			Bot leaderboard →
+		</a>
 	</div>
 
 	<p class="max-w-md text-center text-xs text-content-muted/70">
