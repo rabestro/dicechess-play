@@ -28,7 +28,13 @@ export interface HistoryPage {
 export function liveBoundary(live: PlayerGame[], hasMore: boolean): number | null {
 	if (!hasMore) return null;
 	if (live.length === 0) return Infinity;
-	return Math.min(...live.map((game) => sortTimestamp({ source: 'live', game })));
+	// A reduce, not Math.min(...live.map(...)): spreading into a variadic call scales the same
+	// scan with a real (if distant) call-stack ceiling for no benefit — this keeps the identical
+	// don't-trust-the-server-order guarantee at the same O(N) cost, just without that ceiling.
+	return live.reduce(
+		(min, game) => Math.min(min, sortTimestamp({ source: 'live', game })),
+		Infinity,
+	);
 }
 
 /** Slices an already-merged, newest-first history down to what's both safe to order and within

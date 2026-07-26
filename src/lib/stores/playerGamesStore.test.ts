@@ -188,6 +188,23 @@ describe('playerGamesStore', () => {
 			);
 		});
 
+		it('a failed loadMore keeps the fetched games, flags an error, and leaves hasMore for a retry', async () => {
+			vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+			vi.stubGlobal(
+				'fetch',
+				okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')], hasMore: true }),
+			);
+			await playerGamesStore.load();
+
+			vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
+			await playerGamesStore.loadMore();
+
+			expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['g-1']);
+			expect(playerGamesStore.hasMore).toBe(true);
+			expect(playerGamesStore.loading).toBe(false);
+			expect(playerGamesStore.error).not.toBeNull();
+		});
+
 		it('is a no-op when hasMore is false', async () => {
 			vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
 			vi.stubGlobal(
