@@ -142,6 +142,33 @@ describe('paginateGameHistory', () => {
 		expect(page.needsFetch).toBe(false);
 	});
 
+	it("a transient fetch failure releases the boundary but keeps 'Show more' offering a retry (canFetchMore independent of hasMore)", () => {
+		const local = [
+			localGame('newer-local', '2026-07-16T00:00:00Z'),
+			localGame('older-local', '2026-07-10T00:00:00Z'),
+		];
+		const live = [liveGame('v-1', '2026-07-14T00:00:00Z')];
+		const merged = mergeGameHistory(local, live);
+
+		// hasMore: false releases the boundary (as above); canFetchMore: true says the server
+		// genuinely still has more, so the page must not also hide the retry affordance.
+		const page = paginateGameHistory(merged, live, false, 24, true);
+
+		expect(ids(page.visible)).toEqual(['newer-local', 'v-1', 'older-local']); // boundary released
+		expect(page.canShowMore).toBe(true); // NOT hidden — the guest can retry
+		expect(page.needsFetch).toBe(true); // clicking it calls loadMore() again
+	});
+
+	it('canFetchMore defaults to hasMore when omitted (the happy-path shape existing callers use)', () => {
+		const live = [liveGame('v-1', '2026-07-16T00:00:00Z')];
+		const merged = mergeGameHistory([], live);
+
+		const page = paginateGameHistory(merged, live, true, 24);
+
+		expect(page.canShowMore).toBe(true);
+		expect(page.needsFetch).toBe(true);
+	});
+
 	it('needsFetch is true when hasMore is true and every already-fetched item is already shown', () => {
 		const live = [liveGame('v-1', '2026-07-16T00:00:00Z'), liveGame('v-2', '2026-07-15T00:00:00Z')];
 		const merged = mergeGameHistory([], live);

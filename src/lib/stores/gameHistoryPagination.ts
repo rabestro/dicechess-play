@@ -34,12 +34,19 @@ export function liveBoundary(live: PlayerGame[], hasMore: boolean): number | nul
 /** Slices an already-merged, newest-first history down to what's both safe to order and within
  * the current render cap. `live`/`hasMore` are the same live half already folded into `merged` —
  * passed separately only because the boundary is a property of the live fetch, not of the merge.
+ *
+ * `hasMore` and `canFetchMore` are deliberately separate: a transient fetch failure should release
+ * the boundary (`hasMore: false` — nothing should stay stuck behind a boundary that can't resolve
+ * further), but the page must still offer a retry rather than silently hiding "Show more" — the
+ * server may genuinely have more once the guest tries again. Defaults to `hasMore` for callers with
+ * nothing to retry (e.g. tests) or the happy path, where the two coincide anyway.
  */
 export function paginateGameHistory(
 	merged: GameHistoryItem[],
 	live: PlayerGame[],
 	hasMore: boolean,
 	renderCap: number,
+	canFetchMore: boolean = hasMore,
 ): HistoryPage {
 	const boundary = liveBoundary(live, hasMore);
 	const safe =
@@ -50,7 +57,7 @@ export function paginateGameHistory(
 	const moreAlreadySafe = safe.length > visible.length;
 	return {
 		visible,
-		canShowMore: moreAlreadySafe || hasMore,
-		needsFetch: !moreAlreadySafe && hasMore,
+		canShowMore: moreAlreadySafe || canFetchMore,
+		needsFetch: !moreAlreadySafe && canFetchMore,
 	};
 }

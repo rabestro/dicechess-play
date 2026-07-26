@@ -88,15 +88,15 @@
 	const filteredLocal = $derived(filterLocalGames(localGamesStore.games, filters));
 	const showLive = $derived(liveGamesVisible(filters));
 	const effectiveLive = $derived(showLive ? playerGamesStore.games : []);
-	// A live fetch failure is treated the same as "nothing more is coming" for boundary purposes
-	// (see gameHistoryPagination.ts): a boundary that can never resolve further must not leave
-	// local games permanently held back.
-	const effectiveHasMore = $derived(
-		showLive && !playerGamesStore.error && playerGamesStore.hasMore,
-	);
+	// A live fetch failure releases the boundary (see gameHistoryPagination.ts: nothing should stay
+	// stuck behind a boundary that can never resolve further) but must NOT also hide "Show more" —
+	// the server may genuinely still have more once the guest retries, and canFetchMore (below,
+	// ungated by error) is what keeps that retry path alive instead of forcing a full page reload.
+	const boundaryHasMore = $derived(showLive && !playerGamesStore.error && playerGamesStore.hasMore);
+	const canFetchMore = $derived(showLive && playerGamesStore.hasMore);
 	const history = $derived(mergeGameHistory(filteredLocal, effectiveLive));
 	const paginated = $derived(
-		paginateGameHistory(history, effectiveLive, effectiveHasMore, renderCap),
+		paginateGameHistory(history, effectiveLive, boundaryHasMore, renderCap, canFetchMore),
 	);
 
 	function showMore(): void {
