@@ -9,6 +9,7 @@ import {
 	aggregatePlayerGames,
 	localOpponentOptions,
 	opponentOptions,
+	computeHeadToHead,
 	type GamesFilters,
 } from './gamesFilters';
 import type { LocalGameRecord } from '$lib/localGamesDB';
@@ -77,12 +78,19 @@ describe('parseVsParam', () => {
 		expect(parseVsParam('human')).toEqual({ kind: 'human' });
 	});
 
-	it("parses 'local/<algorithm>'", () => {
-		expect(parseVsParam('local/greedy')).toEqual({ kind: 'local', algorithm: 'greedy' });
+	it("parses 'local:<algorithm>'", () => {
+		expect(parseVsParam('local:greedy')).toEqual({ kind: 'local', algorithm: 'greedy' });
 	});
 
-	it("rejects 'local/' with an empty algorithm", () => {
-		expect(parseVsParam('local/')).toBeNull();
+	it("rejects 'local:' with an empty algorithm", () => {
+		expect(parseVsParam('local:')).toBeNull();
+	});
+
+	it("a real team literally named 'local' still parses as a bot filter, not the local namespace", () => {
+		// The whole reason the marker is `local:`, not `local/`: play-api team names are
+		// self-service and open (only `anon`/`house` are reserved), so `team=local` is legal.
+		// A <team>/<botName> pair always contains a slash; `local:<algorithm>` never does.
+		expect(parseVsParam('local/greedy')).toEqual({ kind: 'bot', team: 'local', botName: 'greedy' });
 	});
 
 	it("parses '<team>/<name>' as a bot filter", () => {
@@ -153,7 +161,7 @@ describe('parseGamesFilters', () => {
 	});
 
 	it('parses a local vs value', () => {
-		const url = new URL('http://localhost/games?vs=local%2Fgreedy');
+		const url = new URL('http://localhost/games?vs=local%3Agreedy');
 		expect(parseGamesFilters(url).vs).toEqual({ kind: 'local', algorithm: 'greedy' });
 	});
 });
@@ -284,5 +292,76 @@ describe('opponentOptions', () => {
 			{ vs: { kind: 'bot', team: 'acme', botName: 'alice' }, label: 'acme alice' },
 			{ vs: { kind: 'human' }, label: 'Anonymous players' },
 		]);
+	});
+});
+
+describe('computeHeadToHead', () => {
+	it('is null when no vs filter is active', () => {
+		expect(computeHeadToHead(null, [], [], [], true)).toBeNull();
+	});
+
+	it('local: the true overall record against the bot, unaffected by a result filter narrowing filterLocalGames elsewhere', () => {
+		// The exact bug both reviewers found on this PR: the summary must not become "record while
+		// winning" just because the visitor also filtered the list below by result.
+		const games = [
+			localGame({ id: 'a', bot_id: 'bot:greedy', player_color: 'WHITE', result: 1 }),
+			localGame({ id: 'b', bot_id: 'bot:greedy', player_color: 'WHITE', result: -1 }),
+			localGame({ id: 'c', bot_id: 'bot:greedy', player_color: 'WHITE', result: 0 }),
+			localGame({ id: 'd', bot_id: 'bot:random', player_color: 'WHITE', result: 1 }),
+		];
+		const vs = { kind: 'local' as const, algorithm: 'greedy' };
+
+		const result = computeHeadToHead(vs, games, [], [], true);
+
+		expect(result).toEqual({
+			label: 'Greedy',
+			isBot: true,
+			counts: { wins: 1, draws: 1, losses: 1 },
+		});
+	});
+
+	it('bot: prefers the exact opponents-summary total over the fetched (possibly page-capped) list', () => {
+		const vs = { kind: 'bot' as const, team: 'acme', botName: 'alice' };
+		const opponents = [bot('acme', 'alice', { wins: 12, draws: 3, losses: 5 })];
+		const liveGames = [liveGame({ result: 'win' })]; // a lone fetched page — must NOT be summed
+
+		const result = computeHeadToHead(vs, [], opponents, liveGames, true);
+
+		expect(result).toEqual({
+			label: 'acme alice',
+			isBot: true,
+			counts: { wins: 12, draws: 3, losses: 5 },
+		});
+	});
+
+	it('human: labels the collapsed bucket and is never a bot', () => {
+		const result = computeHeadToHead({ kind: 'human' }, [], [human], [], true);
+		expect(result).toEqual({
+			label: 'Anonymous players',
+			isBot: false,
+			counts: { wins: human.wins, draws: human.draws, losses: human.losses },
+		});
+	});
+
+	it('falls back to summing the fetched live list when the opponent has no matching summary row yet', () => {
+		const vs = { kind: 'bot' as const, team: 'acme', botName: 'alice' };
+		const liveGames = [liveGame({ result: 'win' }), liveGame({ result: 'loss' })];
+
+		const result = computeHeadToHead(vs, [], [], liveGames, true);
+
+		expect(result).toEqual({
+			label: 'acme alice',
+			isBot: true,
+			counts: { wins: 1, draws: 0, losses: 1 },
+		});
+	});
+
+	it('the fallback never sums live games while they are hidden (liveVisible: false)', () => {
+		const vs = { kind: 'bot' as const, team: 'acme', botName: 'alice' };
+		const liveGames = [liveGame({ result: 'win' })];
+
+		const result = computeHeadToHead(vs, [], [], liveGames, false);
+
+		expect(result?.counts).toEqual({ wins: 0, draws: 0, losses: 0 });
 	});
 });

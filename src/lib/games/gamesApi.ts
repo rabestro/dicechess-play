@@ -30,7 +30,7 @@ interface PlayerGamesResponse {
 export interface PlayerGamesFilters {
 	/** `'human'` or `'<team>/<botName>'` — play-api's `OpponentFilter` wire values (#151/#173). Use
 	 * `serverVsParam` (`$lib/games/gamesFilters`) to derive this from a parsed `VsFilter`; never
-	 * pass a `'local/...'` value here — the server has no such namespace and 400s it.
+	 * pass a `'local:...'` value here — the server has no such namespace and 400s it.
 	 */
 	vs?: string;
 	result?: 'win' | 'draw' | 'loss';

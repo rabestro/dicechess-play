@@ -2,18 +2,23 @@ import type { LocalGameRecord } from '$lib/localGamesDB';
 import type { PlayerGame, PlayerOpponent } from './gamesApi';
 import { botAlgorithm, botLabel } from '$lib/bots';
 import { playerOutcome } from '$lib/gameOutcome';
-import { opponentVsQuery, opponentLabel } from '$lib/stats/lobbyRecord';
-import { emptyCounts, type OutcomeCounts } from '$lib/stats/playerRecord';
+import { opponentVsQuery, opponentLabel, findOpponentByVs } from '$lib/stats/lobbyRecord';
+import { buildPlayerRecord, emptyCounts, type OutcomeCounts } from '$lib/stats/playerRecord';
 
 /**
  * `?vs=`/`?result=`/`?source=` filter state for `/games` (#151) — the query string is the source
  * of truth (shareable, back-button friendly), parsed here and nowhere else.
  *
- * `vs` spans two namespaces the server doesn't know about: a `local/<algorithm>` on-device engine
+ * `vs` spans two namespaces the server doesn't know about: a `local:<algorithm>` on-device engine
  * bot (this repo's own concept, filtered client-side against `LocalGameRecord.bot_id`), versus a
  * lobby `<team>/<botName>` bot or the collapsed `human` bucket (play-api's `OpponentFilter`,
  * forwarded to the server as-is — see `serverVsParam`). The two are mutually exclusive: selecting
  * one always narrows the list to exactly one source, never both.
+ *
+ * The local marker uses `:`, not `/`, deliberately: play-api team names are open, self-service
+ * (`POST /bot/register`, `ReservedTeams` is only `anon`/`house`), so a real team could legally be
+ * named `local`. A `<team>/<botName>` pair always requires a `/`; `local:<algorithm>` never
+ * contains one, so it can never be mistaken for one, regardless of what any team is ever named.
  *
  * Parsing is lenient by design: an unrecognised value for any param resolves to "no filter"
  * rather than an error — unlike the server, which 400s a malformed `vs`/`result`, a bad or stale
@@ -38,8 +43,8 @@ const SOURCES: readonly SourceFilter[] = ['device', 'lobby'];
 
 export function parseVsParam(raw: string): VsFilter | null {
 	if (raw === 'human') return { kind: 'human' };
-	if (raw.startsWith('local/')) {
-		const algorithm = raw.slice('local/'.length);
+	if (raw.startsWith('local:')) {
+		const algorithm = raw.slice('local:'.length);
 		return algorithm ? { kind: 'local', algorithm } : null;
 	}
 	const slash = raw.indexOf('/');
@@ -55,7 +60,7 @@ export function vsParamValue(vs: VsFilter): string {
 		case 'bot':
 			return `${vs.team}/${vs.botName}`;
 		case 'local':
-			return `local/${vs.algorithm}`;
+			return `local:${vs.algorithm}`;
 	}
 }
 
@@ -126,7 +131,7 @@ export interface OpponentOption {
 }
 
 /** Every algorithm actually present in the visitor's on-device history, each labelled and keyed
- * for a `local/<algorithm>` option — never the full bot catalog, so the search never offers a bot
+ * for a `local:<algorithm>` option — never the full bot catalog, so the search never offers a bot
  * this guest hasn't actually played (an always-empty result).
  */
 export function localOpponentOptions(games: LocalGameRecord[]): OpponentOption[] {
@@ -156,4 +161,50 @@ export function opponentOptions(
 		})
 		.filter((option): option is OpponentOption => option !== null);
 	return [...localOpponentOptions(localGames), ...lobby];
+}
+
+export interface HeadToHead {
+	label: string;
+	isBot: boolean;
+	counts: OutcomeCounts;
+}
+
+/** The head-to-head summary for `/games` when `?vs=` is active — `null` otherwise. Totals are
+ * always the true overall record against that opponent, deliberately ignoring `result`/`source`:
+ * those narrow which games the *list below* renders, but the summary card above it must not
+ * quietly become "record while winning" the moment a guest also filters by result.
+ *
+ * Prefers the opponents-summary endpoint (#174, exact even once the games list itself is
+ * paginated) or the on-device record for `local:<algorithm>`, falling back to summing the
+ * fetched (possibly page-capped) live list only if neither is available yet.
+ */
+export function computeHeadToHead(
+	vs: VsFilter | null,
+	localGames: LocalGameRecord[],
+	opponents: PlayerOpponent[],
+	liveGames: PlayerGame[],
+	liveVisible: boolean,
+): HeadToHead | null {
+	if (!vs) return null;
+	if (vs.kind === 'local') {
+		const matchupGames = filterLocalGames(localGames, { vs, result: null, source: null });
+		return {
+			label: botLabel(`bot:${vs.algorithm}`),
+			isBot: true,
+			counts: buildPlayerRecord(matchupGames).overall,
+		};
+	}
+	const summary = findOpponentByVs(opponents, vsParamValue(vs));
+	if (summary) {
+		return {
+			label: summary.opponent.name ?? 'Anonymous players',
+			isBot: summary.opponent.kind === 'Bot',
+			counts: { wins: summary.wins, draws: summary.draws, losses: summary.losses },
+		};
+	}
+	return {
+		label: vs.kind === 'bot' ? `${vs.team} ${vs.botName}` : 'Anonymous players',
+		isBot: vs.kind === 'bot',
+		counts: aggregatePlayerGames(liveVisible ? liveGames : []),
+	};
 }

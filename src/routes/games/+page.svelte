@@ -13,13 +13,10 @@
 		filterLocalGames,
 		liveGamesVisible,
 		opponentOptions,
-		aggregatePlayerGames,
+		computeHeadToHead,
 		vsParamValue,
 		type GamesFilters,
 	} from '$lib/games/gamesFilters';
-	import { buildPlayerRecord } from '$lib/stats/playerRecord';
-	import { findOpponentByVs } from '$lib/stats/lobbyRecord';
-	import { botLabel } from '$lib/bots';
 	import GameHistoryCard from '../../components/GameHistoryCard.svelte';
 	import LiveGameHistoryCard from '../../components/LiveGameHistoryCard.svelte';
 	import GamesFilterBar from '../../components/GamesFilterBar.svelte';
@@ -80,34 +77,18 @@
 
 	const options = $derived(opponentOptions(localGamesStore.games, playerOpponentsStore.opponents));
 
-	// The head-to-head summary shown above the list when `vs=` is active. Totals prefer the
-	// opponents-summary endpoint (#174, exact even once the games list itself is paginated) or the
-	// local record for a `local/<algorithm>` filter; falling back to summing the already-fetched
-	// (possibly page-capped) live list only if neither is available yet.
-	const headToHead = $derived.by(() => {
-		const vs = filters.vs;
-		if (!vs) return null;
-		if (vs.kind === 'local') {
-			return {
-				label: botLabel(`bot:${vs.algorithm}`),
-				isBot: true,
-				counts: buildPlayerRecord(filteredLocal).overall,
-			};
-		}
-		const summary = findOpponentByVs(playerOpponentsStore.opponents, vsParamValue(vs));
-		if (summary) {
-			return {
-				label: summary.opponent.name ?? 'Anonymous players',
-				isBot: summary.opponent.kind === 'Bot',
-				counts: { wins: summary.wins, draws: summary.draws, losses: summary.losses },
-			};
-		}
-		return {
-			label: vs.kind === 'bot' ? `${vs.team} ${vs.botName}` : 'Anonymous players',
-			isBot: vs.kind === 'bot',
-			counts: aggregatePlayerGames(showLive ? playerGamesStore.games : []),
-		};
-	});
+	// The head-to-head summary shown above the list when `vs=` is active — always the true overall
+	// record against that opponent, deliberately unaffected by result/source (see
+	// computeHeadToHead's own doc comment for why).
+	const headToHead = $derived(
+		computeHeadToHead(
+			filters.vs,
+			localGamesStore.games,
+			playerOpponentsStore.opponents,
+			playerGamesStore.games,
+			showLive,
+		),
+	);
 </script>
 
 <section class="flex flex-col gap-6">

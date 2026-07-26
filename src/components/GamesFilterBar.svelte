@@ -75,6 +75,7 @@
 		<button
 			type="button"
 			onclick={() => setSource(null)}
+			aria-pressed={filters.source === null}
 			class={pillClass(filters.source === null)}
 		>
 			All
@@ -82,6 +83,7 @@
 		<button
 			type="button"
 			onclick={() => setSource('device')}
+			aria-pressed={filters.source === 'device'}
 			class={pillClass(filters.source === 'device')}
 		>
 			On this device
@@ -89,6 +91,7 @@
 		<button
 			type="button"
 			onclick={() => setSource('lobby')}
+			aria-pressed={filters.source === 'lobby'}
 			class={pillClass(filters.source === 'lobby')}
 		>
 			In the lobby
@@ -100,6 +103,7 @@
 		<button
 			type="button"
 			onclick={() => setResult(null)}
+			aria-pressed={filters.result === null}
 			class={pillClass(filters.result === null)}
 		>
 			All
@@ -107,6 +111,7 @@
 		<button
 			type="button"
 			onclick={() => setResult('win')}
+			aria-pressed={filters.result === 'win'}
 			class={pillClass(filters.result === 'win')}
 		>
 			Won
@@ -114,6 +119,7 @@
 		<button
 			type="button"
 			onclick={() => setResult('draw')}
+			aria-pressed={filters.result === 'draw'}
 			class={pillClass(filters.result === 'draw')}
 		>
 			Drawn
@@ -121,6 +127,7 @@
 		<button
 			type="button"
 			onclick={() => setResult('loss')}
+			aria-pressed={filters.result === 'loss'}
 			class={pillClass(filters.result === 'loss')}
 		>
 			Lost
@@ -128,7 +135,12 @@
 	</div>
 
 	<div class="flex flex-wrap items-center gap-2">
-		<span class="text-xs font-bold uppercase tracking-wider text-content-muted">Opponent</span>
+		<label
+			for="games-opponent-search"
+			class="text-xs font-bold uppercase tracking-wider text-content-muted"
+		>
+			Opponent
+		</label>
 		{#if filters.vs}
 			<span
 				class="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-sm font-bold text-primary"
@@ -145,6 +157,7 @@
 			</span>
 		{:else}
 			<input
+				id="games-opponent-search"
 				list="games-opponent-options"
 				bind:value={searchText}
 				onchange={selectOpponent}
