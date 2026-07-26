@@ -2,15 +2,14 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { localGamesStore } from '$lib/stores/localGamesStore.svelte';
+	import { playerOpponentsStore } from '$lib/stores/playerOpponentsStore.svelte';
 	import { getGuestId, setGuestId, resetGuestId } from '$lib/ingest/guestIdentity';
+	import { isLiveEnabled } from '$lib/live/liveApi';
 	import { toastStore } from '$lib/toastStore.svelte';
-	import {
-		buildPlayerRecord,
-		totalGames,
-		winRate,
-		outcomeShares,
-		type OutcomeCounts,
-	} from '$lib/stats/playerRecord';
+	import { buildPlayerRecord, totalGames, winRate } from '$lib/stats/playerRecord';
+	import { aggregateOpponents, opponentLabel, opponentVsQuery } from '$lib/stats/lobbyRecord';
+	import WdlBar from '../../components/WdlBar.svelte';
+	import WdlCounts from '../../components/WdlCounts.svelte';
 
 	let guestId = $state('');
 	let restoreInput = $state('');
@@ -27,10 +26,14 @@
 	onMount(() => {
 		guestId = getGuestId();
 		void localGamesStore.load();
+		void playerOpponentsStore.load();
 	});
 
 	const record = $derived(buildPlayerRecord(localGamesStore.games));
 	const overallTotal = $derived(totalGames(record.overall));
+
+	const lobbyOverall = $derived(aggregateOpponents(playerOpponentsStore.opponents));
+	const lobbyTotal = $derived(totalGames(lobbyOverall));
 
 	async function copyCode() {
 		try {
@@ -59,28 +62,13 @@
 	}
 </script>
 
-{#snippet wdlBar(c: OutcomeCounts)}
-	{@const shares = outcomeShares(c)}
-	<div class="flex h-2 w-full overflow-hidden rounded-full bg-surface" aria-hidden="true">
-		<div class="bg-primary" style="width: {shares.win * 100}%"></div>
-		<div class="bg-content-muted/40" style="width: {shares.draw * 100}%"></div>
-		<div class="bg-danger" style="width: {shares.loss * 100}%"></div>
-	</div>
-{/snippet}
-
-{#snippet counts(c: OutcomeCounts)}
-	<span class="font-mono text-sm text-content-muted whitespace-nowrap">
-		<span class="text-primary font-bold">{c.wins}W</span>
-		· {c.draws}D ·
-		<span class="text-danger font-bold">{c.losses}L</span>
-	</span>
-{/snippet}
-
 <section class="flex flex-col gap-8">
 	<div class="flex flex-col gap-1">
 		<h2 class="text-2xl font-bold text-content">Your profile</h2>
-		<p class="text-sm text-content-muted">Your record against the bots on this device.</p>
+		<p class="text-sm text-content-muted">Your record against bots and lobby opponents.</p>
 	</div>
+
+	<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">On this device</h3>
 
 	{#if !localGamesStore.loaded && !localGamesStore.error}
 		<div class="h-32 rounded-2xl bg-surface/40 border border-border animate-pulse"></div>
@@ -111,11 +99,11 @@
 					>
 				</div>
 				<div class="flex flex-col items-end gap-1">
-					{@render counts(record.overall)}
+					<WdlCounts counts={record.overall} />
 					<span class="text-xs text-content-muted">{overallTotal} games</span>
 				</div>
 			</div>
-			{@render wdlBar(record.overall)}
+			<WdlBar counts={record.overall} />
 		</div>
 
 		<div class="flex flex-col gap-2">
@@ -125,16 +113,95 @@
 					<div class="flex items-center justify-between gap-3">
 						<span class="font-bold text-content truncate min-w-0">{bot.label}</span>
 						<div class="flex items-center gap-3 shrink-0">
-							{@render counts(bot)}
+							<WdlCounts counts={bot} />
 							<span class="font-mono text-sm font-bold text-content tabular-nums w-12 text-right">
 								{Math.round(winRate(bot) * 100)}%
 							</span>
 						</div>
 					</div>
-					{@render wdlBar(bot)}
+					<WdlBar counts={bot} />
 				</div>
 			{/each}
 		</div>
+	{/if}
+
+	<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">In the lobby</h3>
+
+	{#if !isLiveEnabled()}
+		<div class="rounded-2xl border border-border bg-surface p-6 text-center text-content-muted">
+			Lobby games need a configured play server (<code class="font-mono text-xs"
+				>VITE_PLAY_API_URL</code
+			>) — not available in this build.
+		</div>
+	{:else}
+		{#if playerOpponentsStore.error}
+			<div
+				class="rounded-xl border border-danger/30 bg-danger/10 p-3 text-center text-xs text-danger"
+			>
+				{playerOpponentsStore.error}
+			</div>
+		{/if}
+
+		{#if !playerOpponentsStore.loaded && !playerOpponentsStore.error}
+			<div class="h-32 rounded-2xl bg-surface/40 border border-border animate-pulse"></div>
+		{:else if playerOpponentsStore.error}
+			<!-- The error banner above already says everything — a failed fetch must never also claim
+			     "you haven't played any lobby games", which could be flatly false for this guest. -->
+		{:else if lobbyTotal === 0}
+			<div
+				class="rounded-2xl border border-border bg-surface/40 p-6 flex flex-col items-center gap-3 text-center"
+			>
+				<p class="text-content-muted">You haven't played any lobby games yet.</p>
+				<a
+					href={resolve('/lobby')}
+					class="px-5 py-2.5 rounded-xl bg-primary text-primary-content font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors"
+				>
+					Visit the lobby →
+				</a>
+			</div>
+		{:else}
+			<div class="rounded-2xl border border-border bg-surface/60 p-6 flex flex-col gap-4">
+				<div class="flex items-end justify-between gap-4">
+					<div class="flex flex-col">
+						<span class="text-4xl font-black text-content tabular-nums">
+							{Math.round(winRate(lobbyOverall) * 100)}%
+						</span>
+						<span class="text-xs font-bold uppercase tracking-wider text-content-muted"
+							>win rate</span
+						>
+					</div>
+					<div class="flex flex-col items-end gap-1">
+						<WdlCounts counts={lobbyOverall} />
+						<span class="text-xs text-content-muted">{lobbyTotal} games</span>
+					</div>
+				</div>
+				<WdlBar counts={lobbyOverall} />
+			</div>
+
+			<div class="flex flex-col gap-2">
+				<h4 class="text-sm font-bold uppercase tracking-wider text-content-muted">By opponent</h4>
+				{#each playerOpponentsStore.opponents as opp (opponentVsQuery(opp))}
+					<!-- Built with resolve('/games') below; the rule can't trace it through a template
+					     literal (it also carries a ?vs=… query that resolve() can't express). -->
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a
+						href={`${resolve('/games')}?vs=${encodeURIComponent(opponentVsQuery(opp))}`}
+						class="rounded-xl border border-border bg-surface/40 hover:bg-surface-hover/60 hover:border-primary/50 p-4 flex flex-col gap-2 transition-colors"
+					>
+						<div class="flex items-center justify-between gap-3">
+							<span class="font-bold text-content truncate min-w-0">{opponentLabel(opp)}</span>
+							<div class="flex items-center gap-3 shrink-0">
+								<WdlCounts counts={opp} />
+								<span class="font-mono text-sm font-bold text-content tabular-nums w-12 text-right">
+									{Math.round(winRate(opp) * 100)}%
+								</span>
+							</div>
+						</div>
+						<WdlBar counts={opp} />
+					</a>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 
 	<div class="flex flex-col gap-3">
