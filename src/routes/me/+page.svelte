@@ -125,7 +125,7 @@
 
 	{#if !isLiveEnabled()}
 		<div class="rounded-2xl border border-border bg-surface p-6 text-center text-content-muted">
-			Lobby games need a configured play server (<code class="font-mono text-xs"
+			Online games need a configured play server (<code class="font-mono text-xs"
 				>VITE_PLAY_API_URL</code
 			>) — not available in this build.
 		</div>
