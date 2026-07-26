@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { getGuestUuid } from '$lib/ingest/guestIdentity';
 	import { type CatalogBot, PlayBotError, playBot, wakeBot } from '$lib/catalog/catalogApi';
 	import { buildJoinUrl } from '$lib/live/seatLink';
@@ -68,7 +69,13 @@
 <div class="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
 	<div class="flex flex-col gap-1">
 		<span class="flex min-w-0 items-center gap-1.5">
-			<b class="truncate font-semibold text-content">{bot.team} {bot.name}</b>
+			<a
+				href={resolve('/bots/[team]/[name]', { team: bot.team, name: bot.name })}
+				class="truncate font-semibold text-content hover:text-primary hover:underline"
+			>
+				{bot.team}
+				{bot.name}
+			</a>
 			<BotBadge />
 		</span>
 		<span class="font-mono text-xs tabular-nums text-content-muted">
