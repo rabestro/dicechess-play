@@ -161,7 +161,9 @@
 				/* ignore */
 			}
 		} finally {
-			accepting = false;
+			// finally always runs, even after the `if (destroyed) return;` above — don't let it write
+			// state on an unmounted component either.
+			if (!destroyed) accepting = false;
 		}
 	}
 </script>

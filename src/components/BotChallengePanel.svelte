@@ -36,8 +36,10 @@
 		error = null;
 		try {
 			const result = await wakeBot(team, name);
+			if (destroyed) return;
 			phase = result.alive ? 'ready' : 'dead';
 		} catch {
+			if (destroyed) return;
 			phase = 'dead';
 		}
 	}
