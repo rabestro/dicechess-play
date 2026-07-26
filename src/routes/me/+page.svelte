@@ -8,8 +8,10 @@
 	import { toastStore } from '$lib/toastStore.svelte';
 	import { buildPlayerRecord, totalGames, winRate } from '$lib/stats/playerRecord';
 	import { aggregateOpponents, opponentLabel, opponentVsQuery } from '$lib/stats/lobbyRecord';
+	import { vsParamValue } from '$lib/games/gamesFilters';
 	import WdlBar from '../../components/WdlBar.svelte';
 	import WdlCounts from '../../components/WdlCounts.svelte';
+	import WdlSummaryCard from '../../components/WdlSummaryCard.svelte';
 
 	let guestId = $state('');
 	let restoreInput = $state('');
@@ -93,27 +95,17 @@
 			</a>
 		</div>
 	{:else}
-		<div class="rounded-2xl border border-border bg-surface/60 p-6 flex flex-col gap-4">
-			<div class="flex items-end justify-between gap-4">
-				<div class="flex flex-col">
-					<span class="text-4xl font-black text-content tabular-nums">
-						{Math.round(winRate(record.overall) * 100)}%
-					</span>
-					<span class="text-xs font-bold uppercase tracking-wider text-content-muted">win rate</span
-					>
-				</div>
-				<div class="flex flex-col items-end gap-1">
-					<WdlCounts counts={record.overall} />
-					<span class="text-xs text-content-muted">{overallTotal} games</span>
-				</div>
-			</div>
-			<WdlBar counts={record.overall} />
-		</div>
+		<WdlSummaryCard counts={record.overall} />
 
 		<div class="flex flex-col gap-2">
 			<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">By opponent</h3>
 			{#each record.perBot as bot (bot.algorithm)}
-				<div class="rounded-xl border border-border bg-surface/40 p-4 flex flex-col gap-2">
+				<a
+					href={resolve(
+						`/games?vs=${encodeURIComponent(vsParamValue({ kind: 'local', algorithm: bot.algorithm }))}`,
+					)}
+					class="rounded-xl border border-border bg-surface/40 hover:bg-surface-hover/60 hover:border-primary/50 p-4 flex flex-col gap-2 transition-colors"
+				>
 					<div class="flex items-center justify-between gap-3">
 						<span class="font-bold text-content truncate min-w-0">{bot.label}</span>
 						<div class="flex items-center gap-3 shrink-0">
@@ -124,7 +116,7 @@
 						</div>
 					</div>
 					<WdlBar counts={bot} />
-				</div>
+				</a>
 			{/each}
 		</div>
 	{/if}
@@ -164,32 +156,13 @@
 				</a>
 			</div>
 		{:else}
-			<div class="rounded-2xl border border-border bg-surface/60 p-6 flex flex-col gap-4">
-				<div class="flex items-end justify-between gap-4">
-					<div class="flex flex-col">
-						<span class="text-4xl font-black text-content tabular-nums">
-							{Math.round(winRate(lobbyOverall) * 100)}%
-						</span>
-						<span class="text-xs font-bold uppercase tracking-wider text-content-muted"
-							>win rate</span
-						>
-					</div>
-					<div class="flex flex-col items-end gap-1">
-						<WdlCounts counts={lobbyOverall} />
-						<span class="text-xs text-content-muted">{lobbyTotal} games</span>
-					</div>
-				</div>
-				<WdlBar counts={lobbyOverall} />
-			</div>
+			<WdlSummaryCard counts={lobbyOverall} />
 
 			<div class="flex flex-col gap-2">
 				<h4 class="text-sm font-bold uppercase tracking-wider text-content-muted">By opponent</h4>
 				{#each playerOpponentsStore.opponents as opp (opponentVsQuery(opp))}
-					<!-- Built with resolve('/games') below; the rule can't trace it through a template
-					     literal (it also carries a ?vs=… query that resolve() can't express). -->
-					<!-- eslint-disable svelte/no-navigation-without-resolve -->
 					<a
-						href={`${resolve('/games')}?vs=${encodeURIComponent(opponentVsQuery(opp))}`}
+						href={resolve(`/games?vs=${encodeURIComponent(opponentVsQuery(opp))}`)}
 						class="rounded-xl border border-border bg-surface/40 hover:bg-surface-hover/60 hover:border-primary/50 p-4 flex flex-col gap-2 transition-colors"
 					>
 						<div class="flex items-center justify-between gap-3">

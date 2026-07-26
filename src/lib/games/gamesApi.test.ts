@@ -47,6 +47,42 @@ describe('gamesApi', () => {
 		await expect(fetchPlayerGames('not-a-uuid')).rejects.toThrow('fetchPlayerGames failed: 400');
 	});
 
+	it('sends no query string when no filters are given', async () => {
+		const fetchMock = okJson({ games: [] });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchPlayerGames('11111111-1111-1111-1111-111111111111');
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games',
+		);
+	});
+
+	it('forwards vs and result as query params', async () => {
+		const fetchMock = okJson({ games: [] });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchPlayerGames('11111111-1111-1111-1111-111111111111', {
+			vs: 'acme/alice',
+			result: 'win',
+		});
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games?vs=acme%2Falice&result=win',
+		);
+	});
+
+	it('forwards only the filter that is given', async () => {
+		const fetchMock = okJson({ games: [] });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchPlayerGames('11111111-1111-1111-1111-111111111111', { vs: 'human' });
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games?vs=human',
+		);
+	});
+
 	it('fetchPlayerOpponents GETs the URL-encoded guest id and returns the opponents array', async () => {
 		const opponents = [
 			{

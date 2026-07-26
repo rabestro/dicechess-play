@@ -30,9 +30,21 @@ export function opponentLabel(opponent: PlayerOpponent): string {
  * building the actual `/games?vs=…` URL needs `resolve()` called directly at the template use
  * site (svelte's `no-navigation-without-resolve` lint can't see through a function call to
  * verify that), so callers combine this with `resolve('/games')` themselves; see `/me`'s usage.
- * Until #151 ships, the query param is simply ignored and the link is a plain — still useful —
- * shortcut to /games.
+ * Matches `vsParamValue` (`$lib/games/gamesFilters`) for the same opponent — kept as its own
+ * function since it takes a `PlayerOpponent` directly rather than an already-parsed `VsFilter`.
  */
 export function opponentVsQuery(opponent: PlayerOpponent): string {
 	return opponent.team && opponent.botName ? `${opponent.team}/${opponent.botName}` : 'human';
+}
+
+/** The opponents-summary row matching a `?vs=` value, if any — an exact W-D-L total for `/games`'s
+ * head-to-head header (#151), even once the games list itself is paginated (#150) and can no
+ * longer be summed directly. `undefined` when the opponents summary hasn't loaded yet, or for a
+ * bookmarked `vs=` this guest has no matching row for.
+ */
+export function findOpponentByVs(
+	opponents: PlayerOpponent[],
+	vs: string,
+): PlayerOpponent | undefined {
+	return opponents.find((opponent) => opponentVsQuery(opponent) === vs);
 }
