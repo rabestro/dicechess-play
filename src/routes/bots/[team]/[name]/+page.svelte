@@ -5,6 +5,7 @@
 	import WdlSummaryCard from '../../../../components/WdlSummaryCard.svelte';
 	import BotProfileGameCard from '../../../../components/BotProfileGameCard.svelte';
 	import BotBadge from '../../../../components/BotBadge.svelte';
+	import BotChallengePanel from '../../../../components/BotChallengePanel.svelte';
 
 	// A bot's public profile (#152 Tier 1) — "almost pure assembly": fetchBotProfile/BotProfile/
 	// ProfileRecentGame already existed with zero consumers before this route. This repo's first
@@ -91,6 +92,10 @@
 				{#if profile.provisional}<span class="italic"> · provisional</span>{/if}
 				{#if !profile.onLadder}<span class="italic"> · left ladder</span>{/if}
 			</p>
+		</div>
+
+		<div class="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+			<BotChallengePanel team={profile.team} name={profile.name} />
 		</div>
 
 		<WdlSummaryCard counts={{ wins: profile.wins, draws: profile.draws, losses: profile.losses }} />
