@@ -11,12 +11,23 @@ import { isLiveEnabled } from '$lib/live/liveApi';
  * (`VITE_PLAY_API_URL` unset) — same rule that disables `/live`. Any fetch failure degrades to
  * an honest `error` flag rather than throwing: the on-device record on `/me` must always render
  * regardless of play-api's health.
+ *
+ * Guest-scoped, unlike the on-device record: call {@link reset} before reloading whenever the
+ * guest identity changes (restore/reset on `/me`), or the previous guest's stats linger in memory
+ * until the page remounts.
  */
 class PlayerOpponentsStore {
 	opponents = $state<PlayerOpponent[]>([]);
 	loading = $state(false);
 	loaded = $state(false);
 	error = $state<string | null>(null);
+
+	reset(): void {
+		this.opponents = [];
+		this.loading = false;
+		this.loaded = false;
+		this.error = null;
+	}
 
 	async load(): Promise<void> {
 		if (this.loading || !isLiveEnabled()) return;

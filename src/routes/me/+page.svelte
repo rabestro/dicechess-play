@@ -50,6 +50,8 @@
 			guestId = getGuestId();
 			restoreInput = '';
 			toastStore.success('Player code restored.');
+			playerOpponentsStore.reset();
+			void playerOpponentsStore.load();
 		} else {
 			toastStore.error('That does not look like a valid player code.');
 		}
@@ -59,6 +61,8 @@
 		guestId = resetGuestId();
 		confirmingReset = false;
 		toastStore.info('Started a new identity.');
+		playerOpponentsStore.reset();
+		void playerOpponentsStore.load();
 	}
 </script>
 

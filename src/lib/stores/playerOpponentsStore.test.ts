@@ -85,4 +85,17 @@ describe('playerOpponentsStore', () => {
 		expect(playerOpponentsStore.opponents.map((o) => o.botName)).toEqual(['alice']);
 		expect(playerOpponentsStore.loading).toBe(false);
 	});
+
+	it('reset clears loaded opponents back to the initial state', async () => {
+		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+		vi.stubGlobal('fetch', okJson({ opponents: [opponent('acme', 'alice', 30)] }));
+		await playerOpponentsStore.load();
+
+		playerOpponentsStore.reset();
+
+		expect(playerOpponentsStore.opponents).toEqual([]);
+		expect(playerOpponentsStore.loaded).toBe(false);
+		expect(playerOpponentsStore.loading).toBe(false);
+		expect(playerOpponentsStore.error).toBeNull();
+	});
 });
