@@ -57,6 +57,12 @@
 				game.
 			</p>
 		</div>
+		<a
+			href={resolve('/leaderboard')}
+			class="w-fit text-sm font-semibold text-content-muted transition-colors hover:text-content"
+		>
+			Bot leaderboard →
+		</a>
 	</div>
 
 	{#if !isLiveEnabled()}

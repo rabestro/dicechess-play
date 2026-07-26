@@ -3,10 +3,9 @@ import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import BotCatalogCard from './BotCatalogCard.svelte';
 import type { CatalogBot } from '$lib/catalog/catalogApi';
 
-// Only wakeBot is faked — click→wake→panel is the part worth unit testing here. start()'s
-// playBot + window.location.href navigation isn't (no component in this codebase unit-tests
-// navigation; the lobby's equivalent goToBoard has none either) — that path is verified in the
-// browser instead, per the project's UI-flow-change convention.
+// Only wakeBot is faked — click→wake is enough to prove BotChallengePanel is wired with this
+// card's team/name. The full phase-transition behavior (ready/dead states, config panel) is
+// BotChallengePanel's own concern and is tested there instead of duplicated here.
 const wakeBotMock = vi.fn();
 vi.mock('$lib/catalog/catalogApi', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/catalog/catalogApi')>();
@@ -41,24 +40,10 @@ describe('BotCatalogCard', () => {
 		expect(getByText(/provisional/)).toBeTruthy();
 	});
 
-	it('clicking Play wakes the bot and shows the config panel once it answers', async () => {
+	it('wires the challenge panel with this card team and name', async () => {
 		wakeBotMock.mockResolvedValue({ alive: true });
-		const { getByRole, findByRole } = render(BotCatalogCard, { bot: bot() });
+		const { getByRole } = render(BotCatalogCard, { bot: bot({ team: 'gcp', name: 'oracle-3' }) });
 		await fireEvent.click(getByRole('button', { name: 'Play →' }));
-		expect(wakeBotMock).toHaveBeenCalledWith('acme', 'alice');
-		expect(await findByRole('button', { name: 'Start game' })).toBeTruthy();
-	});
-
-	it('shows a retry state when the bot does not answer', async () => {
-		// Covers both wakeBot outcomes the component treats identically: a resolved alive:false
-		// and a rejected call both fall into the same one-line `catch { phase = 'dead' }` — proving
-		// the resolved path renders the retry state also proves the (trivially identical) catch
-		// branch does, without a second, promise-rejection-timing-sensitive test for zero extra
-		// coverage.
-		wakeBotMock.mockResolvedValue({ alive: false });
-		const { getByRole, findByText } = render(BotCatalogCard, { bot: bot() });
-		await fireEvent.click(getByRole('button', { name: 'Play →' }));
-		expect(await findByText("This bot isn't answering right now.")).toBeTruthy();
-		expect(getByRole('button', { name: 'Try again' })).toBeTruthy();
+		expect(wakeBotMock).toHaveBeenCalledWith('gcp', 'oracle-3');
 	});
 });
