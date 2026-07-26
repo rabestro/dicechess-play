@@ -27,12 +27,32 @@ interface PlayerGamesResponse {
 	games: PlayerGame[];
 }
 
+export interface PlayerGamesFilters {
+	/** `'human'` or `'<team>/<botName>'` — play-api's `OpponentFilter` wire values (#151/#173). Use
+	 * `serverVsParam` (`$lib/games/gamesFilters`) to derive this from a parsed `VsFilter`; never
+	 * pass a `'local:...'` value here — the server has no such namespace and 400s it.
+	 */
+	vs?: string;
+	result?: 'win' | 'draw' | 'loss';
+}
+
 /** The visitor's own finished lobby/live games, newest first. `guestId` is the BARE uuid — the
  * same convention `createGame`/`createSeek`/`acceptSeek` already use; play-api validates and
- * wraps it internally (see the play-api `Principal.guest` boundary).
+ * wraps it internally (see the play-api `Principal.guest` boundary). `vs`/`result` are forwarded
+ * to the server verbatim (#173) — never filtered client-side, so a later paginated page can't
+ * come back sparse or with a wrong `hasMore`.
  */
-export async function fetchPlayerGames(guestId: string): Promise<PlayerGame[]> {
-	const res = await fetch(`${apiBase()}/players/${encodeURIComponent(guestId)}/games`);
+export async function fetchPlayerGames(
+	guestId: string,
+	filters: PlayerGamesFilters = {},
+): Promise<PlayerGame[]> {
+	const params = new URLSearchParams();
+	if (filters.vs) params.set('vs', filters.vs);
+	if (filters.result) params.set('result', filters.result);
+	const query = params.toString();
+	const res = await fetch(
+		`${apiBase()}/players/${encodeURIComponent(guestId)}/games${query ? `?${query}` : ''}`,
+	);
 	if (!res.ok) throw new Error(`fetchPlayerGames failed: ${res.status}`);
 	const body = (await res.json()) as PlayerGamesResponse;
 	return body.games;

@@ -87,4 +87,61 @@ describe('playerGamesStore', () => {
 		expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['g-1']);
 		expect(playerGamesStore.loading).toBe(false);
 	});
+
+	it('forwards vs/result filters to fetchPlayerGames', async () => {
+		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+		const fetchMock = okJson({ games: [] });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await playerGamesStore.load({ vs: 'acme/alice', result: 'win' });
+
+		expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('?vs=acme%2Falice&result=win'));
+	});
+
+	it('reset clears loaded games back to the initial state', async () => {
+		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+		vi.stubGlobal('fetch', okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')] }));
+		await playerGamesStore.load();
+
+		playerGamesStore.reset();
+
+		expect(playerGamesStore.games).toEqual([]);
+		expect(playerGamesStore.loaded).toBe(false);
+		expect(playerGamesStore.loading).toBe(false);
+		expect(playerGamesStore.error).toBeNull();
+	});
+
+	it("a stale request from before reset() can't clobber the newer filter's state, however it resolves", async () => {
+		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+		let resolveA: (value: unknown) => void = () => {};
+		let resolveB: (value: unknown) => void = () => {};
+		const fetchMock = vi
+			.fn()
+			.mockReturnValueOnce(new Promise((resolve) => (resolveA = resolve)))
+			.mockReturnValueOnce(new Promise((resolve) => (resolveB = resolve)));
+		vi.stubGlobal('fetch', fetchMock);
+
+		const loadA = playerGamesStore.load(); // unfiltered request starts, still in flight
+		playerGamesStore.reset(); // the visitor picks a filter mid-flight
+		const loadB = playerGamesStore.load({ vs: 'acme/alice' });
+
+		// B (the filtered request) resolves first, as it normally would...
+		resolveB({
+			ok: true,
+			json: async () => ({ games: [game('filtered', '2026-07-16T12:00:00Z')] }),
+		});
+		await loadB;
+		expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['filtered']);
+
+		// ...then A's abandoned unfiltered request finally resolves. It must be discarded.
+		resolveA({
+			ok: true,
+			json: async () => ({ games: [game('unfiltered', '2026-07-16T12:00:00Z')] }),
+		});
+		await loadA;
+
+		expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['filtered']);
+		expect(playerGamesStore.loaded).toBe(true);
+		expect(playerGamesStore.loading).toBe(false);
+	});
 });

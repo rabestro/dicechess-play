@@ -1,23 +1,94 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { localGamesStore } from '$lib/stores/localGamesStore.svelte';
 	import { playerGamesStore } from '$lib/stores/playerGamesStore.svelte';
+	import { playerOpponentsStore } from '$lib/stores/playerOpponentsStore.svelte';
 	import { mergeGameHistory } from '$lib/stores/gameHistoryMerge';
+	import {
+		parseGamesFilters,
+		serverVsParam,
+		filterLocalGames,
+		liveGamesVisible,
+		opponentOptions,
+		computeHeadToHead,
+		vsParamValue,
+		type GamesFilters,
+	} from '$lib/games/gamesFilters';
 	import GameHistoryCard from '../../components/GameHistoryCard.svelte';
 	import LiveGameHistoryCard from '../../components/LiveGameHistoryCard.svelte';
+	import GamesFilterBar from '../../components/GamesFilterBar.svelte';
+	import WdlSummaryCard from '../../components/WdlSummaryCard.svelte';
+	import BotBadge from '../../components/BotBadge.svelte';
 
 	onMount(() => {
 		void localGamesStore.load();
-		void playerGamesStore.load();
+		void playerOpponentsStore.load();
 	});
+
+	// The query string is the source of truth for every filter (#151) — shareable, back-button
+	// friendly. Re-parsed reactively; a filter-only navigation never remounts this page (same
+	// route), so this is the only thing that notices the change.
+	const filters = $derived(parseGamesFilters(page.url));
+
+	// vs/result narrow the *live* half on the server (#173) — never client-side over an
+	// already-fetched page, which would break once #150 adds pagination (sparse pages, wrong
+	// hasMore). `source` alone never needs a new request (the server has no notion of it), so this
+	// only reloads when the server-relevant signature actually changed — a bare $effect over
+	// `filters` would over-fire on every source-only change. reset() discards a request from
+	// before the change if it lands after the new one (playerGamesStore's own guard).
+	let lastServerFilterKey: string | null = null;
+	$effect(() => {
+		const vs = serverVsParam(filters.vs);
+		const result = filters.result ?? undefined;
+		const key = `${vs ?? ''}|${result ?? ''}`;
+		if (key === lastServerFilterKey) return;
+		lastServerFilterKey = key;
+		playerGamesStore.reset();
+		void playerGamesStore.load({ vs, result });
+	});
+
+	function updateFilters(next: GamesFilters): void {
+		const params = new URLSearchParams();
+		if (next.vs) params.set('vs', vsParamValue(next.vs));
+		if (next.result) params.set('result', next.result);
+		if (next.source) params.set('source', next.source);
+		const query = params.toString();
+		void goto(query ? resolve(`/games?${query}`) : resolve('/games'), {
+			noScroll: true,
+			keepFocus: true,
+		});
+	}
+
+	const hasActiveFilters = $derived(
+		filters.vs !== null || filters.result !== null || filters.source !== null,
+	);
 
 	// The local list (IndexedDB, near-instant) governs the loading/empty gates below, unchanged
 	// from before live games were added: it must render promptly regardless of play-api's health,
 	// so nothing here waits on the network fetch. A guest with live games but no local ones may
 	// briefly see the empty state until that fetch resolves a moment later — a narrow, self-correcting
 	// tradeoff in favour of never blocking the local list on network I/O.
-	const history = $derived(mergeGameHistory(localGamesStore.games, playerGamesStore.games));
+	const filteredLocal = $derived(filterLocalGames(localGamesStore.games, filters));
+	const showLive = $derived(liveGamesVisible(filters));
+	const history = $derived(mergeGameHistory(filteredLocal, showLive ? playerGamesStore.games : []));
+
+	const options = $derived(opponentOptions(localGamesStore.games, playerOpponentsStore.opponents));
+
+	// The head-to-head summary shown above the list when `vs=` is active — always the true overall
+	// record against that opponent, deliberately unaffected by result/source (see
+	// computeHeadToHead's own doc comment for why).
+	const headToHead = $derived(
+		computeHeadToHead(
+			filters.vs,
+			localGamesStore.games,
+			playerOpponentsStore.opponents,
+			playerGamesStore.games,
+			showLive,
+		),
+	);
 </script>
 
 <section class="flex flex-col gap-6">
@@ -27,6 +98,18 @@
 			Every game you've played — on this device and in the lobby.
 		</p>
 	</div>
+
+	<GamesFilterBar {filters} {options} onChange={updateFilters} />
+
+	{#if headToHead}
+		<div class="flex flex-col gap-2">
+			<div class="flex items-center gap-2">
+				<h3 class="text-lg font-bold text-content">{headToHead.label}</h3>
+				{#if headToHead.isBot}<BotBadge />{/if}
+			</div>
+			<WdlSummaryCard counts={headToHead.counts} />
+		</div>
+	{/if}
 
 	<!-- Hoisted above the branches below (rather than duplicated inside the non-empty one): a guest
 	     whose local list is empty but who HAS played lobby games must still be told the live fetch
@@ -52,13 +135,24 @@
 		</div>
 	{:else if history.length === 0}
 		<div class="flex flex-col items-center gap-4 py-16 text-center">
-			<p class="text-content-muted">You haven't played any games yet.</p>
-			<a
-				href={resolve('/play')}
-				class="px-6 py-3 rounded-xl bg-primary text-primary-content font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors"
-			>
-				Play your first game →
-			</a>
+			{#if hasActiveFilters}
+				<p class="text-content-muted">No games match these filters.</p>
+				<button
+					type="button"
+					onclick={() => updateFilters({ vs: null, result: null, source: null })}
+					class="px-6 py-3 rounded-xl bg-primary text-primary-content font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors"
+				>
+					Reset filters
+				</button>
+			{:else}
+				<p class="text-content-muted">You haven't played any games yet.</p>
+				<a
+					href={resolve('/play')}
+					class="px-6 py-3 rounded-xl bg-primary text-primary-content font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover transition-colors"
+				>
+					Play your first game →
+				</a>
+			{/if}
 		</div>
 	{:else}
 		{#if localGamesStore.error}

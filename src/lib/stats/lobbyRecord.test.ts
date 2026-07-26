@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateOpponents, opponentLabel, opponentVsQuery } from './lobbyRecord';
+import {
+	aggregateOpponents,
+	opponentLabel,
+	opponentVsQuery,
+	findOpponentByVs,
+} from './lobbyRecord';
 import type { PlayerOpponent } from '$lib/games/gamesApi';
 
 function bot(team: string, botName: string, games: Partial<PlayerOpponent> = {}): PlayerOpponent {
@@ -59,5 +64,25 @@ describe('opponentVsQuery', () => {
 
 	it("is 'human' for the collapsed bucket", () => {
 		expect(opponentVsQuery(human)).toBe('human');
+	});
+});
+
+describe('findOpponentByVs', () => {
+	const opponents = [bot('acme', 'alice'), bot('acme', 'bob'), human];
+
+	it('finds the matching bot row', () => {
+		expect(findOpponentByVs(opponents, 'acme/alice')).toEqual(bot('acme', 'alice'));
+	});
+
+	it("finds the collapsed human row for 'human'", () => {
+		expect(findOpponentByVs(opponents, 'human')).toEqual(human);
+	});
+
+	it('is undefined for a vs value with no matching row', () => {
+		expect(findOpponentByVs(opponents, 'other-team/carol')).toBeUndefined();
+	});
+
+	it('is undefined for an empty opponents list', () => {
+		expect(findOpponentByVs([], 'human')).toBeUndefined();
 	});
 });
