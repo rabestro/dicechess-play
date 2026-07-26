@@ -1,0 +1,49 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { fetchPlayerGames } from './gamesApi';
+
+describe('gamesApi', () => {
+	beforeEach(() => vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080'));
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		vi.unstubAllGlobals();
+	});
+
+	const okJson = (body: unknown) => vi.fn().mockResolvedValue({ ok: true, json: async () => body });
+
+	it('fetchPlayerGames GETs the URL-encoded guest id and returns the games array', async () => {
+		const games = [
+			{
+				gameId: 'g-1',
+				seat: 'White',
+				opponent: { kind: 'Bot', name: 'acme alice' },
+				result: 'win',
+				rated: false,
+				termination: 'resign',
+				timeControl: 'Fischer(300,3)',
+				finishedAt: '2026-07-16T12:00:00Z',
+			},
+		];
+		const fetchMock = okJson({ games });
+		vi.stubGlobal('fetch', fetchMock);
+
+		expect(await fetchPlayerGames('11111111-1111-1111-1111-111111111111')).toEqual(games);
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games',
+		);
+	});
+
+	it('URL-encodes a guest id that needs it', async () => {
+		const fetchMock = okJson({ games: [] });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchPlayerGames('weird id/with?chars');
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/weird%20id%2Fwith%3Fchars/games',
+		);
+	});
+
+	it('throws with the status on a non-OK response', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400 }));
+		await expect(fetchPlayerGames('not-a-uuid')).rejects.toThrow('fetchPlayerGames failed: 400');
+	});
+});

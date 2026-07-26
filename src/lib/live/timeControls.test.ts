@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	botTimeControlPresets,
 	defaultBotTimeControlIndex,
+	parseGameResultsTimeControl,
 	timeControlGroups,
 	timeControlLabel,
 	timeControlPresets,
@@ -35,6 +36,28 @@ describe('botTimeControlPresets', () => {
 
 	it('defaults to the 5 + 5 preset', () => {
 		expect(botTimeControlPresets[defaultBotTimeControlIndex].label).toBe('5 + 5');
+	});
+});
+
+describe('parseGameResultsTimeControl', () => {
+	it('parses a Fischer control the same way timeControlLabel renders the structured form', () => {
+		expect(parseGameResultsTimeControl('Fischer(300,3)')).toBe(
+			timeControlLabel({ Fischer: { initialSeconds: 300, incrementSeconds: 3 } }),
+		);
+	});
+
+	it('parses a SuddenDeath control', () => {
+		expect(parseGameResultsTimeControl('SuddenDeath(300)')).toBe('5 min');
+	});
+
+	it('parses a PerMove control', () => {
+		expect(parseGameResultsTimeControl('PerMove(30)')).toBe('30s / move');
+	});
+
+	it('falls back to Unlimited for the literal Unlimited value and anything unrecognised', () => {
+		expect(parseGameResultsTimeControl('Unlimited')).toBe('Unlimited');
+		expect(parseGameResultsTimeControl('garbage')).toBe('Unlimited');
+		expect(parseGameResultsTimeControl('')).toBe('Unlimited');
 	});
 });
 
