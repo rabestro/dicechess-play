@@ -122,7 +122,7 @@
 	{/if}
 
 	<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Online</h3>
-
+			Online games need a configured play server (<code class="font-mono text-xs"
 	{#if !isLiveEnabled()}
 		<div class="rounded-2xl border border-border bg-surface p-6 text-center text-content-muted">
 			Lobby games need a configured play server (<code class="font-mono text-xs"
