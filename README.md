@@ -42,13 +42,17 @@ src/
 │   │                          head-to-head view (#151), "Show more" pagination (#150) · replay
 │   ├── leaderboard/           bot rating ladder (play-api GET /leaderboard)
 │   ├── bots/                  human-play bot catalog (play-api GET /lobby/bots, ADR-0014)
+│   │   └── [team]/[name]/     bot profile — rating, ladder W-D-L, recent games (#152 Tier 1;
+│   │                          Tier 2/3 — human record, head-to-head vs models, rating history —
+│   │                          are a separate, not-yet-agreed design)
 │   └── me/                    guest profile + restore code; W-D-L on this device + in the lobby
 ├── components/                shared UI
 │   ├── Board.svelte           thin chessground wrapper driven by either game store
 │   ├── lib/Chessground.svelte
 │   ├── PlayerStrip · DicePanel · MoveHistory · GameEndModal · BotBadge
-│   ├── GameHistoryCard · LiveGameHistoryCard · WdlBar · WdlCounts · WdlSummaryCard · MiniBoard
-│   │                     TimeControlPicker · PawnPromotionSelector · ToastContainer
+│   ├── GameHistoryCard · LiveGameHistoryCard · BotProfileGameCard · WdlBar · WdlCounts
+│   │                     WdlSummaryCard · MiniBoard · TimeControlPicker · PawnPromotionSelector
+│   │                     ToastContainer
 │   ├── GamesFilterBar         /games's source/result pills + opponent search+chip (#151)
 │   └── BotCatalogCard · BotTimeControlPicker — the /bots page's card (click → wake → config → start)
 ├── lib/
@@ -56,7 +60,8 @@ src/
 │   ├── live/                  live-play client: liveGameStore, liveClient (WS + reconnect),
 │   │                          liveApi/lobbyApi (REST), liveTypes (play-api wire mirror),
 │   │                          dfen/board/clock/seat/timeControl/playerLabel helpers
-│   ├── leaderboard/           leaderboardApi — rating-ladder read client (play-api wire mirror)
+│   ├── leaderboard/           leaderboardApi — rating-ladder + bot-profile read client (play-api
+│   │                          wire mirror; GET /bots/{team}/{name}, #152)
 │   ├── catalog/               catalogApi — bot-catalog read/wake/play-bot client (play-api wire mirror)
 │   ├── games/                 gamesApi — GET /players/{guestId}/games (vs/result/before filters +
 │   │                          hasMore, #173) + /opponents client (play-api wire mirror);

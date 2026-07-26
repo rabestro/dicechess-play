@@ -116,7 +116,16 @@
 							</td>
 							<td class="px-4 py-3">
 								<span class="flex min-w-0 items-center gap-1.5">
-									<b class="truncate font-semibold text-content">{leader.team} {leader.name}</b>
+									<a
+										href={resolve('/bots/[team]/[name]', {
+											team: leader.team,
+											name: leader.name,
+										})}
+										class="truncate font-semibold text-content hover:text-primary hover:underline"
+									>
+										{leader.team}
+										{leader.name}
+									</a>
 									<BotBadge />
 									{#if !leader.onLadder}
 										<span class="shrink-0 text-[10px] text-content-muted italic">left ladder</span>
