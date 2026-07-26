@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchPlayerGames } from './gamesApi';
+import { fetchPlayerGames, fetchPlayerOpponents } from './gamesApi';
 
 describe('gamesApi', () => {
 	beforeEach(() => vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080'));
@@ -45,5 +45,44 @@ describe('gamesApi', () => {
 	it('throws with the status on a non-OK response', async () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400 }));
 		await expect(fetchPlayerGames('not-a-uuid')).rejects.toThrow('fetchPlayerGames failed: 400');
+	});
+
+	it('fetchPlayerOpponents GETs the URL-encoded guest id and returns the opponents array', async () => {
+		const opponents = [
+			{
+				opponent: { kind: 'Bot', name: 'acme alice' },
+				team: 'acme',
+				botName: 'alice',
+				games: 30,
+				wins: 12,
+				draws: 3,
+				losses: 15,
+				lastPlayedAt: '2026-07-16T12:00:00Z',
+			},
+			{
+				opponent: { kind: 'Human', name: null },
+				team: null,
+				botName: null,
+				games: 5,
+				wins: 2,
+				draws: 0,
+				losses: 3,
+				lastPlayedAt: '2026-07-16T12:00:00Z',
+			},
+		];
+		const fetchMock = okJson({ opponents });
+		vi.stubGlobal('fetch', fetchMock);
+
+		expect(await fetchPlayerOpponents('11111111-1111-1111-1111-111111111111')).toEqual(opponents);
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/opponents',
+		);
+	});
+
+	it('fetchPlayerOpponents throws with the status on a non-OK response', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400 }));
+		await expect(fetchPlayerOpponents('not-a-uuid')).rejects.toThrow(
+			'fetchPlayerOpponents failed: 400',
+		);
 	});
 });
