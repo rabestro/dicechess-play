@@ -77,3 +77,20 @@ export function timeControlLabel(tc: TimeControl | null | undefined): string {
 	if ('PerMove' in tc) return `${tc.PerMove.secondsPerMove}s / move`;
 	return 'Unlimited';
 }
+
+/** The SAME short label as `timeControlLabel`, but parsed from play-api's `GET /players/{id}/games`
+ * wire, which carries the time control as the server's own `TimeControl` ADT `toString()` (e.g.
+ * `Fischer(300,3)`, `SuddenDeath(300)`, `PerMove(30)`, `Unlimited`) rather than the structured JSON
+ * the live WebSocket wire uses. A distinct parser rather than reshaping that response to fit
+ * `timeControlLabel` — the two wires are separate contracts and neither should bend to match the
+ * other. Falls back to 'Unlimited' for anything unrecognised, same tolerance as `timeControlLabel`.
+ */
+export function parseGameResultsTimeControl(raw: string): string {
+	const fischer = /^Fischer\((\d+),(\d+)\)$/.exec(raw);
+	if (fischer) return `${Math.round(Number(fischer[1]) / 60)} + ${fischer[2]}`;
+	const suddenDeath = /^SuddenDeath\((\d+)\)$/.exec(raw);
+	if (suddenDeath) return `${Math.round(Number(suddenDeath[1]) / 60)} min`;
+	const perMove = /^PerMove\((\d+)\)$/.exec(raw);
+	if (perMove) return `${perMove[1]}s / move`;
+	return 'Unlimited';
+}

@@ -38,7 +38,7 @@ src/
 │   ├── play/                  vs-bot game (client-authoritative; engine in a Web Worker)
 │   ├── lobby/                 seek list + live-board wall (polls play-api)
 │   ├── live/ · live/[id]/     friend-link entry · server-authoritative live board (WebSocket)
-│   ├── games/ · games/[id]/   local game history · replay
+│   ├── games/ · games/[id]/   game history (local + play-api's own lobby/live games) · replay
 │   ├── leaderboard/           bot rating ladder (play-api GET /leaderboard)
 │   ├── bots/                  human-play bot catalog (play-api GET /lobby/bots, ADR-0014)
 │   └── me/                    guest profile + restore code
@@ -46,7 +46,7 @@ src/
 │   ├── Board.svelte           thin chessground wrapper driven by either game store
 │   ├── lib/Chessground.svelte
 │   ├── PlayerStrip · DicePanel · MoveHistory · GameEndModal · BotBadge
-│   ├── GameHistoryCard · MiniBoard · TimeControlPicker · PawnPromotionSelector · ToastContainer
+│   ├── GameHistoryCard · LiveGameHistoryCard · MiniBoard · TimeControlPicker · PawnPromotionSelector · ToastContainer
 │   └── BotCatalogCard · BotTimeControlPicker — the /bots page's card (click → wake → config → start)
 ├── lib/
 │   ├── playWithBot/           bot-play core: store, engine worker, dice/history, opening book
@@ -55,6 +55,7 @@ src/
 │   │                          dfen/board/clock/seat/timeControl/playerLabel helpers
 │   ├── leaderboard/           leaderboardApi — rating-ladder read client (play-api wire mirror)
 │   ├── catalog/               catalogApi — bot-catalog read/wake/play-bot client (play-api wire mirror)
+│   ├── games/                 gamesApi — GET /players/{guestId}/games client (play-api #151 wire mirror)
 │   ├── ingest/                → analytics POST /api/games
 │   │   ├── types.ts           GameIngestWire contract (verbatim copy — see the file head)
 │   │   ├── guestIdentity.ts   per-browser guest:<uuidv7> + restore code
@@ -63,7 +64,9 @@ src/
 │   │   └── outbox.ts          flush pending games → gateway
 │   ├── history/               move-history reconstruction for replays
 │   ├── stats/                 local player W-D-L record
-│   ├── stores/                singleton rune stores: themeStore (7 themes) · localGamesStore · chromeStore
+│   ├── stores/                singleton rune stores (themeStore 7 themes · localGamesStore ·
+│   │                          playerGamesStore · chromeStore) + gameHistoryMerge (local + play-api
+│   │                          games → one newest-first /games list)
 │   ├── localGamesDB.ts        IndexedDB via idb (sync_status: pending → synced | quarantined)
 │   ├── timings.ts             presentation pacing shared by BOTH game surfaces — never fork per surface
 │   └── bots.ts · gameOutcome.ts · sound.ts · preferencesStore · toastStore · authStore (guest stub)
