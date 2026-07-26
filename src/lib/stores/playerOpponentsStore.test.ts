@@ -98,4 +98,32 @@ describe('playerOpponentsStore', () => {
 		expect(playerOpponentsStore.loading).toBe(false);
 		expect(playerOpponentsStore.error).toBeNull();
 	});
+
+	it("a stale request from before reset() can't clobber the newer guest's state, however it resolves", async () => {
+		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+		let resolveA: (value: unknown) => void = () => {};
+		let resolveB: (value: unknown) => void = () => {};
+		const fetchMock = vi
+			.fn()
+			.mockReturnValueOnce(new Promise((resolve) => (resolveA = resolve)))
+			.mockReturnValueOnce(new Promise((resolve) => (resolveB = resolve)));
+		vi.stubGlobal('fetch', fetchMock);
+
+		const loadA = playerOpponentsStore.load(); // guest A's request starts, still in flight
+		playerOpponentsStore.reset(); // identity changes to guest B mid-flight
+		const loadB = playerOpponentsStore.load();
+
+		// B resolves first, as it normally would...
+		resolveB({ ok: true, json: async () => ({ opponents: [opponent('acme', 'bob', 10)] }) });
+		await loadB;
+		expect(playerOpponentsStore.opponents.map((o) => o.botName)).toEqual(['bob']);
+
+		// ...then A's abandoned request finally resolves. It must be discarded, not applied.
+		resolveA({ ok: true, json: async () => ({ opponents: [opponent('acme', 'alice', 30)] }) });
+		await loadA;
+
+		expect(playerOpponentsStore.opponents.map((o) => o.botName)).toEqual(['bob']);
+		expect(playerOpponentsStore.loaded).toBe(true);
+		expect(playerOpponentsStore.loading).toBe(false);
+	});
 });

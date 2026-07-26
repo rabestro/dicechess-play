@@ -211,8 +211,9 @@
 	<div class="flex flex-col gap-3">
 		<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Your player code</h3>
 		<p class="text-sm text-content-muted">
-			This anonymous code is your identity. Save it to keep the same identity if you switch browser
-			or device. Your game history above is stored on this device only.
+			This anonymous code is your identity. Save it to keep the same identity — and your lobby
+			record — if you switch browser or device. Only the "on this device" history above stays local
+			to this browser.
 		</p>
 
 		<div class="rounded-2xl border border-border bg-surface/60 p-5 flex flex-col gap-5">

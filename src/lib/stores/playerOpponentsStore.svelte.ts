@@ -14,35 +14,42 @@ import { isLiveEnabled } from '$lib/live/liveApi';
  *
  * Guest-scoped, unlike the on-device record: call {@link reset} before reloading whenever the
  * guest identity changes (restore/reset on `/me`), or the previous guest's stats linger in memory
- * until the page remounts.
+ * until the page remounts. `reset()` also bumps a generation counter so a still-in-flight request
+ * from the guest being left behind can never land after a newer one — see `load()`.
  */
 class PlayerOpponentsStore {
 	opponents = $state<PlayerOpponent[]>([]);
 	loading = $state(false);
 	loaded = $state(false);
 	error = $state<string | null>(null);
+	#generation = 0;
 
 	reset(): void {
 		this.opponents = [];
 		this.loading = false;
 		this.loaded = false;
 		this.error = null;
+		this.#generation++;
 	}
 
 	async load(): Promise<void> {
 		if (this.loading || !isLiveEnabled()) return;
 		this.loading = true;
 		this.error = null;
+		const generation = this.#generation;
 		try {
-			this.opponents = await fetchPlayerOpponents(getGuestUuid());
+			const opponents = await fetchPlayerOpponents(getGuestUuid());
+			if (generation !== this.#generation) return;
+			this.opponents = opponents;
 			this.loaded = true;
 		} catch {
+			if (generation !== this.#generation) return;
 			// Any failure here — unreachable server, a bad response — means the same thing to the
 			// visitor: their lobby record just isn't available right now. One honest, non-technical
 			// message (matching playerGamesStore's convention) instead of a raw fetch exception.
 			this.error = "Your lobby record isn't available right now.";
 		} finally {
-			this.loading = false;
+			if (generation === this.#generation) this.loading = false;
 		}
 	}
 }
