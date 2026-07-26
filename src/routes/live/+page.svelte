@@ -1,10 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { createGame, isLiveEnabled } from '$lib/live/liveApi';
-	import { buildJoinUrl } from '$lib/live/seatLink';
+	import { buildJoinUrl, resolveSeats } from '$lib/live/seatLink';
 	import { getGuestUuid } from '$lib/ingest/guestIdentity';
 	import { timeControlPresets } from '$lib/live/timeControls';
 	import TimeControlPicker from '../../components/TimeControlPicker.svelte';
+	import type { Seat } from '$lib/live/liveTypes';
+
+	type ColorChoice = Seat | 'random';
+	const colorOptions: readonly { value: ColorChoice; label: string }[] = [
+		{ value: 'random', label: 'Random' },
+		{ value: 'White', label: 'White' },
+		{ value: 'Black', label: 'Black' },
+	];
 
 	let creating = $state(false);
 	let error = $state<string | null>(null);
@@ -13,6 +21,9 @@
 	let copied = $state(false);
 	let selected = $state(0); // index into presets
 	let chosenLabel = $state('Unlimited'); // the control the created game actually used
+	let preferredColor = $state<ColorChoice>('random');
+	let yourSeat = $state<Seat>('White'); // the colour actually assigned once the game is created
+	const opponentSeat = $derived<Seat>(yourSeat === 'White' ? 'Black' : 'White');
 
 	async function create() {
 		creating = true;
@@ -25,8 +36,13 @@
 			const white = res.tokens.find((t) => t.seat === 'White');
 			const black = res.tokens.find((t) => t.seat === 'Black');
 			if (!white || !black) throw new Error('Server did not return both seat tokens');
-			shareUrl = buildJoinUrl(location.origin, res.gameId, black.token, 'Black');
-			boardUrl = `${resolve('/live/[id]', { id: res.gameId })}?seat=${encodeURIComponent(white.token)}&as=white`;
+			// Both seats are already registered to this guest — "colour choice" is just which token
+			// we keep for our own board vs. which one goes into the friend's link. Random is resolved
+			// here, at creation time, not deferred until the friend joins.
+			const { mine, theirs } = resolveSeats(preferredColor, white, black);
+			yourSeat = mine.seat;
+			shareUrl = buildJoinUrl(location.origin, res.gameId, theirs.token, theirs.seat);
+			boardUrl = `${resolve('/live/[id]', { id: res.gameId })}?seat=${encodeURIComponent(mine.token)}&as=${mine.seat === 'White' ? 'white' : 'black'}`;
 		} catch {
 			// Any failure here — unreachable server, a bad response, a malformed body — means the same
 			// thing to the player: live play isn't working right now. Show one honest, non-technical
@@ -58,8 +74,30 @@
 		</p>
 	{:else if !shareUrl}
 		<p class="text-content-muted">
-			Create a game, send the link to your opponent, and open your board. You play White.
+			Create a game, send the link to your opponent, and open your board.
 		</p>
+		<fieldset class="flex flex-col gap-2">
+			<legend class="text-sm font-bold text-content-muted pb-1">Your color</legend>
+			<div class="flex gap-2">
+				{#each colorOptions as opt (opt.value)}
+					<label
+						class="flex-1 cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-bold transition-colors focus-within:ring-2 focus-within:ring-primary/50
+							{preferredColor === opt.value
+							? 'border-primary bg-primary text-primary-content'
+							: 'border-border bg-surface text-content-muted hover:text-content'}"
+					>
+						<input
+							type="radio"
+							name="friendColor"
+							value={opt.value}
+							bind:group={preferredColor}
+							class="sr-only"
+						/>
+						{opt.label}
+					</label>
+				{/each}
+			</div>
+		</fieldset>
 		<TimeControlPicker bind:selected />
 		<button
 			type="button"
@@ -72,11 +110,12 @@
 		{#if error}<p class="text-sm text-danger">{error}</p>{/if}
 	{:else}
 		<p class="text-sm text-content-muted">
-			Time control: <span class="text-content font-bold">{chosenLabel}</span>
+			Time control: <span class="text-content font-bold">{chosenLabel}</span> · You play
+			<span class="text-content font-bold">{yourSeat}</span>
 		</p>
 		<div class="flex flex-col gap-2">
 			<span class="text-sm font-bold text-content-muted"
-				>Send this link to your opponent (Black):</span
+				>Send this link to your opponent ({opponentSeat}):</span
 			>
 			<div class="flex gap-2">
 				<input
