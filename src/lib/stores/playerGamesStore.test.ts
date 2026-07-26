@@ -21,6 +21,7 @@ describe('playerGamesStore', () => {
 	beforeEach(() => {
 		// Reset the singleton between tests.
 		playerGamesStore.games = [];
+		playerGamesStore.hasMore = false;
 		playerGamesStore.loading = false;
 		playerGamesStore.loaded = false;
 		playerGamesStore.error = null;
@@ -30,13 +31,14 @@ describe('playerGamesStore', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('loads games from play-api and flags loaded', async () => {
+	it('loads games from play-api, flags loaded, and tracks hasMore', async () => {
 		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
-		vi.stubGlobal('fetch', okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')] }));
+		vi.stubGlobal('fetch', okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')], hasMore: true }));
 
 		await playerGamesStore.load();
 
 		expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['g-1']);
+		expect(playerGamesStore.hasMore).toBe(true);
 		expect(playerGamesStore.loaded).toBe(true);
 		expect(playerGamesStore.loading).toBe(false);
 		expect(playerGamesStore.error).toBeNull();
@@ -79,7 +81,7 @@ describe('playerGamesStore', () => {
 		const second = playerGamesStore.load();
 		resolveFetch({
 			ok: true,
-			json: async () => ({ games: [game('g-1', '2026-07-16T12:00:00Z')] }),
+			json: async () => ({ games: [game('g-1', '2026-07-16T12:00:00Z')], hasMore: false }),
 		});
 		await Promise.all([first, second]);
 
@@ -90,7 +92,7 @@ describe('playerGamesStore', () => {
 
 	it('forwards vs/result filters to fetchPlayerGames', async () => {
 		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
-		const fetchMock = okJson({ games: [] });
+		const fetchMock = okJson({ games: [], hasMore: false });
 		vi.stubGlobal('fetch', fetchMock);
 
 		await playerGamesStore.load({ vs: 'acme/alice', result: 'win' });
@@ -100,12 +102,13 @@ describe('playerGamesStore', () => {
 
 	it('reset clears loaded games back to the initial state', async () => {
 		vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
-		vi.stubGlobal('fetch', okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')] }));
+		vi.stubGlobal('fetch', okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')], hasMore: true }));
 		await playerGamesStore.load();
 
 		playerGamesStore.reset();
 
 		expect(playerGamesStore.games).toEqual([]);
+		expect(playerGamesStore.hasMore).toBe(false);
 		expect(playerGamesStore.loaded).toBe(false);
 		expect(playerGamesStore.loading).toBe(false);
 		expect(playerGamesStore.error).toBeNull();
@@ -128,7 +131,7 @@ describe('playerGamesStore', () => {
 		// B (the filtered request) resolves first, as it normally would...
 		resolveB({
 			ok: true,
-			json: async () => ({ games: [game('filtered', '2026-07-16T12:00:00Z')] }),
+			json: async () => ({ games: [game('filtered', '2026-07-16T12:00:00Z')], hasMore: false }),
 		});
 		await loadB;
 		expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['filtered']);
@@ -136,12 +139,113 @@ describe('playerGamesStore', () => {
 		// ...then A's abandoned unfiltered request finally resolves. It must be discarded.
 		resolveA({
 			ok: true,
-			json: async () => ({ games: [game('unfiltered', '2026-07-16T12:00:00Z')] }),
+			json: async () => ({ games: [game('unfiltered', '2026-07-16T12:00:00Z')], hasMore: false }),
 		});
 		await loadA;
 
 		expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['filtered']);
 		expect(playerGamesStore.loaded).toBe(true);
 		expect(playerGamesStore.loading).toBe(false);
+	});
+
+	describe('loadMore', () => {
+		it('appends the next page and updates hasMore', async () => {
+			vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+			vi.stubGlobal(
+				'fetch',
+				okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')], hasMore: true }),
+			);
+			await playerGamesStore.load();
+
+			vi.stubGlobal(
+				'fetch',
+				okJson({ games: [game('g-2', '2026-07-15T12:00:00Z')], hasMore: false }),
+			);
+			await playerGamesStore.loadMore();
+
+			expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['g-1', 'g-2']);
+			expect(playerGamesStore.hasMore).toBe(false);
+			expect(playerGamesStore.loading).toBe(false);
+		});
+
+		it("passes the oldest fetched game's own finishedAt as before, reusing the original filters", async () => {
+			vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+			vi.stubGlobal(
+				'fetch',
+				okJson({
+					games: [game('newer', '2026-07-16T12:00:00Z'), game('older', '2026-07-14T09:30:00Z')],
+					hasMore: true,
+				}),
+			);
+			await playerGamesStore.load({ result: 'win' });
+
+			const fetchMock = okJson({ games: [], hasMore: false });
+			vi.stubGlobal('fetch', fetchMock);
+			await playerGamesStore.loadMore();
+
+			expect(fetchMock).toHaveBeenCalledWith(
+				expect.stringContaining('result=win&before=2026-07-14T09%3A30%3A00Z'),
+			);
+		});
+
+		it('is a no-op when hasMore is false', async () => {
+			vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+			vi.stubGlobal(
+				'fetch',
+				okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')], hasMore: false }),
+			);
+			await playerGamesStore.load();
+
+			const fetchMock = vi.fn();
+			vi.stubGlobal('fetch', fetchMock);
+			await playerGamesStore.loadMore();
+
+			expect(fetchMock).not.toHaveBeenCalled();
+			expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['g-1']);
+		});
+
+		it('is a no-op before anything has loaded — there is no oldest game to cursor from', async () => {
+			vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+			const fetchMock = vi.fn();
+			vi.stubGlobal('fetch', fetchMock);
+
+			await playerGamesStore.loadMore();
+
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it("a stale loadMore response from before reset() can't clobber the newer state", async () => {
+			vi.stubEnv('VITE_PLAY_API_URL', 'http://localhost:8080');
+			vi.stubGlobal(
+				'fetch',
+				okJson({ games: [game('g-1', '2026-07-16T12:00:00Z')], hasMore: true }),
+			);
+			await playerGamesStore.load();
+
+			let resolveMore: (value: unknown) => void = () => {};
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockReturnValue(new Promise((resolve) => (resolveMore = resolve))),
+			);
+			const more = playerGamesStore.loadMore(); // still in flight when identity/filters change
+
+			playerGamesStore.reset();
+			vi.stubGlobal(
+				'fetch',
+				okJson({ games: [game('fresh', '2026-07-20T12:00:00Z')], hasMore: false }),
+			);
+			await playerGamesStore.load();
+			expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['fresh']);
+
+			// The abandoned loadMore() finally resolves — must not append onto the new state.
+			resolveMore({
+				ok: true,
+				json: async () => ({ games: [game('stale', '2026-07-10T12:00:00Z')], hasMore: true }),
+			});
+			await more;
+
+			expect(playerGamesStore.games.map((g) => g.gameId)).toEqual(['fresh']);
+			expect(playerGamesStore.hasMore).toBe(false);
+		});
 	});
 });

@@ -39,7 +39,7 @@ src/
 │   ├── lobby/                 seek list + live-board wall (polls play-api)
 │   ├── live/ · live/[id]/     friend-link entry · server-authoritative live board (WebSocket)
 │   ├── games/ · games/[id]/   game history (local + play-api's own lobby/live games), filters +
-│   │                          head-to-head view (#151) · replay
+│   │                          head-to-head view (#151), "Show more" pagination (#150) · replay
 │   ├── leaderboard/           bot rating ladder (play-api GET /leaderboard)
 │   ├── bots/                  human-play bot catalog (play-api GET /lobby/bots, ADR-0014)
 │   └── me/                    guest profile + restore code; W-D-L on this device + in the lobby
@@ -58,10 +58,11 @@ src/
 │   │                          dfen/board/clock/seat/timeControl/playerLabel helpers
 │   ├── leaderboard/           leaderboardApi — rating-ladder read client (play-api wire mirror)
 │   ├── catalog/               catalogApi — bot-catalog read/wake/play-bot client (play-api wire mirror)
-│   ├── games/                 gamesApi — GET /players/{guestId}/games (vs/result filters, #173) +
-│   │                          /opponents client (play-api wire mirror); gamesFilters — /games's
-│   │                          ?vs=/?result=/?source= URL state (VsFilter's local/lobby namespaces,
-│   │                          local-game filtering, opponent search options) (#151)
+│   ├── games/                 gamesApi — GET /players/{guestId}/games (vs/result/before filters +
+│   │                          hasMore, #173) + /opponents client (play-api wire mirror);
+│   │                          gamesFilters — /games's ?vs=/?result=/?source= URL state (VsFilter's
+│   │                          local/lobby namespaces, local-game filtering, opponent search
+│   │                          options, head-to-head totals) (#151)
 │   ├── ingest/                → analytics POST /api/games
 │   │   ├── types.ts           GameIngestWire contract (verbatim copy — see the file head)
 │   │   ├── guestIdentity.ts   per-browser guest:<uuidv7> + restore code
@@ -73,8 +74,10 @@ src/
 │   │                          aggregate + /me's "In the lobby" label/link helpers, head-to-head
 │   │                          lookup by ?vs=)
 │   ├── stores/                singleton rune stores (themeStore 7 themes · localGamesStore ·
-│   │                          playerGamesStore · playerOpponentsStore · chromeStore) +
-│   │                          gameHistoryMerge (local + play-api games → one newest-first /games list)
+│   │                          playerGamesStore (paginated, keyset `before` cursor, #150) ·
+│   │                          playerOpponentsStore · chromeStore) + gameHistoryMerge (local +
+│   │                          play-api games → one newest-first /games list) · gameHistoryPagination
+│   │                          (render-cap + live-fetch-boundary logic over the merge, #150)
 │   ├── localGamesDB.ts        IndexedDB via idb (sync_status: pending → synced | quarantined)
 │   ├── timings.ts             presentation pacing shared by BOTH game surfaces — never fork per surface
 │   └── bots.ts · gameOutcome.ts · sound.ts · preferencesStore · toastStore · authStore (guest stub)

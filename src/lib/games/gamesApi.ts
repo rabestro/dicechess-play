@@ -23,8 +23,13 @@ export interface PlayerGame {
 	finishedAt: string; // ISO-8601
 }
 
-interface PlayerGamesResponse {
+export interface PlayerGamesPage {
 	games: PlayerGame[];
+	/** Whether older games exist beyond this page — the server's own count (`limit + 1` rows
+	 * fetched, one held back), not something the client infers. `false` means every remaining
+	 * older game for the active filters is already accounted for.
+	 */
+	hasMore: boolean;
 }
 
 export interface PlayerGamesFilters {
@@ -34,28 +39,34 @@ export interface PlayerGamesFilters {
 	 */
 	vs?: string;
 	result?: 'win' | 'draw' | 'loss';
+	/** Keyset cursor (#150/#173): only games strictly older than this ISO-8601 instant. Always the
+	 * exact `finishedAt` of the oldest game already fetched under the SAME filters — never
+	 * recomputed or rounded, or the server's strict `<` comparison could skip or repeat a row.
+	 */
+	before?: string;
 }
 
-/** The visitor's own finished lobby/live games, newest first. `guestId` is the BARE uuid — the
- * same convention `createGame`/`createSeek`/`acceptSeek` already use; play-api validates and
- * wraps it internally (see the play-api `Principal.guest` boundary). `vs`/`result` are forwarded
- * to the server verbatim (#173) — never filtered client-side, so a later paginated page can't
- * come back sparse or with a wrong `hasMore`.
+/** One page of the visitor's own finished lobby/live games, newest first. `guestId` is the BARE
+ * uuid — the same convention `createGame`/`createSeek`/`acceptSeek` already use; play-api
+ * validates and wraps it internally (see the play-api `Principal.guest` boundary). `vs`/`result`
+ * are forwarded to the server verbatim (#173) — never filtered client-side, which would make
+ * `hasMore` a lie (a client-side match dropped from an already-fetched page looks identical to one
+ * that was never fetched).
  */
 export async function fetchPlayerGames(
 	guestId: string,
 	filters: PlayerGamesFilters = {},
-): Promise<PlayerGame[]> {
+): Promise<PlayerGamesPage> {
 	const params = new URLSearchParams();
 	if (filters.vs) params.set('vs', filters.vs);
 	if (filters.result) params.set('result', filters.result);
+	if (filters.before) params.set('before', filters.before);
 	const query = params.toString();
 	const res = await fetch(
 		`${apiBase()}/players/${encodeURIComponent(guestId)}/games${query ? `?${query}` : ''}`,
 	);
 	if (!res.ok) throw new Error(`fetchPlayerGames failed: ${res.status}`);
-	const body = (await res.json()) as PlayerGamesResponse;
-	return body.games;
+	return (await res.json()) as PlayerGamesPage;
 }
 
 /** One opponent bucket: a specific registered bot (`team`/`botName` populated — the
