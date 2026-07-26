@@ -119,7 +119,7 @@
 
 			<fieldset class="flex flex-col gap-1.5">
 				<legend class="text-[10px] font-bold tracking-widest text-content-muted/80 uppercase">
-					Colour
+					Color
 				</legend>
 				<div class="flex flex-wrap gap-2">
 					{#each colorOptions as opt (opt.value)}
@@ -150,7 +150,7 @@
 				disabled={phase === 'starting'}
 				class="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-content transition-colors hover:bg-primary-hover disabled:opacity-60"
 			>
-				{phase === 'starting' ? 'Starting…' : 'Start Game'}
+				{phase === 'starting' ? 'Starting…' : 'Start game'}
 			</button>
 		</div>
 	{/if}

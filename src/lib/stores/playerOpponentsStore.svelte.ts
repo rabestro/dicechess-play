@@ -4,7 +4,7 @@ import { isLiveEnabled } from '$lib/live/liveApi';
 
 /**
  * Loads and holds the guest's aggregate W-D-L record against every lobby opponent from play-api
- * (#174) — the "In the lobby" counterpart to `/me`'s on-device `buildPlayerRecord`.
+ * (#174) — the "Online" counterpart to `/me`'s on-device `buildPlayerRecord`.
  *
  * A singleton so the loaded list survives navigation, matching `playerGamesStore`; call
  * {@link load} to (re)fetch. A no-op (empty `opponents`, no error) when live play is off

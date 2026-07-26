@@ -1,12 +1,12 @@
 import type { PlayerOpponent } from '$lib/games/gamesApi';
 import { emptyCounts, type OutcomeCounts } from './playerRecord';
 
-// Aggregation + display helpers for /me's "In the lobby" section (#149) — the play-api-backed
+// Aggregation + display helpers for /me's "Online" section (#149) — the play-api-backed
 // counterpart to playerRecord.ts's on-device-only aggregation. Kept as its own module rather than
 // folded into playerRecord.ts: that file's whole API (buildPlayerRecord, BotOutcomeCounts) is
 // scoped to LocalGameRecord and stays that way; this one operates on PlayerOpponent instead.
 
-/** Total W-D-L across every lobby opponent — the "In the lobby" section's overall summary card. */
+/** Total W-D-L across every lobby opponent — the "Online" section's overall summary card. */
 export function aggregateOpponents(opponents: PlayerOpponent[]): OutcomeCounts {
 	return opponents.reduce<OutcomeCounts>(
 		(acc, o) => ({

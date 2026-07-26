@@ -46,7 +46,7 @@ describe('BotCatalogCard', () => {
 		const { getByRole, findByRole } = render(BotCatalogCard, { bot: bot() });
 		await fireEvent.click(getByRole('button', { name: 'Play →' }));
 		expect(wakeBotMock).toHaveBeenCalledWith('acme', 'alice');
-		expect(await findByRole('button', { name: 'Start Game' })).toBeTruthy();
+		expect(await findByRole('button', { name: 'Start game' })).toBeTruthy();
 	});
 
 	it('shows a retry state when the bot does not answer', async () => {
