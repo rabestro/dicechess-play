@@ -7,6 +7,7 @@
 	import { playerGamesStore } from '$lib/stores/playerGamesStore.svelte';
 	import { playerOpponentsStore } from '$lib/stores/playerOpponentsStore.svelte';
 	import { mergeGameHistory } from '$lib/stores/gameHistoryMerge';
+	import { paginateGameHistory } from '$lib/stores/gameHistoryPagination';
 	import {
 		parseGamesFilters,
 		serverVsParam,
@@ -17,11 +18,16 @@
 		vsParamValue,
 		type GamesFilters,
 	} from '$lib/games/gamesFilters';
+	import { totalGames } from '$lib/stats/playerRecord';
 	import GameHistoryCard from '../../components/GameHistoryCard.svelte';
 	import LiveGameHistoryCard from '../../components/LiveGameHistoryCard.svelte';
 	import GamesFilterBar from '../../components/GamesFilterBar.svelte';
 	import WdlSummaryCard from '../../components/WdlSummaryCard.svelte';
 	import BotBadge from '../../components/BotBadge.svelte';
+
+	// "Show more" grows the render cap by one page (#150); 24 renders as 12 rows of the 2-column
+	// grid below.
+	const PAGE_SIZE = 24;
 
 	onMount(() => {
 		void localGamesStore.load();
@@ -34,11 +40,11 @@
 	const filters = $derived(parseGamesFilters(page.url));
 
 	// vs/result narrow the *live* half on the server (#173) — never client-side over an
-	// already-fetched page, which would break once #150 adds pagination (sparse pages, wrong
-	// hasMore). `source` alone never needs a new request (the server has no notion of it), so this
-	// only reloads when the server-relevant signature actually changed — a bare $effect over
-	// `filters` would over-fire on every source-only change. reset() discards a request from
-	// before the change if it lands after the new one (playerGamesStore's own guard).
+	// already-fetched page, which would break pagination (sparse pages, wrong hasMore). `source`
+	// alone never needs a new request (the server has no notion of it), so this only reloads when
+	// the server-relevant signature actually changed — a bare $effect over `filters` would
+	// over-fire on every source-only change. reset() discards a request from before the change if
+	// it lands after the new one (playerGamesStore's own guard).
 	let lastServerFilterKey: string | null = null;
 	$effect(() => {
 		const vs = serverVsParam(filters.vs);
@@ -48,6 +54,14 @@
 		lastServerFilterKey = key;
 		playerGamesStore.reset();
 		void playerGamesStore.load({ vs, result });
+	});
+
+	// A newly filtered (or unfiltered) view starts its own reveal progress from the top — including
+	// a source-only change, which the effect above deliberately does NOT refetch for.
+	let renderCap = $state(PAGE_SIZE);
+	$effect(() => {
+		void filters;
+		renderCap = PAGE_SIZE;
 	});
 
 	function updateFilters(next: GamesFilters): void {
@@ -73,7 +87,23 @@
 	// tradeoff in favour of never blocking the local list on network I/O.
 	const filteredLocal = $derived(filterLocalGames(localGamesStore.games, filters));
 	const showLive = $derived(liveGamesVisible(filters));
-	const history = $derived(mergeGameHistory(filteredLocal, showLive ? playerGamesStore.games : []));
+	const effectiveLive = $derived(showLive ? playerGamesStore.games : []);
+	// A live fetch failure releases the boundary (see gameHistoryPagination.ts: nothing should stay
+	// stuck behind a boundary that can never resolve further) but must NOT also hide "Show more" —
+	// the server may genuinely still have more once the guest retries, and canFetchMore (below,
+	// ungated by error) is what keeps that retry path alive instead of forcing a full page reload.
+	const boundaryHasMore = $derived(showLive && !playerGamesStore.error && playerGamesStore.hasMore);
+	const canFetchMore = $derived(showLive && playerGamesStore.hasMore);
+	const history = $derived(mergeGameHistory(filteredLocal, effectiveLive));
+	const paginated = $derived(
+		paginateGameHistory(history, effectiveLive, boundaryHasMore, renderCap, canFetchMore),
+	);
+
+	function showMore(): void {
+		const needsFetch = paginated.needsFetch;
+		renderCap += PAGE_SIZE;
+		if (needsFetch) void playerGamesStore.loadMore();
+	}
 
 	const options = $derived(opponentOptions(localGamesStore.games, playerOpponentsStore.opponents));
 
@@ -89,6 +119,17 @@
 			showLive,
 		),
 	);
+
+	// "Showing X of N" only when N is exact: a specific opponent (the same total the head-to-head
+	// card already shows), or no filters at all (every local game plus the guest's whole lobby
+	// total, #174). A result/source-only filter has no cheap exact denominator, so the line just
+	// shows a bare count rather than a misleading mismatched one.
+	const totalMatchingFilters = $derived.by(() => {
+		if (filters.vs) return headToHead ? totalGames(headToHead.counts) : null;
+		if (hasActiveFilters) return null;
+		const lobbyTotal = playerOpponentsStore.opponents.reduce((sum, o) => sum + o.games, 0);
+		return localGamesStore.games.length + lobbyTotal;
+	});
 </script>
 
 <section class="flex flex-col gap-6">
@@ -162,8 +203,13 @@
 				Couldn't refresh your games: {localGamesStore.error}
 			</div>
 		{/if}
+		<p class="text-xs text-content-muted">
+			Showing {paginated.visible.length}{totalMatchingFilters !== null
+				? ` of ${totalMatchingFilters}`
+				: ''} game{paginated.visible.length === 1 ? '' : 's'}
+		</p>
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-			{#each history as item (item.source === 'local' ? item.game.id : item.game.gameId)}
+			{#each paginated.visible as item (item.source === 'local' ? item.game.id : item.game.gameId)}
 				{#if item.source === 'local'}
 					<GameHistoryCard game={item.game} />
 				{:else}
@@ -171,5 +217,15 @@
 				{/if}
 			{/each}
 		</div>
+		{#if paginated.canShowMore}
+			<button
+				type="button"
+				onclick={showMore}
+				disabled={playerGamesStore.loading}
+				class="self-center px-6 py-2.5 rounded-xl bg-surface border border-border text-content font-bold hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+			>
+				{playerGamesStore.loading ? 'Loading…' : 'Show more'}
+			</button>
+		{/if}
 	{/if}
 </section>

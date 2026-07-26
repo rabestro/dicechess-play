@@ -10,7 +10,7 @@ describe('gamesApi', () => {
 
 	const okJson = (body: unknown) => vi.fn().mockResolvedValue({ ok: true, json: async () => body });
 
-	it('fetchPlayerGames GETs the URL-encoded guest id and returns the games array', async () => {
+	it('fetchPlayerGames GETs the URL-encoded guest id and returns the page (games + hasMore)', async () => {
 		const games = [
 			{
 				gameId: 'g-1',
@@ -23,17 +23,20 @@ describe('gamesApi', () => {
 				finishedAt: '2026-07-16T12:00:00Z',
 			},
 		];
-		const fetchMock = okJson({ games });
+		const fetchMock = okJson({ games, hasMore: true });
 		vi.stubGlobal('fetch', fetchMock);
 
-		expect(await fetchPlayerGames('11111111-1111-1111-1111-111111111111')).toEqual(games);
+		expect(await fetchPlayerGames('11111111-1111-1111-1111-111111111111')).toEqual({
+			games,
+			hasMore: true,
+		});
 		expect(fetchMock).toHaveBeenCalledWith(
 			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games',
 		);
 	});
 
 	it('URL-encodes a guest id that needs it', async () => {
-		const fetchMock = okJson({ games: [] });
+		const fetchMock = okJson({ games: [], hasMore: false });
 		vi.stubGlobal('fetch', fetchMock);
 
 		await fetchPlayerGames('weird id/with?chars');
@@ -48,7 +51,7 @@ describe('gamesApi', () => {
 	});
 
 	it('sends no query string when no filters are given', async () => {
-		const fetchMock = okJson({ games: [] });
+		const fetchMock = okJson({ games: [], hasMore: false });
 		vi.stubGlobal('fetch', fetchMock);
 
 		await fetchPlayerGames('11111111-1111-1111-1111-111111111111');
@@ -59,7 +62,7 @@ describe('gamesApi', () => {
 	});
 
 	it('forwards vs and result as query params', async () => {
-		const fetchMock = okJson({ games: [] });
+		const fetchMock = okJson({ games: [], hasMore: false });
 		vi.stubGlobal('fetch', fetchMock);
 
 		await fetchPlayerGames('11111111-1111-1111-1111-111111111111', {
@@ -73,13 +76,41 @@ describe('gamesApi', () => {
 	});
 
 	it('forwards only the filter that is given', async () => {
-		const fetchMock = okJson({ games: [] });
+		const fetchMock = okJson({ games: [], hasMore: false });
 		vi.stubGlobal('fetch', fetchMock);
 
 		await fetchPlayerGames('11111111-1111-1111-1111-111111111111', { vs: 'human' });
 
 		expect(fetchMock).toHaveBeenCalledWith(
 			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games?vs=human',
+		);
+	});
+
+	it('forwards before as a query param', async () => {
+		const fetchMock = okJson({ games: [], hasMore: false });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchPlayerGames('11111111-1111-1111-1111-111111111111', {
+			before: '2026-07-16T12:00:00Z',
+		});
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games?before=2026-07-16T12%3A00%3A00Z',
+		);
+	});
+
+	it('composes vs, result, and before together', async () => {
+		const fetchMock = okJson({ games: [], hasMore: false });
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchPlayerGames('11111111-1111-1111-1111-111111111111', {
+			vs: 'acme/alice',
+			result: 'win',
+			before: '2026-07-16T12:00:00Z',
+		});
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			'http://localhost:8080/players/11111111-1111-1111-1111-111111111111/games?vs=acme%2Falice&result=win&before=2026-07-16T12%3A00%3A00Z',
 		);
 	});
 

@@ -27,7 +27,11 @@ export function mergeGameHistory(local: LocalGameRecord[], live: PlayerGame[]): 
 	return items.sort((a, b) => sortTimestamp(b) - sortTimestamp(a));
 }
 
-function sortTimestamp(item: GameHistoryItem): number {
+/** Each item's own timestamp as epoch millis (`start_time` for local, `finishedAt` for live) — the
+ * ordering key `mergeGameHistory` sorts by; exported for `gameHistoryPagination.ts` (#150), which
+ * needs the same per-item timestamp to decide what's safe to render relative to the live boundary.
+ */
+export function sortTimestamp(item: GameHistoryItem): number {
 	const raw = item.source === 'local' ? item.game.start_time : item.game.finishedAt;
 	const parsed = Date.parse(raw);
 	// An unparseable timestamp sorts last rather than throwing or landing at the (very wrong) 1970
