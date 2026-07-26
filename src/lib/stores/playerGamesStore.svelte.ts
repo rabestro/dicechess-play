@@ -9,7 +9,7 @@ import { isLiveEnabled } from '$lib/live/liveApi';
  */
 function oldestFinishedAt(games: PlayerGame[]): string {
 	return games.reduce(
-		(oldest, g) => (Date.parse(g.finishedAt) < Date.parse(oldest) ? g.finishedAt : oldest),
+		(oldest, g) => (g.finishedAt < oldest ? g.finishedAt : oldest),
 		games[0].finishedAt,
 	);
 }
