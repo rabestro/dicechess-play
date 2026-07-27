@@ -156,7 +156,8 @@
 			// Lost the race (someone took it) or it expired — refresh the list.
 			error = 'That table was just taken — pick another.';
 			try {
-				seeks = await listSeeks();
+				const freshSeeks = await listSeeks();
+				if (!destroyed) seeks = freshSeeks;
 			} catch {
 				/* ignore */
 			}
