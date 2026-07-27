@@ -1,8 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { isLiveEnabled } from '$lib/live/liveApi';
 	import { fetchBotProfile, type BotProfile } from '$lib/leaderboard/leaderboardApi';
+	import type { PlayerOpponent } from '$lib/games/gamesApi';
+	import { emptyCounts, winRate } from '$lib/stats/playerRecord';
 	import WdlSummaryCard from '../../../../components/WdlSummaryCard.svelte';
+	import WdlCounts from '../../../../components/WdlCounts.svelte';
+	import WdlBar from '../../../../components/WdlBar.svelte';
 	import BotProfileGameCard from '../../../../components/BotProfileGameCard.svelte';
 	import BotBadge from '../../../../components/BotBadge.svelte';
 	import BotChallengePanel from '../../../../components/BotChallengePanel.svelte';
@@ -11,8 +16,9 @@
 	// ProfileRecentGame already existed with zero consumers before this route. This repo's first
 	// multi-segment dynamic route; follows the same client-side-fetch-in-$effect pattern
 	// games/[id] and live/[id] already establish (no +page.ts load function exists anywhere here).
-	// Tier 2 (record vs humans, head-to-head vs other models) and Tier 3 (rating history) are
-	// explicitly out of scope — see the issue's own tiering.
+	// Tier 2 (record vs humans, head-to-head vs other models, #165) reuses PlayerOpponent — the
+	// same wire shape `/me`'s "Online" section already renders via WdlBar/WdlCounts, just filtered
+	// by perspective instead of aggregated by guest. Tier 3 (rating history) stays out of scope.
 
 	let profile = $state<BotProfile | null>(null);
 	let loading = $state(false);
@@ -53,6 +59,24 @@
 	// as the leaderboard and catalog card, whose exact "±rd / · provisional / left ladder" text
 	// conventions this line reuses verbatim.
 	const wholeNumber = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+	interface BotOpponent extends PlayerOpponent {
+		team: string;
+		botName: string;
+	}
+
+	// `profile.opponents` defaults to `[]` rather than trusting the field is always present:
+	// play-api promotes production manually (a separate step from merging its PR), so this page
+	// can deploy — Cloudflare Pages auto-deploys every push to main — before the backend version
+	// that added the field does, and an old server's response simply omits it.
+	const headToHead = $derived(
+		(profile?.opponents ?? []).filter(
+			(o): o is BotOpponent => o.team !== null && o.botName !== null,
+		),
+	);
+	const vsHumans = $derived(
+		(profile?.opponents ?? []).find((o) => o.team === null) ?? emptyCounts(),
+	);
 </script>
 
 <svelte:head>
@@ -98,7 +122,40 @@
 			<BotChallengePanel team={profile.team} name={profile.name} />
 		</div>
 
-		<WdlSummaryCard counts={{ wins: profile.wins, draws: profile.draws, losses: profile.losses }} />
+		<div class="flex flex-col gap-2">
+			<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Ladder record</h3>
+			<WdlSummaryCard
+				counts={{ wins: profile.wins, draws: profile.draws, losses: profile.losses }}
+			/>
+		</div>
+
+		<div class="flex flex-col gap-2">
+			<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Vs humans</h3>
+			<WdlSummaryCard counts={vsHumans} />
+		</div>
+
+		{#if headToHead.length > 0}
+			<div class="flex flex-col gap-2">
+				<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Head-to-head</h3>
+				{#each headToHead as opp (`${opp.team}/${opp.botName}`)}
+					<a
+						href={resolve('/bots/[team]/[name]', { team: opp.team, name: opp.botName })}
+						class="rounded-xl border border-border bg-surface/40 hover:bg-surface-hover/60 hover:border-primary/50 p-4 flex flex-col gap-2 transition-colors"
+					>
+						<div class="flex items-center justify-between gap-3">
+							<span class="font-bold text-content truncate min-w-0">{opp.team} {opp.botName}</span>
+							<div class="flex items-center gap-3 shrink-0">
+								<WdlCounts counts={opp} />
+								<span class="font-mono text-sm font-bold text-content tabular-nums w-12 text-right">
+									{Math.round(winRate(opp) * 100)}%
+								</span>
+							</div>
+						</div>
+						<WdlBar counts={opp} />
+					</a>
+				{/each}
+			</div>
+		{/if}
 
 		<div class="flex flex-col gap-2">
 			<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Recent games</h3>
