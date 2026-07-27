@@ -1,4 +1,5 @@
 import { apiBase } from '../live/liveApi';
+import type { PlayerOpponent } from '../games/gamesApi';
 
 // REST client for the public rating-ladder read API (play-api D.2). The wire mirrors
 // play-api's `LeaderboardRoutes.scala` verbatim (camelCase, like the rest of the live wire) —
@@ -52,6 +53,15 @@ export interface BotProfile {
 	wins: number;
 	draws: number;
 	losses: number;
+	/** Aggregate record per opponent (#182): one row per other registered bot (head-to-head) plus
+	 * one collapsed row for every human/guest opponent combined ("vs humans", `team`/`botName`
+	 * both null). Counts every game, rated and casual alike — unlike `wins`/`draws`/`losses` above
+	 * (the ladder record: rated, decided only), so games against site visitors — always casual —
+	 * are visible here even though they don't count above. Same `PlayerOpponent` shape
+	 * `GET /players/{guestId}/opponents` uses (`$lib/games/gamesApi`) — the aggregate is symmetric
+	 * in whose external id is queried, so one wire type serves both.
+	 */
+	opponents: PlayerOpponent[];
 	recent: ProfileRecentGame[];
 }
 
