@@ -21,7 +21,9 @@ export interface Clocks {
 }
 
 // A game's time control, chosen at creation (mirrors the server's TimeControl ADT). Omitting it on
-// create means Unlimited.
+// create no longer means Unlimited: on every path a human can be seated (POST /lobby/seeks,
+// /bot/seeks, /games) the server fills in Fischer 600+10, so a clockless public game can only happen
+// by asking for `Unlimited` by name (play-api#185, this repo's #99).
 export type TimeControl =
 	| { Unlimited: Record<string, never> }
 	| { SuddenDeath: { initialSeconds: number } }

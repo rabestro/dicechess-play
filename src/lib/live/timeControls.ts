@@ -2,7 +2,9 @@ import type { TimeControl } from './liveTypes';
 
 export interface TimeControlPreset {
 	label: string;
-	value: TimeControl | null; // null = Unlimited (the field is omitted on create)
+	// `null` omits the field on create, which now yields the server's default (Fischer 600+10), NOT
+	// Unlimited — see liveTypes.ts. No preset is null today; the type keeps the option open.
+	value: TimeControl | null;
 }
 
 /** The time-control choices offered when creating a game or a seek. The first preset is the

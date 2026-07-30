@@ -31,7 +31,9 @@ describe('lobbyApi', () => {
 		});
 	});
 
-	it('createSeek omits the time control when null (unlimited)', async () => {
+	// Omitting the field is still the wire behaviour for a null preset — what it *means* changed
+	// server-side: the server now fills in its own timed default rather than Unlimited.
+	it('createSeek omits the time control field entirely when null', async () => {
 		const fetchMock = okJson({ seekId: 's1', secret: 'x' });
 		vi.stubGlobal('fetch', fetchMock);
 		await createSeek('alice', null);
