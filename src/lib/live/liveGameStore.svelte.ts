@@ -4,12 +4,12 @@ import {
 	deriveChessgroundDests,
 	buildDfen,
 	getDieValue,
-	DICE_TO_CHAR_MAP,
 } from '../../utils/fenUtils';
 import type { DieState } from '../playWithBot/playWithBotDice.svelte';
 import { LiveClient, randomClientSeed, type ConnStatus } from './liveClient';
 import { wsUrl } from './liveApi';
 import { splitDfen, stripDfen } from './dfenUtils';
+import { dieStateFromValue, expandTurn } from './turnReplay';
 import type {
 	ClientCommand,
 	Clocks,
@@ -24,7 +24,6 @@ import * as DiceChessEngine from '@rabestro/dicechess-engine';
 import { buildTurnBlocks } from '../playWithBot/turnBlocks';
 import type { BotMoveHistoryState } from '../playWithBot/playWithBotHistory.svelte';
 import type { TurnBlock } from '../types';
-import { logger } from '../utils/logger';
 import { playDiceSound } from '../sound';
 import { ROLL_ANIMATION_MS, MOVE_STEP_MS, PASS_DWELL_MS, GAME_END_SUSPENSE_MS } from '../timings';
 import { lastMoveKeys } from '../lastMove';
@@ -34,15 +33,6 @@ import { toastStore } from '../toastStore.svelte';
 const DiceChess = (DiceChessEngine as any).DiceChess;
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-
-// Turns a SnapshotTurn's raw `dice: number[]` back into the piece-letter DieState the UI (and
-// getDieValue) expects, via fenUtils' DICE_TO_CHAR_MAP — the same table buildDfen uses. Unlike a
-// live DiceRolled, a replayed turn's dice have no dfen to read the letters from directly: its dfen
-// has already moved on to the position after the turn.
-function dieStateFromValue(value: number, color: 'w' | 'b'): DieState {
-	const letter = DICE_TO_CHAR_MAP[value] ?? String(value);
-	return { value: color === 'w' ? letter : letter.toLowerCase(), allowed: true, used: false };
-}
 
 export type LiveStatus = 'connecting' | 'waiting' | 'playing' | 'over';
 export type LiveOutcome = 'won' | 'lost' | 'draw';
@@ -679,95 +669,31 @@ export class LiveGameStore {
 	 * (or one PASS entry if `moves` is empty) starting at `this.maxMoveIndex + 1`. Shared by the live
 	 * incremental path (`recordTurn`, replaying on top of the current confirmed position/dice) and
 	 * `replayHistory` (replaying a joining client's backlog, turn by turn from the opening position).
-	 * Returns the resulting board fen, so a caller chaining multiple turns can feed it back in. */
+	 * Returns the resulting board fen, so a caller chaining multiple turns can feed it back in.
+	 *
+	 * The engine walk itself is `expandTurn` (`./turnReplay`) — this method only owns the
+	 * historyMap-index bookkeeping, shared with `reconstructServerHistory`'s archived-game replay
+	 * (#163), which needs the same per-move engine walk but has no `historyMap` of its own to push
+	 * into.
+	 */
 	private appendTurnEntries(
 		boardFen: string,
 		color: 'w' | 'b',
 		dice: DieState[],
 		moves: string[],
 	): string {
-		if (moves.length === 0) {
-			// A legitimate pass turn (the rolled dice had no legal move) — record it with the
-			// PASS convention buildTurnBlocks expects instead of silently dropping the turn.
+		const { entries, resultFen } = expandTurn(boardFen, color, dice, moves);
+		for (const entry of entries) {
 			const nextIndex = this.maxMoveIndex + 1;
 			this.historyMap[String(nextIndex)] = {
-				fen: boardFen,
+				fen: entry.fen,
 				active_color: color,
-				dices: dice.map((d) => ({ ...d })),
-				gameMoveHistoryMove: { from: '', to: '', promotion: '' },
+				dices: entry.dices,
+				gameMoveHistoryMove: entry.move,
 			};
 			this.maxMoveIndex = nextIndex;
-			return boardFen;
 		}
-
-		const diceValues = dice.map((d) => getDieValue(d));
-		let currentDfen = buildDfen(boardFen, diceValues, color);
-		const tempDiceState = dice.map((d) => ({ ...d }));
-		let nextBoardFen = boardFen;
-
-		for (const move of moves) {
-			if (move.length < 4) continue;
-			const from = move.slice(0, 2);
-			const dest = move.slice(2, 4);
-			const promo = move.slice(4) || undefined;
-
-			const piece = getPieceFromFen(nextBoardFen, from);
-			if (piece) {
-				const dieVal = getDieValue(piece);
-				const dieIndex = tempDiceState.findIndex(
-					(d) => d.allowed && !d.used && getDieValue(d) === dieVal,
-				);
-				if (dieIndex !== -1) {
-					tempDiceState[dieIndex].used = true;
-				}
-				// Handle castling rook die consumption
-				if (
-					piece.toLowerCase() === 'k' &&
-					Math.abs(from.charCodeAt(0) - dest.charCodeAt(0)) === 2
-				) {
-					const rookDie = getDieValue('r');
-					const rIdx = tempDiceState.findIndex(
-						(d) => d.allowed && !d.used && getDieValue(d) === rookDie,
-					);
-					if (rIdx !== -1) {
-						tempDiceState[rIdx].used = true;
-					}
-				}
-			}
-
-			const applied = DiceChess.applyMove(currentDfen, from, dest, promo);
-			if (!applied) {
-				logger.error(
-					'appendTurnEntries: local replay rejected a server-confirmed move; history truncated',
-					{
-						move,
-						moves,
-						color,
-						lastRecordedIndex: this.maxMoveIndex,
-					},
-				);
-				break;
-			}
-
-			nextBoardFen = applied.split(/\s+/).slice(0, 6).join(' ');
-			const nextIndex = this.maxMoveIndex + 1;
-
-			this.historyMap[String(nextIndex)] = {
-				fen: nextBoardFen,
-				active_color: color,
-				dices: tempDiceState.map((d) => ({ ...d })),
-				gameMoveHistoryMove: {
-					from,
-					to: dest,
-					promotion: promo ? promo.toUpperCase() : 'NONE',
-				},
-			};
-
-			this.maxMoveIndex = nextIndex;
-			currentDfen = applied;
-		}
-
-		return nextBoardFen;
+		return resultFen;
 	}
 
 	private sleep(ms: number): Promise<void> {

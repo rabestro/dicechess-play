@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import type { PlayerGame } from '$lib/games/gamesApi';
 	import { parseGameResultsTimeControl } from '$lib/live/timeControls';
 	import { formatDate } from '../utils/formatters';
@@ -34,9 +35,10 @@
 	};
 </script>
 
-<div
-	class="bg-surface/60 border border-border rounded-2xl p-5 flex flex-col gap-4"
-	title="Played online — recorded by the server, not this browser"
+<a
+	href={resolve('/replay/[id]', { id: game.gameId })}
+	class="group bg-surface/60 hover:bg-surface-hover/80 border border-border hover:border-primary/50 rounded-2xl p-5 flex flex-col gap-4 transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
+	title="Played online — recorded by the server. Click to watch the replay."
 >
 	<div class="flex justify-between items-center gap-2">
 		<span
@@ -75,4 +77,4 @@
 		<span>{termination}</span>
 		<span>{timeControl}</span>
 	</div>
-</div>
+</a>
