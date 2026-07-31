@@ -38,7 +38,7 @@
 <a
 	href={resolve('/replay/[id]', { id: game.gameId })}
 	class="group bg-surface/60 hover:bg-surface-hover/80 border border-border hover:border-primary/50 rounded-2xl p-5 flex flex-col gap-4 transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
-	title="Played online — recorded by the server. History unavailable for games played before replay existed."
+	title="Played online — recorded by the server. Click to watch the replay."
 >
 	<div class="flex justify-between items-center gap-2">
 		<span

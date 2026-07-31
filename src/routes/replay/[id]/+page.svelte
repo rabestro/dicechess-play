@@ -31,7 +31,9 @@
 	let error = $state<string | null>(null);
 	let currentMoveIndex = $state(0);
 	let orientation = $state<'white' | 'black'>('white');
-	let copiedSeed = $state(false);
+	// Which fairness field's Copy button most recently succeeded ('seed' | 'whiteSeed' | 'blackSeed'),
+	// so each button shows its own "Copied" feedback independently.
+	let copiedField = $state<string | null>(null);
 
 	$effect(() => {
 		const id = page.params.id;
@@ -105,12 +107,14 @@
 		orientation = orientation === 'white' ? 'black' : 'white';
 	}
 
-	async function copySeed() {
-		if (!history?.fairness.seed || !navigator.clipboard) return;
+	async function copyValue(field: string, value: string) {
+		if (!navigator.clipboard) return;
 		try {
-			await navigator.clipboard.writeText(history.fairness.seed);
-			copiedSeed = true;
-			setTimeout(() => (copiedSeed = false), 1500);
+			await navigator.clipboard.writeText(value);
+			copiedField = field;
+			setTimeout(() => {
+				if (copiedField === field) copiedField = null;
+			}, 1500);
 		} catch {
 			// Clipboard write was blocked/rejected; the value stays selectable for manual copy.
 		}
@@ -299,29 +303,35 @@
 			<h3 class="text-xs font-bold uppercase tracking-wider text-content-muted">
 				Provably-fair dice
 			</h3>
-			{#if fairnessRevealed && history.fairness.commit && history.fairness.seed}
+			{#snippet copyableRow(label: string, field: string, value: string)}
+				<div class="flex items-center gap-2">
+					<span class="text-content-muted shrink-0">{label}:</span>
+					<code
+						class="flex-1 min-w-0 truncate bg-background/50 border border-border rounded px-2 py-1 text-content"
+					>
+						{value}
+					</code>
+					<button
+						type="button"
+						onclick={() => copyValue(field, value)}
+						class="shrink-0 px-3 py-1 rounded-lg bg-primary text-primary-content font-bold text-xs hover:bg-primary-hover transition-colors"
+					>
+						{copiedField === field ? 'Copied' : 'Copy'}
+					</button>
+				</div>
+			{/snippet}
+			{#if fairnessRevealed && history.fairness.commit && history.fairness.seed && history.fairness.clientSeeds}
 				<p class="text-xs text-content-muted">
-					Every roll can be independently re-derived from the commitment and the revealed seed.
+					Every roll can be independently re-derived from the commitment, the revealed seed, and
+					both sides' client seeds.
 				</p>
 				<div class="flex flex-col gap-1.5 font-mono text-xs">
 					<span class="text-content-muted"
 						>Commit: <span class="text-content">{history.fairness.commit}</span></span
 					>
-					<div class="flex items-center gap-2">
-						<span class="text-content-muted">Seed:</span>
-						<code
-							class="flex-1 min-w-0 truncate bg-background/50 border border-border rounded px-2 py-1 text-content"
-						>
-							{history.fairness.seed}
-						</code>
-						<button
-							type="button"
-							onclick={copySeed}
-							class="shrink-0 px-3 py-1 rounded-lg bg-primary text-primary-content font-bold text-xs hover:bg-primary-hover transition-colors"
-						>
-							{copiedSeed ? 'Copied' : 'Copy'}
-						</button>
-					</div>
+					{@render copyableRow('Seed', 'seed', history.fairness.seed)}
+					{@render copyableRow('White seed', 'whiteSeed', history.fairness.clientSeeds.white)}
+					{@render copyableRow('Black seed', 'blackSeed', history.fairness.clientSeeds.black)}
 				</div>
 			{:else}
 				<p class="text-xs text-content-muted">
