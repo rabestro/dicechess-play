@@ -1,7 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import LiveGameHistoryCard from './LiveGameHistoryCard.svelte';
 import type { PlayerGame } from '$lib/games/gamesApi';
+
+// The card links out via resolve(); stub it so the component renders without the SvelteKit runtime,
+// substituting [id] the same way the real router would (same pattern as GameHistoryCard.test.ts).
+vi.mock('$app/paths', () => ({
+	resolve: (path: string, params?: Record<string, string>) =>
+		params ? path.replace(/\[(\w+)\]/g, (_, key) => params[key]) : path,
+}));
 
 function game(overrides: Partial<PlayerGame> = {}): PlayerGame {
 	return {
@@ -55,8 +62,8 @@ describe('LiveGameHistoryCard', () => {
 		expect(getByText('5 min')).toBeTruthy();
 	});
 
-	it('is not a clickable link — there is nowhere to navigate (no replay data exists)', () => {
-		const { container } = render(LiveGameHistoryCard, { game: game() });
-		expect(container.querySelector('a')).toBeNull();
+	it('links to the replay page for its own gameId (#163)', () => {
+		const { container } = render(LiveGameHistoryCard, { game: game({ gameId: 'g-42' }) });
+		expect(container.querySelector('a')?.getAttribute('href')).toBe('/replay/g-42');
 	});
 });

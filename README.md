@@ -40,6 +40,9 @@ src/
 │   ├── live/ · live/[id]/     friend-link entry · server-authoritative live board (WebSocket)
 │   ├── games/ · games/[id]/   game history (local + play-api's own lobby/live games), filters +
 │   │                          head-to-head view (#151), "Show more" pagination (#150) · replay
+│   ├── replay/[id]/           public replay for a server-recorded game (play-api GET
+│   │                          /games/{id}/history, #163) — engine-walked per-turn positions,
+│   │                          board-flip toggle, provably-fair commit/seed section
 │   ├── leaderboard/           bot rating ladder (play-api GET /leaderboard)
 │   ├── bots/                  human-play bot catalog (play-api GET /lobby/bots, ADR-0014)
 │   │   └── [team]/[name]/     bot profile — rating, ladder W-D-L, recent games (#152 Tier 1;
@@ -58,7 +61,9 @@ src/
 ├── lib/
 │   ├── playWithBot/           bot-play core: store, engine worker, dice/history, opening book
 │   ├── live/                  live-play client: liveGameStore, liveClient (WS + reconnect),
-│   │                          liveApi/lobbyApi (REST), liveTypes (play-api wire mirror),
+│   │                          liveApi/lobbyApi/historyApi (REST), liveTypes (play-api wire mirror),
+│   │                          turnReplay (engine-driven per-turn walk, shared by liveGameStore and
+│   │                          reconstructServerHistory, #163),
 │   │                          dfen/board/clock/seat/timeControl/playerLabel helpers
 │   ├── leaderboard/           leaderboardApi — rating-ladder + bot-profile read client (play-api
 │   │                          wire mirror; GET /bots/{team}/{name}, #152)
@@ -74,7 +79,9 @@ src/
 │   │   ├── mapper.ts          LocalGameRecord → GameIngestWire (UUIDv5 id, dice decode)
 │   │   ├── gatewayClient.ts   POST to the ingest gateway (token never in browser)
 │   │   └── outbox.ts          flush pending games → gateway
-│   ├── history/               move-history reconstruction for replays
+│   ├── history/               move-history reconstruction for replays: reconstructHistoryMap
+│   │                          (local IndexedDB games) · reconstructServerHistory (play-api's
+│   │                          per-turn archive → the same historyMap shape, #163)
 │   ├── stats/                 playerRecord (local W-D-L) · lobbyRecord (play-api opponents
 │   │                          aggregate + /me's "In the lobby" label/link helpers, head-to-head
 │   │                          lookup by ?vs=)
