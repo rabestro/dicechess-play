@@ -97,7 +97,12 @@
 		history ? history.termination.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : '',
 	);
 
-	const fairnessRevealed = $derived(!!history?.fairness.seed);
+	// `commit` is meant to always be present (published at game creation, never itself secret) — but
+	// the archive computes it independently of the reveal gate (see play-api's GameArchive), so a
+	// malformed stored server seed could in principle leave it null even when seed/clientSeeds are
+	// populated. Requiring it here too means the fallback copy below never claims a commitment was
+	// published when it wasn't.
+	const fairnessRevealed = $derived(!!history?.fairness.seed && !!history?.fairness.commit);
 
 	function setMove(index: number) {
 		currentMoveIndex = Math.max(0, Math.min(index, maxMoveIndex));
@@ -333,11 +338,13 @@
 					{@render copyableRow('White seed', 'whiteSeed', history.fairness.clientSeeds.white)}
 					{@render copyableRow('Black seed', 'blackSeed', history.fairness.clientSeeds.black)}
 				</div>
-			{:else}
+			{:else if history.fairness.commit}
 				<p class="text-xs text-content-muted">
 					The dice commitment is published, but the seed is withheld until this game's paired ladder
 					match also concludes — it will appear here once both are over.
 				</p>
+			{:else}
+				<p class="text-xs text-content-muted">Fairness details aren't available for this game.</p>
 			{/if}
 		</div>
 	{/if}
