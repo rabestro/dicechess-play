@@ -23,7 +23,7 @@ Generated extract of AGENTS.md review rules for the Gemini Code Assist bot — k
 - Do not change `src/lib/ingest/types.ts` (`GameIngestWire`) or `src/lib/live/liveTypes.ts` casually — both mirror external contracts (analytics ingest, play-api Circe codecs); changes require counterpart-repo coordination.
 - Do not make the outbox retry `rejected` (400/422) games — they are permanently quarantined by design; only transient errors are retried.
 - Do not duplicate pacing constants — `src/lib/timings.ts` is the single source for both game surfaces.
-- No direct analytics-API calls or bearer tokens in client code — recording goes through the ingest gateway only.
+- No direct analytics-API calls or bearer tokens in client code — recording goes through play-api's `POST /ingest/games` only.
 - No code checkout/execution steps in `labeler.yaml` (`pull_request_target` has write permissions on fork PRs).
 
 ## Testing expectations

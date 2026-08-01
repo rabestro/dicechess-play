@@ -41,14 +41,11 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Public URL of the ingest gateway, baked into the bundle at build time.
-          # Set it as a repo VARIABLE (Settings → Secrets and variables → Actions →
-          # Variables → VITE_INGEST_GATEWAY_URL). Empty = recording disabled (games
-          # stay in IndexedDB). Changing it requires a rebuild + redeploy.
-          VITE_INGEST_GATEWAY_URL: ${{ vars.VITE_INGEST_GATEWAY_URL }}
-          # Public URL of the play-api (live HvH). Baked in here because the bundle is built in
-          # Actions and Direct-Uploaded — a Cloudflare Pages *dashboard* variable would never reach
-          # vite build. Override via a repo VARIABLE (vars.VITE_PLAY_API_URL); empty = /live disabled.
+          # Public URL of the play-api (live HvH + finished-game recording via POST
+          # /ingest/games). Baked in here because the bundle is built in Actions and
+          # Direct-Uploaded — a Cloudflare Pages *dashboard* variable would never reach
+          # vite build. Override via a repo VARIABLE (vars.VITE_PLAY_API_URL); empty =
+          # /live disabled AND recording disabled (games stay in IndexedDB).
           VITE_PLAY_API_URL: ${{ vars.VITE_PLAY_API_URL || 'https://play-api.jc.id.lv' }}
 
       # wrangler pages deploy does not auto-create the project; create it once

@@ -19,7 +19,7 @@ dicechess-play is the public Dice Chess play site: a fully client-side SvelteKit
 - `src/routes/` — pages: `+page` (home), `play/`, `lobby/`, `live/[id]/`, `games/` + `games/[id]/` (local history & replay), `me/` (guest profile + restore code). `+layout.ts` disables SSR/prerender.
 - `src/lib/playWithBot/` — bot-play surface: `playWithBotStore.svelte.ts` (game store), `playWithBot.worker.ts` (engine runs here), dice/history submodules, `opening_book.json`.
 - `src/lib/live/` — live surface: `liveGameStore.svelte.ts` (applies versioned `ServerEvent`s, optimistic moves rolled back on `Rejected`), `liveClient.ts` (WS + reconnect backoff, deliberately rune-free), `liveApi.ts`/`lobbyApi.ts` (REST), `liveTypes.ts`, clocks/seat/time-control helpers.
-- `src/lib/ingest/` — finished-game recording: `mapper.ts` (LocalGameRecord → `GameIngestWire`), `gatewayClient.ts` (posts to the ingest gateway; the browser never holds an analytics token), `outbox.ts`, `guestIdentity.ts`.
+- `src/lib/ingest/` — finished-game recording: `mapper.ts` (LocalGameRecord → `GameIngestWire`), `ingestClient.ts` (posts to play-api `POST /ingest/games`; the browser never holds an analytics token), `outbox.ts`, `guestIdentity.ts`.
 - `src/lib/localGamesDB.ts` — IndexedDB via `idb`; `sync_status`: `pending` | `synced` | `quarantined`.
 - `src/lib/history/`, `src/lib/stats/` — replay reconstruction, local player record.
 - `src/lib/stores/` — singleton rune stores: `themeStore` (7 themes), `localGamesStore`, `chromeStore`.
@@ -48,7 +48,7 @@ npm run test:watch      # watch mode; npm run test:coverage for v8 coverage
 ```
 
 - Run `npm ci` immediately after every `git pull`. Failure signature of skipping it: local prettier disagrees with CI and produces false formatting "drift" (this repo has 4 commits that exist only to undo such damage). When local lint/format disagrees with CI, compare tool versions first — never "fix" the files.
-- Local live-play dev: run play-api locally and set `VITE_PLAY_API_URL=http://localhost:8080` in `.env.local`. Empty `VITE_INGEST_GATEWAY_URL` = recording disabled (games stay in IndexedDB); empty `VITE_PLAY_API_URL` = `/live` routes disabled.
+- Local live-play dev: run play-api locally and set `VITE_PLAY_API_URL=http://localhost:8080` in `.env.local`. Empty `VITE_PLAY_API_URL` = `/live` routes disabled AND recording disabled (games stay in IndexedDB) — both share the same base URL.
 
 ## Quality gates — Definition of Done
 
@@ -85,8 +85,8 @@ npm run test:watch      # watch mode; npm run test:coverage for v8 coverage
 - Never add game-logic decisions to the live client. `/live` is server-authoritative: the client only applies versioned `ServerEvent`s and rolls back optimistic moves on `Rejected`. Game rules belong in the engine worker (`/play`) or in play-api.
 - Live-vs-viewed separation — this codebase's signature bug, fixed twice (PRs #45, #56): game logic must read the private live fields (`liveFen`/`liveActiveColor`/`liveDice`), never the public presentation getters (`currentBoardFen`/`activeColor`/`currentDice`), because those switch to historical values while the user scrubs move history. Documented at the top of `liveGameStore.svelte.ts`.
 - `liveGameStore` uses `epoch`/`pumpingEpoch` counters to invalidate in-flight async presentation loops across reset/reconnect — respect them when touching the present pipeline; racing loops caused several past fixes.
-- `gatewayClient.classify`: 200 = `exists` (first-writer-wins dedup), 201 = `created`, 400/422 = permanent `rejected` → quarantined and never retried, everything else = `error` → retried. Do not "fix" the outbox to retry rejects.
-- `VITE_*` env vars are baked at BUILD time — the bundle is direct-uploaded to Cloudflare Pages, so Pages dashboard variables do nothing. Changing `VITE_INGEST_GATEWAY_URL`/`VITE_PLAY_API_URL` requires rebuild + redeploy (`deploy.yaml` reads them from repo variables).
+- `ingestClient.classify`: 200 = `exists` (first-writer-wins dedup), 201 = `created` (accepted into play-api's relay queue — analytics replay happens asynchronously server-side), 400/422 = permanent `rejected` → quarantined and never retried, everything else = `error` → retried. Do not "fix" the outbox to retry rejects.
+- `VITE_*` env vars are baked at BUILD time — the bundle is direct-uploaded to Cloudflare Pages, so Pages dashboard variables do nothing. Changing `VITE_PLAY_API_URL` requires rebuild + redeploy (`deploy.yaml` reads it from a repo variable).
 - Every push to `main` auto-deploys to production Cloudflare Pages. The never-commit-to-main rule is absolute here.
 - Releases are manual (`Ops: Release` workflow_dispatch bumps a git tag); `package.json` stays `0.0.0`. Never push tags yourself.
 - The engine loads via `(DiceChessEngine as any).DiceChess` (Scala.js export shape) and runs in a Web Worker for bot play; only legal-move hints and optimistic move application run on the main thread in the live store.
@@ -132,7 +132,7 @@ Repo-specific additions:
 
 - lefthook pre-commit runs a betterleaks secret scan on staged files — keep hooks
   installed (`mise run hook:install`).
-- The browser must never hold the analytics Bearer token — recording goes through the ingest gateway (`gatewayClient.ts`). Do not add direct analytics-API calls to the client.
+- The browser must never hold the analytics Bearer token — recording goes through play-api's `POST /ingest/games` (`ingestClient.ts`), which relays to analytics server-side. Do not add direct analytics-API calls to the client.
 - Provably-fair dice depend on the client seed contribution in `liveClient.ts` (`randomClientSeed`) — changes there affect the public verification procedure; treat as a cross-repo contract with play-api.
 - `NODE_AUTH_TOKEN` is a real PAT: keep it in your shell env or `.env.local`, never in committed files.
 

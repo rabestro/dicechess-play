@@ -1,9 +1,10 @@
-// Durable ingest outbox: flush finished games from IndexedDB to the gateway.
+// Durable ingest outbox: flush finished games from IndexedDB to play-api.
 //
 // The play store saves every finished game to localGamesDB with sync_status 'pending'
 // (the durable, offline-first outbox). This flush maps each pending record to the
-// analytics contract and posts it via the gateway. On 'created'/'exists' the record is
-// marked synced; 'rejected'/'error' are left pending for retry/quarantine.
+// analytics contract and posts it to play-api's /ingest/games, which relays it to
+// analytics server-side. On 'created'/'exists' the record is marked synced;
+// 'rejected'/'error' are left pending for retry/quarantine.
 //
 // TODO(phase-1): backoff + a dedicated 'quarantined' state for 422 rejects so a bad
 // record is surfaced for review instead of retried forever.
@@ -11,7 +12,7 @@
 import { getPendingGames, markGameAsSynced, markGameAsQuarantined } from '$lib/localGamesDB';
 import { getGuestId } from './guestIdentity';
 import { toGameIngest } from './mapper';
-import { postGame } from './gatewayClient';
+import { postGame } from './ingestClient';
 
 export interface FlushSummary {
 	created: number;
