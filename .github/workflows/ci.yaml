@@ -46,3 +46,21 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      # Everything above this line tests source. This tests what actually ships: the smoke drives
+      # the built dist/ through `vite preview` and plays a real move. vitest never bundles the
+      # Scala.js engine, so without this a bundler that miscompiles it reaches production with a
+      # fully green pipeline — which is exactly how #185 happened.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test the built bundle
+        run: npm run test:e2e
+
+      - name: Upload smoke failure trace
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-trace
+          path: test-results/
+          retention-days: 7

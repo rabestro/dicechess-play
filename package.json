@@ -26,7 +26,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"prepare": "svelte-kit sync || echo \"\""
+		"prepare": "svelte-kit sync || echo \"\"",
+		"test:e2e": "playwright test"
 	},
 	"dependencies": {
 		"@lichess-org/chessground": "^10.1.1",
@@ -36,6 +37,7 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
+		"@playwright/test": "^1.62.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.70.1",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
