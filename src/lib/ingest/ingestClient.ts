@@ -31,10 +31,14 @@ function classify(status: number): IngestOutcome {
 	return 'error';
 }
 
+// A hung connection would otherwise stall the sequential flushOutbox() loop for the whole
+// visit — an abort classifies as 'error' and the record stays pending for the next flush.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 /**
  * Send one game to play-api. Resolves with a classified outcome; never throws on
- * HTTP status (transport errors resolve to 'error' so the caller can retry/quarantine
- * via the localGamesDB outbox).
+ * HTTP status (transport errors and timeouts resolve to 'error' so the caller can
+ * retry/quarantine via the localGamesDB outbox).
  *
  * TODO(phase-1): retry with backoff on error instead of waiting for the next visit.
  */
@@ -48,6 +52,7 @@ export async function postGame(payload: GameIngestWire): Promise<IngestResult> {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(payload),
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 		});
 		let body: unknown = undefined;
 		try {

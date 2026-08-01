@@ -61,6 +61,20 @@ describe('ingestClient', () => {
 		expect(res).toMatchObject({ outcome: 'error', status: 0 });
 	});
 
+	it('bounds the request with a timeout signal, and an abort classifies as error', async () => {
+		const fetchMock = stubFetch(201);
+		await postGame(payload);
+		const init = fetchMock.mock.calls[0][1] as RequestInit;
+		expect(init.signal).toBeInstanceOf(AbortSignal);
+
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockRejectedValue(new DOMException('signal timed out', 'TimeoutError')),
+		);
+		const res = await postGame(payload);
+		expect(res).toMatchObject({ outcome: 'error', status: 0 });
+	});
+
 	it('resolves to error with status 0 when no base URL is configured', async () => {
 		vi.stubEnv('VITE_PLAY_API_URL', '');
 		const fetchMock = stubFetch(201);

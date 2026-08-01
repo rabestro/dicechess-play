@@ -3,11 +3,12 @@
 // The play store saves every finished game to localGamesDB with sync_status 'pending'
 // (the durable, offline-first outbox). This flush maps each pending record to the
 // analytics contract and posts it to play-api's /ingest/games, which relays it to
-// analytics server-side. On 'created'/'exists' the record is marked synced;
-// 'rejected'/'error' are left pending for retry/quarantine.
+// analytics server-side. On 'created'/'exists' the record is marked synced; 'rejected'
+// (400/422, permanent) is quarantined and never retried; 'error' is left pending for
+// the next flush.
 //
-// TODO(phase-1): backoff + a dedicated 'quarantined' state for 422 rejects so a bad
-// record is surfaced for review instead of retried forever.
+// TODO(phase-1): retry with backoff for 'error' records instead of waiting for the
+// next visit, and surface quarantined records for review.
 
 import { getPendingGames, markGameAsSynced, markGameAsQuarantined } from '$lib/localGamesDB';
 import { getGuestId } from './guestIdentity';
