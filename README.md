@@ -1,32 +1,63 @@
 # dicechess-play
 
-Public site to **play Dice Chess against our bots** — anonymous, no sign-up. Phase 1 of
-the play-site roadmap: a visitor plays a full game in the browser, and the finished game
-is recorded to `dicechess-analytics` as a new source, `playsite`.
+The public **Dice Chess play site** ([play.jc.id.lv](https://play.jc.id.lv)) — anonymous, no
+sign-up. Two ways to play:
 
-> Private repo. Decisions and roadmap live in the `dicechess-docs` wiki under
-> **Play Site** (`00 Overview`, `01 Дорожная карта`, `02 Архитектура`, `03 Фаза 1`,
-> `Decisions/ADR-0001…0006`).
+- **`/play` — against our bots**, fully in the browser: the Scala.js engine runs client-side in
+  a Web Worker, so a game needs no server at all. Finished games are recorded to
+  `dicechess-analytics` as the `playsite` source.
+- **`/lobby` + `/live/[id]` — against another human**, served by the sibling `dicechess-play-api`.
+  That server is authoritative: it owns the dice (provably fair), the clocks, and move legality;
+  this client only applies versioned events and rolls back optimistic moves.
+
+Around them: a bot catalog (`/bots`), the rating ladder (`/leaderboard`), local + server game
+history with replays (`/games`, `/replay/[id]`), and a guest profile (`/me`).
+
+> Public repo, AGPL-3.0 — external contributors sign the CLA (`CLA.md`). Decisions and roadmap
+> live in the private `dicechess-docs` wiki under **Play Site**; ADRs are referenced by number
+> (ADR-0002 client authority, ADR-0007 server authority, ADR-0014 bot catalog).
 
 ## Stack
 
-SvelteKit 2 · Svelte 5 (runes) · Tailwind 4 · `adapter-static` (SPA) · PWA
-(`@vite-pwa/sveltekit`). The Dice Chess engine (`@rabestro/dicechess-engine`, Scala.js)
-runs **client-side** in a Web Worker — phase 1 is deliberately client-authoritative
-(free bot play has nothing to cheat; the analytics replay gate still guarantees
-legality). Theme system (7 themes) is shared with `dicechess-analytics-ui`.
+SvelteKit 2 · Svelte 5 (runes) · Tailwind 4 · `adapter-static` (SPA, `ssr=false`) · PWA
+(`@vite-pwa/sveltekit`). Game rules come from one place — the `@rabestro/dicechess-engine`
+(Scala.js) artifact, pinned in `package.json`. Theme system (7 themes) is shared with
+`dicechess-analytics-ui`.
 
 ## Getting started
 
 ```bash
-export NODE_AUTH_TOKEN=ghp_xxx   # PAT with read:packages (GitHub Packages — see .env.example)
+export NODE_AUTH_TOKEN=ghp_xxx   # PAT with read:packages — see Configuration
 mise run setup                   # npm install
+mise run hook:install            # register the lefthook Git hooks (once per clone)
 mise run dev                     # vite dev → http://localhost:5173
-mise run check                   # lint + format + svelte-check
+mise run check                   # eslint + prettier --check + svelte-check
+mise run test                    # vitest run
+mise run compile                 # vite build → dist/
 ```
 
-The engine and chessground are published on GitHub Packages, so `npm install` needs
-`NODE_AUTH_TOKEN` (see `.npmrc`).
+Only the `@rabestro` scope resolves from GitHub Packages (see `.npmrc`), and that needs
+`NODE_AUTH_TOKEN` even though the packages are public — everything else, chessground included,
+comes from the public npm registry. Failure signature: `npm install` dies with `401 Unauthorized`
+on `@rabestro/dicechess-engine`.
+
+Run `npm ci` right after every `git pull`: a stale `node_modules` makes local Prettier disagree
+with CI and produce phantom formatting drift.
+
+To work on live play, run `dicechess-play-api` locally and point `VITE_PLAY_API_URL` at it in
+`.env.local`.
+
+## Configuration
+
+| Variable                  | When           | Effect                                                                          |
+| ------------------------- | -------------- | ------------------------------------------------------------------------------- |
+| `NODE_AUTH_TOKEN`         | install        | GitHub PAT with `read:packages`, for the `@rabestro` scope                      |
+| `VITE_INGEST_GATEWAY_URL` | build (client) | Base URL of the ingest gateway. Empty = recording off (games stay in IndexedDB) |
+| `VITE_PLAY_API_URL`       | build (client) | Base URL of play-api. Empty = the `/live` routes are disabled                   |
+
+`VITE_*` values are **baked into the bundle at build time** — the site is Direct-Uploaded to
+Cloudflare Pages, so Pages dashboard variables never reach `vite build`. Changing either one means
+a rebuild and redeploy; in CI they come from repo variables.
 
 ## Layout
 
@@ -52,12 +83,13 @@ src/
 ├── components/                shared UI
 │   ├── Board.svelte           thin chessground wrapper driven by either game store
 │   ├── lib/Chessground.svelte
-│   ├── PlayerStrip · DicePanel · MoveHistory · GameEndModal · BotBadge
+│   ├── PlayerStrip · DicePanel · MoveHistory · GameEndModal · BotBadge · PawnPromotionSelector
 │   ├── GameHistoryCard · LiveGameHistoryCard · BotProfileGameCard · WdlBar · WdlCounts
-│   │                     WdlSummaryCard · MiniBoard · TimeControlPicker · PawnPromotionSelector
+│   │                     WdlSummaryCard · MiniBoard · TimeControlPicker · ThemeMenu
 │   │                     ToastContainer
 │   ├── GamesFilterBar         /games's source/result pills + opponent search+chip (#151)
-│   └── BotCatalogCard · BotTimeControlPicker — the /bots page's card (click → wake → config → start)
+│   └── BotCatalogCard · BotTimeControlPicker · BotChallengePanel — the /bots page's card
+│                              (click → wake → config → start)
 ├── lib/
 │   ├── playWithBot/           bot-play core: store, engine worker, dice/history, opening book
 │   ├── live/                  live-play client: liveGameStore, liveClient (WS + reconnect),
@@ -90,32 +122,43 @@ src/
 │   │                          playerOpponentsStore · chromeStore) + gameHistoryMerge (local +
 │   │                          play-api games → one newest-first /games list) · gameHistoryPagination
 │   │                          (render-cap + live-fetch-boundary logic over the merge, #150)
+│   ├── utils/                 getPieceImage (piece sprite paths) · logger (DEV-gated console)
 │   ├── localGamesDB.ts        IndexedDB via idb (sync_status: pending → synced | quarantined)
 │   ├── timings.ts             presentation pacing shared by BOTH game surfaces — never fork per surface
-│   └── bots.ts · gameOutcome.ts · sound.ts · preferencesStore · toastStore · authStore (guest stub)
-└── utils/                     fenUtils · pieceImages · formatters
+│   ├── boardStore.ts          the structural interface Board.svelte consumes, satisfied by both stores
+│   ├── lastMove.ts            last-move highlight keys · types.ts shared history/board types
+│   └── bots.ts · gameOutcome.ts · sound.ts · preferencesStore · toastStore · botStatsStore
+│                              · authStore (guest stub)
+└── utils/                     fenUtils · formatters
 ```
 
 ## How recording works
 
 Finished games are saved to IndexedDB (`localGamesDB`, `sync_status: 'pending'`), then
 `flushOutbox()` maps each to `GameIngestWire` and `POST`s it to the **ingest gateway**
-(`VITE_INGEST_GATEWAY_URL`, hosted on Koyeb). The gateway holds the analytics Bearer
-token, re-validates via an engine replay, and forwards to `sync.jc.id.lv`. The browser
-never holds `INGEST_TOKEN`.
+(`VITE_INGEST_GATEWAY_URL`, a separate service — `dicechess-ingest-gateway`). The gateway holds
+the analytics Bearer token, re-validates via an engine replay, and forwards to
+`dicechess-analytics`. The browser never holds `INGEST_TOKEN`.
 
 Identity: `source='playsite'`; human = `guest:<uuidv7>` (per-browser), bot =
 `bot:<algorithm>` (shared with the extension, disambiguated by `source`); game id =
 `UUIDv5('playsite/game/<uuid>')`.
 
-## Phase-1 follow-ups (scaffold TODOs)
+A 400/422 from analytics is permanent: `gatewayClient` classifies it as `rejected`, the outbox
+quarantines the record and never retries it. Games only reachable through the live surface are
+recorded by play-api itself, not from here.
 
-- [ ] **Ingest gateway**: separate service (not in this repo) — Koyeb, holds the token, local engine pre-validate. Set `VITE_INGEST_GATEWAY_URL` once it exists.
-- [ ] **Outbox**: add retry backoff (the `quarantined` state for 422 rejects is already implemented).
-- [x] **Engine version pin**: updated to `^1.6.6` in `package.json`.
-- [x] **Termination**: persisting `gameEndReason` onto `LocalGameRecord` and mapping to analytics is done.
-- [x] **UI polish**: clocks, draw/double, and interactive dice/board are done.
-- [x] **Tests**: engine-dependent integration tests (`playWithBotStore.test.ts`) are implemented and run in CI with `NODE_AUTH_TOKEN`.
+## Deploy
+
+Every push to `main` builds in GitHub Actions and Direct-Uploads `dist/` to Cloudflare Pages
+(`.github/workflows/deploy.yaml`) — so **never commit to `main`**. Building in Actions is what
+keeps the packages PAT out of Cloudflare. Releases are a manual `Ops: Release` dispatch that bumps
+a git tag; `package.json` stays at `0.0.0`.
+
+## Open follow-ups
+
+- [ ] **Outbox retry backoff** — a `rejected`/`error` record is left pending and retried on the
+      next flush with no delay (the `quarantined` state for 422 rejects is already implemented).
 
 ## License
 
