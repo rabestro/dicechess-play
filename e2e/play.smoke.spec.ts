@@ -6,7 +6,7 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 // passed, because none of them touch the bundle.
 //
 // So this runs a real turn against the built dist: pick a piece, play a legal move, assert the
-// piece actually left its square. It is deliberately blind to which colour, opponent or dice the
+// game's history counter advanced. It is deliberately blind to which colour, opponent or dice the
 // game hands out — it hunts for a movable piece instead of assuming one.
 
 /** Console errors that mean the engine itself refused to work — the #185 signature. */
@@ -28,27 +28,51 @@ async function piecesOnBoard(page: Page): Promise<string[]> {
 }
 
 /**
- * Selects a piece that can actually move right now.
+ * Plays one move, and reports whether the engine accepted it.
  *
- * Chessground only renders `square.move-dest` once a movable piece is selected, so the only way to
- * find one is to try. The turn may also belong to the bot, or the roll may have handed this seat
- * nothing playable (in which case the store auto-passes) — hence the outer wait rather than a
- * single sweep.
+ * Select and move have to be one attempt, retried as a unit. Chessground only renders
+ * `square.move-dest` once a movable piece is selected, so finding a movable piece means clicking
+ * pieces until dests appear — but the bot moves on its own clock, and its re-render drops the
+ * selection and leaves the dest squares behind as hidden nodes. Selecting in one step and moving in
+ * a later one therefore races the bot: the dest resolves, then never becomes clickable.
+ *
+ * The turn may also belong to the bot, or the roll may have handed this seat nothing playable (the
+ * store then auto-passes) — so a sweep that finds nothing is normal and just retries.
  */
-async function selectMovablePiece(page: Page): Promise<Locator> {
-	const deadline = Date.now() + 60_000;
-	while (Date.now() < deadline) {
-		const pieces = await page.locator('cg-board piece').all();
-		for (const piece of pieces) {
-			// Short per-click bound: against a remote target this sweep is up to 32 round trips, and
-			// one unactionable piece must not eat the whole hunt.
-			await piece.click({ force: true, timeout: 2_000 }).catch(() => {});
-			if ((await page.locator('cg-board square.move-dest').count()) > 0) return piece;
-		}
-		// Nothing playable yet: let the bot finish its turn and the next roll land.
-		await page.waitForTimeout(500);
+async function tryPlayOneMove(page: Page): Promise<boolean> {
+	const counterBefore = await moveCounter(page).innerText();
+
+	for (const piece of await page.locator('cg-board piece').all()) {
+		// Short per-click bound: against a remote target this sweep is up to 32 round trips, and one
+		// unactionable piece must not eat the budget.
+		await piece.click({ force: true, timeout: 2_000 }).catch(() => {});
+
+		// `:visible` matters — a stale dest left over from a selection the bot's re-render dropped
+		// still matches the class and would hang the click until the test timeout.
+		const dest = page.locator('cg-board square.move-dest:visible').first();
+		if (!(await dest.isVisible().catch(() => false))) continue;
+		if (
+			!(await dest.click({ timeout: 2_000 }).then(
+				() => true,
+				() => false,
+			))
+		)
+			continue;
+
+		// The move counter is the honest signal that the engine took it. Watching the piece is not:
+		// on a rejected move the store leaves the FEN untouched, so nothing re-renders and
+		// chessground keeps the piece on the square it was dropped on — a build that cannot move at
+		// all still looks like a successful move until something else forces a render.
+		const applied = await expect
+			.poll(async () => moveCounter(page).innerText(), { timeout: 3_000 })
+			.not.toEqual(counterBefore)
+			.then(
+				() => true,
+				() => false,
+			);
+		if (applied) return true;
 	}
-	throw new Error('no movable piece appeared within 60s — the board never became playable');
+	return false;
 }
 
 test('the built bundle can play a move', async ({ page }) => {
@@ -63,20 +87,21 @@ test('the built bundle can play a move', async ({ page }) => {
 	await page.getByRole('button', { name: 'Start game' }).click();
 	await expect(page.locator('cg-board')).toBeVisible();
 
-	await selectMovablePiece(page);
 	const before = await piecesOnBoard(page);
-	const counterBefore = await moveCounter(page).innerText();
+	const deadline = Date.now() + 60_000;
+	let played = false;
+	while (!played && Date.now() < deadline) {
+		played = await tryPlayOneMove(page);
+		if (!played) await page.waitForTimeout(500); // let the bot's turn and the next roll land
+	}
 
-	await page.locator('cg-board square.move-dest').first().click();
-
-	// The move counter is the honest signal. Watching the piece is not: on a rejected move the
-	// store leaves the FEN untouched, so nothing re-renders and chessground keeps the piece at the
-	// square it was dropped on — a broken build looks like a successful move until the next render.
-	// `maxMoveIndex` only advances when the engine actually applied the move.
-	await expect
-		.poll(async () => moveCounter(page).innerText(), { timeout: 10_000 })
-		.not.toEqual(counterBefore);
-
+	// On a bundle that cannot apply moves this is the assertion that fires, so it carries the
+	// diagnosis: the console errors are the difference between "engine is broken" and "the test
+	// never got a turn".
+	expect(
+		played,
+		`no move was accepted in 60s; engine console errors: ${JSON.stringify(engineFailures)}`,
+	).toBe(true);
 	expect(await piecesOnBoard(page)).not.toEqual(before);
 	expect(engineFailures, 'engine reported failures in the console').toEqual([]);
 });

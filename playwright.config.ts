@@ -11,7 +11,9 @@ import { defineConfig, devices } from '@playwright/test';
 // or production — which is how you confirm a deploy is playable without clicking through it:
 //   SMOKE_BASE_URL=https://<branch>.dicechess-play.pages.dev npm run test:e2e
 const PORT = 4173;
-const REMOTE_TARGET = process.env.SMOKE_BASE_URL;
+// Normalised to undefined when blank: an empty SMOKE_BASE_URL would otherwise be taken as a remote
+// target, skipping the preview server while leaving baseURL empty — every navigation then fails.
+const REMOTE_TARGET = process.env.SMOKE_BASE_URL?.trim() || undefined;
 
 export default defineConfig({
 	testDir: 'e2e',

@@ -61,8 +61,9 @@ jobs:
           #
           # Previews point at the SAME play-api as production: /play is fully exercisable either
           # way, and pointing previews at the real API is what makes the lobby and live surfaces
-          # reviewable at all. The cost is that a preview writes real games and real ingest rows —
-          # set vars.VITE_PLAY_API_URL empty-string-per-environment if that ever becomes unwanted.
+          # reviewable at all. The cost is that a preview writes real games and real ingest rows.
+          # Isolating previews needs a real branch here, NOT an empty repo variable: `||` treats
+          # '' as falsy, so an empty vars.VITE_PLAY_API_URL silently yields the production URL.
           # Note that /live from a preview also needs the *.pages.dev origin allowed by play-api's
           # PLAY_CORS_ORIGINS, which is otherwise pinned to the production origin.
           VITE_PLAY_API_URL: ${{ vars.VITE_PLAY_API_URL || 'https://play-api.jc.id.lv' }}
@@ -77,9 +78,20 @@ jobs:
 
       # Cloudflare decides production vs preview purely from --branch: the project's production
       # branch (main) deploys to the live site, anything else becomes a preview deployment.
+      #
+      # A branch name is attacker-influenced text, so it goes through `env` and is referenced as a
+      # shell variable — never interpolated into the script body, where `${{ }}` would splice it in
+      # before bash ever sees it and a crafted name could run commands.
       - name: Resolve deploy branch
         id: target
-        run: echo "branch=${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}" >> "$GITHUB_OUTPUT"
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            printf 'branch=%s\n' "$HEAD_REF" >> "$GITHUB_OUTPUT"
+          else
+            printf 'branch=main\n' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Deploy to Cloudflare Pages
         id: deploy
@@ -97,8 +109,10 @@ jobs:
           # keeps working as the PR moves; `deployment-url` is per-deployment and goes stale.
           # Fall back to it anyway — an aliasless deploy should still leave a usable link.
           PREVIEW_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ steps.target.outputs.branch }}
         run: |
-          gh pr comment "${{ github.event.pull_request.number }}" --edit-last --create-if-none --body \
+          gh pr comment "$PR_NUMBER" --edit-last --create-if-none --body \
             "🔍 **Preview**: ${PREVIEW_URL}
 
-          The production bundle for \`${{ steps.target.outputs.branch }}\`, built exactly as it would deploy. Updated on every push to this PR."
+          The production bundle for \`${BRANCH}\`, built exactly as it would deploy. Updated on every push to this PR."
