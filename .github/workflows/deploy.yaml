@@ -59,13 +59,20 @@ jobs:
           # vite build. Override via a repo VARIABLE (vars.VITE_PLAY_API_URL); empty =
           # /live disabled AND recording disabled (games stay in IndexedDB).
           #
-          # Previews point at the SAME play-api as production: /play is fully exercisable either
-          # way, and pointing previews at the real API is what makes the lobby and live surfaces
-          # reviewable at all. The cost is that a preview writes real games and real ingest rows.
-          # Isolating previews needs a real branch here, NOT an empty repo variable: `||` treats
-          # '' as falsy, so an empty vars.VITE_PLAY_API_URL silently yields the production URL.
-          # Note that /live from a preview also needs the *.pages.dev origin allowed by play-api's
-          # PLAY_CORS_ORIGINS, which is otherwise pinned to the production origin.
+          # Previews point at the SAME play-api as production. In practice, though, production's
+          # PLAY_CORS_ORIGINS is pinned to https://play.jc.id.lv (measured: a preview origin gets no
+          # Access-Control-Allow-Origin at all), so the browser blocks every play-api call from a
+          # preview. A preview therefore reviews /play — the client-side vs-bot surface, and the one
+          # that broke in #185 — while /lobby, /live, /bots, /leaderboard, the server half of /games
+          # and finished-game recording stay empty on it.
+          #
+          # Widening that is a play-api change, not a knob here: Cors.policy matches origins by
+          # exact string, and Cloudflare mints a new *.pages.dev host per deployment, so there is no
+          # allow-list entry to add. Leaving it pinned is the current, deliberate choice.
+          #
+          # Isolating previews from the production API would need a real branch here, NOT an empty
+          # repo variable: `||` treats '' as falsy, so an empty vars.VITE_PLAY_API_URL silently
+          # yields the production URL.
           VITE_PLAY_API_URL: ${{ vars.VITE_PLAY_API_URL || 'https://play-api.jc.id.lv' }}
 
       # wrangler pages deploy does not auto-create the project; create it once
