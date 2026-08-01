@@ -151,3 +151,9 @@ vite.config.ts.timestamp-*
 
 # Engine WASM runtime copied from node_modules by scripts/copy-wasm.mjs (served statically)
 public/engine-wasm/
+
+# Playwright (e2e smoke over the built dist/)
+test-results/
+playwright-report/
+blob-report/
+.playwright/
