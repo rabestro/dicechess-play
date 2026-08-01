@@ -93,7 +93,10 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
+          # The alias URL is per-BRANCH and therefore stable across pushes, so the comment's link
+          # keeps working as the PR moves; `deployment-url` is per-deployment and goes stale.
+          # Fall back to it anyway — an aliasless deploy should still leave a usable link.
+          PREVIEW_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
         run: |
           gh pr comment "${{ github.event.pull_request.number }}" --edit-last --create-if-none --body \
             "🔍 **Preview**: ${PREVIEW_URL}
