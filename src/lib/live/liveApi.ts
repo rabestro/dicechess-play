@@ -1,8 +1,8 @@
 import type { CreateGameResponse, PublicGameState, TimeControl } from './liveTypes';
 
-// REST + WebSocket-URL helpers against play-api. The base URL is configured via VITE_PLAY_API_URL
-// (mirroring VITE_INGEST_GATEWAY_URL); when empty, live play is disabled. Read at call time so it
-// is easy to stub in tests.
+// REST + WebSocket-URL helpers against play-api. The base URL is configured via VITE_PLAY_API_URL;
+// when empty, live play is disabled (and so is finished-game recording — see ingest/ingestClient.ts,
+// which shares this base). Read at call time so it is easy to stub in tests.
 
 export function apiBase(): string {
 	return (import.meta.env.VITE_PLAY_API_URL as string | undefined) ?? '';

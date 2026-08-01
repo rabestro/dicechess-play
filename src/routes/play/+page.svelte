@@ -122,7 +122,7 @@
 		}
 	});
 
-	// Flush finished games to the ingest gateway exactly once per game. `flushed` is a
+	// Flush finished games to play-api's ingest endpoint exactly once per game. `flushed` is a
 	// plain (non-reactive) flag so this effect depends only on gameStatus.
 	let flushed = false;
 	$effect(() => {

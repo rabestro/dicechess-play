@@ -49,14 +49,13 @@ To work on live play, run `dicechess-play-api` locally and point `VITE_PLAY_API_
 
 ## Configuration
 
-| Variable                  | When           | Effect                                                                          |
-| ------------------------- | -------------- | ------------------------------------------------------------------------------- |
-| `NODE_AUTH_TOKEN`         | install        | GitHub PAT with `read:packages`, for the `@rabestro` scope                      |
-| `VITE_INGEST_GATEWAY_URL` | build (client) | Base URL of the ingest gateway. Empty = recording off (games stay in IndexedDB) |
-| `VITE_PLAY_API_URL`       | build (client) | Base URL of play-api. Empty = the `/live` routes are disabled                   |
+| Variable            | When           | Effect                                                                                                       |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `NODE_AUTH_TOKEN`   | install        | GitHub PAT with `read:packages`, for the `@rabestro` scope                                                   |
+| `VITE_PLAY_API_URL` | build (client) | Base URL of play-api. Empty = the `/live` routes are disabled AND recording is off (games stay in IndexedDB) |
 
 `VITE_*` values are **baked into the bundle at build time** — the site is Direct-Uploaded to
-Cloudflare Pages, so Pages dashboard variables never reach `vite build`. Changing either one means
+Cloudflare Pages, so Pages dashboard variables never reach `vite build`. Changing one means
 a rebuild and redeploy; in CI they come from repo variables.
 
 ## Layout
@@ -105,12 +104,12 @@ src/
 │   │                          gamesFilters — /games's ?vs=/?result=/?source= URL state (VsFilter's
 │   │                          local/lobby namespaces, local-game filtering, opponent search
 │   │                          options, head-to-head totals) (#151)
-│   ├── ingest/                → analytics POST /api/games
+│   ├── ingest/                finished-game recording via play-api POST /ingest/games
 │   │   ├── types.ts           GameIngestWire contract (verbatim copy — see the file head)
 │   │   ├── guestIdentity.ts   per-browser guest:<uuidv7> + restore code
 │   │   ├── mapper.ts          LocalGameRecord → GameIngestWire (UUIDv5 id, dice decode)
-│   │   ├── gatewayClient.ts   POST to the ingest gateway (token never in browser)
-│   │   └── outbox.ts          flush pending games → gateway
+│   │   ├── ingestClient.ts    POST to play-api /ingest/games (token never in browser)
+│   │   └── outbox.ts          flush pending games → play-api
 │   ├── history/               move-history reconstruction for replays: reconstructHistoryMap
 │   │                          (local IndexedDB games) · reconstructServerHistory (play-api's
 │   │                          per-turn archive → the same historyMap shape, #163)
@@ -135,18 +134,21 @@ src/
 ## How recording works
 
 Finished games are saved to IndexedDB (`localGamesDB`, `sync_status: 'pending'`), then
-`flushOutbox()` maps each to `GameIngestWire` and `POST`s it to the **ingest gateway**
-(`VITE_INGEST_GATEWAY_URL`, a separate service — `dicechess-ingest-gateway`). The gateway holds
-the analytics Bearer token, re-validates via an engine replay, and forwards to
-`dicechess-analytics`. The browser never holds `INGEST_TOKEN`.
+`flushOutbox()` maps each to `GameIngestWire` and `POST`s it to **play-api's
+`/ingest/games`** (same `VITE_PLAY_API_URL` base as live play). play-api validates the
+payload structurally, queues it durably, and relays it to `dicechess-analytics`
+server-side with its own Bearer token and retry/backoff. The browser never holds
+`INGEST_TOKEN`. (This replaced the standalone Koyeb gateway of ADR-0005.)
 
 Identity: `source='playsite'`; human = `guest:<uuidv7>` (per-browser), bot =
 `bot:<algorithm>` (shared with the extension, disambiguated by `source`); game id =
 `UUIDv5('playsite/game/<uuid>')`.
 
-A 400/422 from analytics is permanent: `gatewayClient` classifies it as `rejected`, the outbox
-quarantines the record and never retries it. Games only reachable through the live surface are
-recorded by play-api itself, not from here.
+A 400/422 from play-api is permanent: `ingestClient` classifies it as `rejected`, the outbox
+quarantines the record and never retries it. Acceptance is asynchronous — the authoritative
+engine-replay validation happens later in analytics, and a replay rejection parks the report
+on the server rather than reaching this client. Games only reachable through the live surface
+are recorded by play-api itself, not from here.
 
 ## Deploy
 
