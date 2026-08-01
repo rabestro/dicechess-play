@@ -511,10 +511,13 @@ export class LiveGameStore {
 
 		const isPromotion = piece.toLowerCase() === 'p' && (dest[1] === '8' || dest[1] === '1');
 		if (isPromotion) {
-			// Capturing the king on the promotion rank ends the game — auto-queen past the popup.
+			// Capturing the king on the last rank is NOT a promotion: the game ends there, so the
+			// engine emits a plain capture and no promotion variants exist. Submitting a suffix
+			// anyway costs the whole turn — `applyMove` ignores it locally, but the server's
+			// legal-turn index is keyed on the engine's own UCI and rejects `c7d8q` (#177).
 			const target = getPieceFromFen(this.liveFen, dest);
 			if (target && target.toLowerCase() === 'k') {
-				this.completeMove(orig, dest, 'q', dieIndex);
+				this.completeMove(orig, dest, undefined, dieIndex);
 				return;
 			}
 			this.pendingPromotion = {

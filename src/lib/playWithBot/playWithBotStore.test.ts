@@ -408,3 +408,42 @@ describe('PlayWithBotStore draw offers', () => {
 		expect(store.gameStatus).toBe('playing');
 	});
 });
+
+describe('PlayWithBotStore king capture on the last rank (issue #177)', () => {
+	let store: PlayWithBotStore;
+	let mock: ReturnType<typeof createMockDiceChess>;
+
+	// White pawn on c7, black king on d8 — the position from the reported game. The capture lands
+	// on the last rank but is NOT a promotion: the game ends there, so the engine emits a plain
+	// capture. Analytics replays a game by exact UCI equality, so a stray `q` gets the whole game
+	// rejected at ingest and quarantined for good.
+	const KING_ON_LAST_RANK_FEN = 'Qn1k3r/1pPB1pp1/3p1n2/4p1Np/4P3/BRN5/P1PP1PPP/4K2R w - - 0 1';
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		mock = createMockDiceChess();
+		setDiceChessInstance(mock);
+		store = new PlayWithBotStore();
+	});
+
+	afterEach(() => {
+		store.endSession();
+		resetDiceChessInstance();
+		vi.useRealTimers();
+	});
+
+	it('records the winning capture without a promotion suffix', async () => {
+		store.customDfen = `${KING_ON_LAST_RANK_FEN} PBK`;
+		store.startNewGame('white', 'greedy');
+		const rolled = store.rollDice();
+		await vi.advanceTimersByTimeAsync(600); // roll-animation spin
+		await rolled;
+
+		store.handleBoardMove('c7', 'd8');
+
+		expect(store.pendingPromotion).toBeNull(); // no picker: this is a capture, not a promotion
+		expect(store.gameEndReason).toBe('mate');
+		expect(mock.applyMove.mock.calls.at(-1)?.[3]).toBeUndefined();
+		expect(store.turnHistory.at(-1)?.moves?.map((m) => m.uci)).toEqual(['c7d8']);
+	});
+});

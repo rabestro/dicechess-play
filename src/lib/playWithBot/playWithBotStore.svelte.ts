@@ -602,11 +602,13 @@ export class PlayWithBotStore {
 		const isPromotion = isPawn && (dest[1] === '8' || dest[1] === '1');
 
 		if (isPromotion) {
-			// If capturing the King on the promotion rank, the game ends immediately.
-			// Auto-promote to Queen to bypass the popup UI.
+			// Capturing the King on the last rank is NOT a promotion: the game ends immediately, so
+			// the engine emits a plain capture with no promotion variants — no popup, and no suffix
+			// on the recorded UCI. A suffix here survives locally (`applyMove` ignores it) but makes
+			// the analytics replay reject the whole game, which quarantines it forever (#177).
 			const targetPiece = getPieceFromFen(this.liveBoardFen, dest);
 			if (targetPiece && targetPiece.toLowerCase() === 'k') {
-				this.completeMoveLogic(orig, dest, 'q', dieIndex);
+				this.completeMoveLogic(orig, dest, undefined, dieIndex);
 				return;
 			}
 
