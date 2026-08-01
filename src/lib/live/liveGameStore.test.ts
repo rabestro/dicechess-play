@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LiveGameStore } from './liveGameStore.svelte';
-import type { PublicGameState, ServerEvent } from './liveTypes';
+import type { ClientCommand, PublicGameState, ServerEvent } from './liveTypes';
 import { getPieceFromFen } from '../../utils/fenUtils';
 import { playDiceSound } from '../sound';
 import { toastStore } from '../toastStore.svelte';
@@ -27,10 +27,14 @@ class MockWebSocket {
 	onerror: (() => void) | null = null;
 	onmessage: ((event: { data: unknown }) => void) | null = null;
 	readyState = MockWebSocket.OPEN;
+	/** Every raw frame the store sent, so tests can assert the exact ClientCommand on the wire. */
+	sent: string[] = [];
 	constructor(public url: string) {
 		MockWebSocket.last = this;
 	}
-	send() {}
+	send(data: string) {
+		this.sent.push(data);
+	}
 	close() {
 		this.onclose?.();
 	}
@@ -691,6 +695,49 @@ describe('LiveGameStore connection feedback (issue #76)', () => {
 			},
 		});
 		expect(live.lastMove).toEqual(['b1', 'c3']);
+	});
+
+	// Issue #177, from a real game: the white pawn on c7 can capture the black king on d8. The
+	// destination is the last rank, but a king capture ends the game, so the engine emits a plain
+	// capture and no promotion variants exist — `c7d8q` is absent from the server's legal-turn
+	// index and would cost the whole turn. `applyMove` ignores a stray suffix, so only the wire
+	// payload can catch this.
+	const KING_ON_LAST_RANK_FEN = 'Qn1k3r/1pPB1pp1/3p1n2/4p1Np/4P3/BRN5/P1PP1PPP/4K2R w - - 0 1';
+
+	const rollKingCapturePosition = async (diceField: string, dice: number[]) => {
+		const dfen = `${KING_ON_LAST_RANK_FEN} ${diceField}`;
+		deliver(snapshot({ dfen }));
+		deliver({ DiceRolled: { v: 1, seat: 'White', dice, dfen, clocks: null } });
+		await vi.advanceTimersByTimeAsync(600); // let the own-roll spin land
+	};
+
+	const submittedTurns = (): string[][] =>
+		MockWebSocket.last!.sent.flatMap((raw) => {
+			const command = JSON.parse(raw) as ClientCommand;
+			return 'SubmitTurn' in command ? [command.SubmitTurn.moves] : [];
+		});
+
+	it('submits a pawn capturing the king on the last rank without a promotion suffix', async () => {
+		await rollKingCapturePosition('PBK', [1, 3, 6]);
+
+		live.handleBoardMove('c7', 'd8');
+
+		expect(live.pendingPromotion).toBeNull(); // no picker: this is a capture, not a promotion
+		// Submitted straight away despite the two unused dice — the captured king ends the game.
+		expect(submittedTurns()).toEqual([['c7d8']]);
+	});
+
+	it('still opens the promotion picker for a pawn reaching the last rank without a king there', async () => {
+		await rollKingCapturePosition('P', [1]);
+
+		live.handleBoardMove('c7', 'c8'); // empty square on the last rank — a real promotion
+
+		expect(live.pendingPromotion?.availablePieces).toEqual(['q', 'r', 'b', 'n']);
+		expect(submittedTurns()).toEqual([]); // nothing goes out until a piece is picked
+
+		live.completePromotion('r');
+
+		expect(submittedTurns()).toEqual([['c7c8r']]);
 	});
 
 	it('updates hasClocks correctly when initialized with clocks from a snapshot', () => {
