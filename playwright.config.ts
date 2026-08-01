@@ -6,25 +6,36 @@ import { defineConfig, devices } from '@playwright/test';
 // gate (see #185, and `scripts/verify-bundle.mjs` for the narrower engine-only guard).
 //
 // `npm run build` must have run first — the web server here only serves dist/, it does not build.
+//
+// Set SMOKE_BASE_URL to run the same suite against an already-deployed site instead — a PR preview
+// or production — which is how you confirm a deploy is playable without clicking through it:
+//   SMOKE_BASE_URL=https://<branch>.dicechess-play.pages.dev npm run test:e2e
 const PORT = 4173;
+const REMOTE_TARGET = process.env.SMOKE_BASE_URL;
 
 export default defineConfig({
 	testDir: 'e2e',
 	// A red smoke means the shipped bundle cannot play a game; never let a retry paper over that.
 	// Flakiness here is a bug in the test, to be fixed rather than absorbed.
 	retries: 0,
+	// Comfortably above the spec's own 60s hunt for a movable piece — the default 30s cut that
+	// budget short, which looked like a failing site when it was only a slow (remote) target.
+	timeout: 120_000,
 	forbidOnly: !!process.env.CI,
 	reporter: process.env.CI ? [['github'], ['list']] : [['list']],
 	use: {
-		baseURL: `http://localhost:${PORT}`,
+		baseURL: REMOTE_TARGET ?? `http://localhost:${PORT}`,
 		trace: 'retain-on-failure',
 	},
 	// Chromium alone: this suite guards the build pipeline, not browser compatibility.
 	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-	webServer: {
-		command: `npm run preview -- --port ${PORT} --strictPort`,
-		url: `http://localhost:${PORT}`,
-		reuseExistingServer: !process.env.CI,
-		timeout: 60_000,
-	},
+	// Serve dist/ ourselves only when testing locally; a remote target is already served.
+	webServer: REMOTE_TARGET
+		? undefined
+		: {
+				command: `npm run preview -- --port ${PORT} --strictPort`,
+				url: `http://localhost:${PORT}`,
+				reuseExistingServer: !process.env.CI,
+				timeout: 60_000,
+			},
 });

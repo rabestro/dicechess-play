@@ -40,7 +40,9 @@ async function selectMovablePiece(page: Page): Promise<Locator> {
 	while (Date.now() < deadline) {
 		const pieces = await page.locator('cg-board piece').all();
 		for (const piece of pieces) {
-			await piece.click({ force: true });
+			// Short per-click bound: against a remote target this sweep is up to 32 round trips, and
+			// one unactionable piece must not eat the whole hunt.
+			await piece.click({ force: true, timeout: 2_000 }).catch(() => {});
 			if ((await page.locator('cg-board square.move-dest').count()) > 0) return piece;
 		}
 		// Nothing playable yet: let the bot finish its turn and the next roll land.
