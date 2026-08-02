@@ -46,6 +46,15 @@ describe('BotCatalogCard', () => {
 		expect(queryByText(/playing now/)).toBeNull();
 	});
 
+	it('shows no busy hint when the server omits `available` entirely — undefined is unknown, not busy', () => {
+		// The production regression this locks down: client and API release independently, so a client
+		// build routinely runs against an API version that predates a field it reads. `!bot.available`
+		// badged EVERY card as "playing now"; only an explicit `false` may.
+		const { available: _omitted, ...withoutAvailable } = bot();
+		const { queryByText } = render(BotCatalogCard, { bot: withoutAvailable as CatalogBot });
+		expect(queryByText(/playing now/)).toBeNull();
+	});
+
 	it('flags a bot at its declared capacity as "playing now" (#224) — advisory, the card stays clickable', () => {
 		const { getByText, getByRole } = render(BotCatalogCard, { bot: bot({ available: false }) });
 		expect(getByText(/playing now/)).toBeTruthy();

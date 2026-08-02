@@ -7,9 +7,17 @@ import type { Seat, TimeControl } from '../live/liveTypes';
 // and on this side only when VITE_PLAY_API_URL is configured (same gate as live play).
 
 /** One catalog card: a bot a visitor can start a game against. `provisional` flags a rating that
- * hasn't converged yet — shown, not hidden (unlike the leaderboard's policy). `available` is
- * advisory: the catalog is fetched once per visit, not polled, so a bot's actual seating state can
- * move before a click — `wakeBot`'s own `busy` and, ultimately, `playBot`'s 409 remain the real gate.
+ * hasn't converged yet — shown, not hidden (unlike the leaderboard's policy).
+ *
+ * `available` is advisory: the catalog is fetched once per visit, not polled, so a bot's actual
+ * seating state can move before a click — `wakeBot`'s own `busy` and, ultimately, `playBot`'s 409
+ * remain the real gate.
+ *
+ * It is **optional on purpose**, and callers must treat `undefined` as "unknown", never as
+ * "unavailable". Client and API release independently, so a build of this client is routinely live
+ * against an API version that predates a field it has just learned to read. Declaring
+ * `available: boolean` and testing it with `!bot.available` put a "playing now" badge on every card
+ * in production for exactly that reason.
  */
 export interface CatalogBot {
 	team: string;
@@ -18,7 +26,7 @@ export interface CatalogBot {
 	rd: number;
 	provisional: boolean;
 	description: string | null;
-	available: boolean;
+	available?: boolean;
 }
 
 export interface BotCatalog {
@@ -27,10 +35,14 @@ export interface BotCatalog {
 
 /** `busy` is true when the bot is at its declared concurrent-game limit — the server never actually
  * probed it in that case, so `alive` is always `false` alongside `busy: true`.
+ *
+ * Optional for the same deploy-skew reason as `CatalogBot.available`: an older API version answers
+ * `{alive}` alone. A missing `busy` correctly reads as falsy, so the caller degrades to the
+ * pre-existing alive/dead split — but the type must say so rather than lie about the guarantee.
  */
 export interface WakeResponse {
 	alive: boolean;
-	busy: boolean;
+	busy?: boolean;
 }
 
 /** `preferredColor` omitted means a random seat — the server's default. */
