@@ -14,9 +14,8 @@ import type { Seat, TimeControl } from '../live/liveTypes';
  * remain the real gate.
  *
  * It is **optional on purpose**, and callers must treat `undefined` as "unknown", never as
- * "unavailable". This SPA auto-deploys to Cloudflare Pages on every push to `main`, while play-api
- * ships behind a manual release plus an operator promotion — so a build of this client is routinely
- * live against a play-api that predates any field it just learned to read. Shipping
+ * "unavailable". Client and API release independently, so a build of this client is routinely live
+ * against an API version that predates a field it has just learned to read. Declaring
  * `available: boolean` and testing it with `!bot.available` put a "playing now" badge on every card
  * in production for exactly that reason.
  */
@@ -37,7 +36,7 @@ export interface BotCatalog {
 /** `busy` is true when the bot is at its declared concurrent-game limit — the server never actually
  * probed it in that case, so `alive` is always `false` alongside `busy: true`.
  *
- * Optional for the same deploy-skew reason as `CatalogBot.available`: an older play-api answers
+ * Optional for the same deploy-skew reason as `CatalogBot.available`: an older API version answers
  * `{alive}` alone. A missing `busy` correctly reads as falsy, so the caller degrades to the
  * pre-existing alive/dead split — but the type must say so rather than lie about the guarantee.
  */
