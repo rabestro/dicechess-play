@@ -20,6 +20,7 @@ function bot(overrides: Partial<CatalogBot> = {}): CatalogBot {
 		rd: 85,
 		provisional: false,
 		description: 'aggressive + book',
+		available: true,
 		...overrides,
 	};
 }
@@ -38,6 +39,17 @@ describe('BotCatalogCard', () => {
 	it('flags a provisional rating without hiding the bot (opposite of the leaderboard policy)', () => {
 		const { getByText } = render(BotCatalogCard, { bot: bot({ provisional: true }) });
 		expect(getByText(/provisional/)).toBeTruthy();
+	});
+
+	it('shows no busy hint for an available bot', () => {
+		const { queryByText } = render(BotCatalogCard, { bot: bot({ available: true }) });
+		expect(queryByText(/playing now/)).toBeNull();
+	});
+
+	it('flags a bot at its declared capacity as "playing now" (#224) — advisory, the card stays clickable', () => {
+		const { getByText, getByRole } = render(BotCatalogCard, { bot: bot({ available: false }) });
+		expect(getByText(/playing now/)).toBeTruthy();
+		expect(getByRole('button', { name: 'Play →' })).toBeTruthy();
 	});
 
 	it('wires the challenge panel with this card team and name', async () => {

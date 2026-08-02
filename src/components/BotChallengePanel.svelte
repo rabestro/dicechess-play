@@ -12,7 +12,10 @@
 	// config inline. Only team/name are needed; callers own their own layout/wrapper around this panel.
 	let { team, name }: { team: string; name: string } = $props();
 
-	type Phase = 'idle' | 'waking' | 'dead' | 'ready' | 'starting';
+	// 'busy' is distinct from 'dead': the bot answered nothing because the server never asked it to
+	// (it's at its declared concurrent-game limit) — a visitor should be told to come back shortly,
+	// not that the bot looks broken.
+	type Phase = 'idle' | 'waking' | 'dead' | 'busy' | 'ready' | 'starting';
 	type ColorChoice = 'random' | 'White' | 'Black';
 	let phase = $state<Phase>('idle');
 	let selectedTimeControl = $state(defaultBotTimeControlIndex);
@@ -31,17 +34,33 @@
 		{ value: 'Black', label: 'Black' },
 	];
 
+	const GenericStartFailure = 'Could not start the game right now — try again in a minute.';
+
 	async function wake() {
 		phase = 'waking';
 		error = null;
 		try {
 			const result = await wakeBot(team, name);
 			if (destroyed) return;
-			phase = result.alive ? 'ready' : 'dead';
+			phase = result.busy ? 'busy' : result.alive ? 'ready' : 'dead';
 		} catch {
 			if (destroyed) return;
 			phase = 'dead';
 		}
+	}
+
+	/** play-api writes its 409 body specifically to be shown to a visitor — two distinct causes share
+	 * the status (an unfinished catalog game of the visitor's own vs. the bot being at its declared
+	 * concurrent-game limit), so displaying the server's own text is how the two stay distinguishable
+	 * without this component hardcoding either message. Capitalized and given a trailing period for
+	 * consistency with the rest of this panel's copy; falls back to the generic message if the body is
+	 * ever empty (never expected, but a thrown response is not a promise about its own body).
+	 */
+	function presentableConflictMessage(body: string): string {
+		const trimmed = body.trim();
+		if (!trimmed) return GenericStartFailure;
+		const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+		return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
 	}
 
 	async function start() {
@@ -62,13 +81,14 @@
 			window.location.href = buildJoinUrl(location.origin, match.gameId, match.token, match.seat);
 		} catch (e) {
 			if (destroyed) return;
-			// 409 (an unfinished catalog game already in progress) is worth naming specifically — the
-			// visitor can go finish it. Every other failure collapses to one honest message, same
+			// A 409 has two distinct causes since play-api's per-bot concurrency (#189) — an unfinished
+			// catalog game of the visitor's own, or the bot being busy at its declared limit — and only
+			// the server knows which. Every other status collapses to one honest message, same
 			// philosophy as the lobby's create/accept: there's nothing more useful to say.
 			error =
 				e instanceof PlayBotError && e.status === 409
-					? 'You already have a game in progress — finish it before starting another.'
-					: 'Could not start the game right now — try again in a minute.';
+					? presentableConflictMessage(e.body)
+					: GenericStartFailure;
 			phase = 'ready';
 		}
 	}
@@ -87,6 +107,19 @@
 {:else if phase === 'dead'}
 	<div class="flex flex-col gap-2">
 		<p class="text-sm text-danger" role="alert">This bot isn't answering right now.</p>
+		<button
+			type="button"
+			onclick={wake}
+			class="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-bold text-content-muted transition-colors hover:text-content"
+		>
+			Try again
+		</button>
+	</div>
+{:else if phase === 'busy'}
+	<div class="flex flex-col gap-2">
+		<p class="text-sm text-content-muted" role="status">
+			This bot is playing right now — try again in a few minutes.
+		</p>
 		<button
 			type="button"
 			onclick={wake}

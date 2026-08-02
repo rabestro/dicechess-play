@@ -20,6 +20,7 @@ describe('catalogApi', () => {
 					rd: 85.0,
 					provisional: false,
 					description: 'aggressive + book',
+					available: true,
 				},
 			],
 		};
@@ -30,9 +31,9 @@ describe('catalogApi', () => {
 	});
 
 	it('wakeBot POSTs to the URL-encoded team/name segments', async () => {
-		const fetchMock = okJson({ alive: true });
+		const fetchMock = okJson({ alive: true, busy: false });
 		vi.stubGlobal('fetch', fetchMock);
-		expect(await wakeBot('acme', 'alice')).toEqual({ alive: true });
+		expect(await wakeBot('acme', 'alice')).toEqual({ alive: true, busy: false });
 		expect(fetchMock).toHaveBeenCalledWith('http://localhost:8080/lobby/bots/acme/alice/wake', {
 			method: 'POST',
 		});
@@ -63,7 +64,10 @@ describe('catalogApi', () => {
 	});
 
 	it('playBot throws a typed PlayBotError carrying the status, so callers can branch on it', async () => {
-		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409 }));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({ ok: false, status: 409, text: async () => 'busy' }),
+		);
 		const req = {
 			guestId: '11111111-1111-1111-1111-111111111111',
 			team: 'acme',
@@ -72,5 +76,25 @@ describe('catalogApi', () => {
 		};
 		await expect(playBot(req)).rejects.toThrow(PlayBotError);
 		await expect(playBot(req)).rejects.toMatchObject({ status: 409 });
+	});
+
+	it('playBot carries the server’s own 409 body, so callers can tell its two causes apart (#189)', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: false,
+			status: 409,
+			text: async () =>
+				'that bot is busy — it is at its concurrent-game limit; try another or retry soon',
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const req = {
+			guestId: '11111111-1111-1111-1111-111111111111',
+			team: 'acme',
+			name: 'alice',
+			timeControl: { SuddenDeath: { initialSeconds: 300 } },
+		};
+		await expect(playBot(req)).rejects.toMatchObject({
+			status: 409,
+			body: 'that bot is busy — it is at its concurrent-game limit; try another or retry soon',
+		});
 	});
 });
