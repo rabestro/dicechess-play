@@ -34,7 +34,7 @@
 		{ value: 'Black', label: 'Black' },
 	];
 
-	const GenericStartFailure = 'Could not start the game right now — try again in a minute.';
+	const GENERIC_START_FAILURE = 'Could not start the game right now — try again in a minute.';
 
 	async function wake() {
 		phase = 'waking';
@@ -58,7 +58,7 @@
 	 */
 	function presentableConflictMessage(body: string): string {
 		const trimmed = body.trim();
-		if (!trimmed) return GenericStartFailure;
+		if (!trimmed) return GENERIC_START_FAILURE;
 		const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 		return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
 	}
@@ -88,7 +88,7 @@
 			error =
 				e instanceof PlayBotError && e.status === 409
 					? presentableConflictMessage(e.body)
-					: GenericStartFailure;
+					: GENERIC_START_FAILURE;
 			phase = 'ready';
 		}
 	}

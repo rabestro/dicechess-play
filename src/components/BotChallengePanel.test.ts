@@ -58,7 +58,7 @@ describe('BotChallengePanel', () => {
 
 	it('shows a distinct busy state — not "isn\'t answering" — for a bot at its declared limit (#189)', async () => {
 		wakeBotMock.mockResolvedValue({ alive: false, busy: true });
-		const { getByRole, findByText, queryByText } = render(BotChallengePanel, {
+		const { getByRole, findByText, findByRole, queryByText } = render(BotChallengePanel, {
 			team: 'acme',
 			name: 'alice',
 		});
@@ -67,7 +67,12 @@ describe('BotChallengePanel', () => {
 			await findByText('This bot is playing right now — try again in a few minutes.'),
 		).toBeTruthy();
 		expect(queryByText("This bot isn't answering right now.")).toBeNull();
-		expect(getByRole('button', { name: 'Try again' })).toBeTruthy();
+
+		// The retry button must actually re-wake the bot and reflect its NEXT answer, not just render inert.
+		wakeBotMock.mockResolvedValue({ alive: true, busy: false });
+		await fireEvent.click(await findByRole('button', { name: 'Try again' }));
+		expect(wakeBotMock).toHaveBeenCalledTimes(2);
+		expect(await findByRole('button', { name: 'Start game' })).toBeTruthy();
 	});
 
 	it('does not navigate if the panel unmounts before playBot resolves', async () => {
@@ -141,6 +146,23 @@ describe('BotChallengePanel', () => {
 			await findByText('You already have an active game — finish it before starting another.'),
 		).toBeTruthy();
 		expect(queryByText(/concurrent-game limit/i)).toBeNull();
+	});
+
+	it('falls back to the generic message when a 409 body is empty or whitespace-only', async () => {
+		// Never expected in practice (play-api always writes a reason) — a thrown response is not a promise
+		// about its own body, so presentableConflictMessage must not render an empty/blank paragraph.
+		wakeBotMock.mockResolvedValue({ alive: true, busy: false });
+		playBotMock.mockRejectedValue(new PlayBotError(409, '   '));
+		const { getByRole, findByRole, findByText } = render(BotChallengePanel, {
+			team: 'acme',
+			name: 'alice',
+		});
+		await fireEvent.click(getByRole('button', { name: 'Play →' }));
+		await fireEvent.click(await findByRole('button', { name: 'Start game' }));
+
+		expect(
+			await findByText('Could not start the game right now — try again in a minute.'),
+		).toBeTruthy();
 	});
 
 	it('falls back to the generic message for a non-409 failure, unchanged from before', async () => {
