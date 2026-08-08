@@ -12,6 +12,10 @@
 	import WdlBar from '../../components/WdlBar.svelte';
 	import WdlCounts from '../../components/WdlCounts.svelte';
 	import WdlSummaryCard from '../../components/WdlSummaryCard.svelte';
+	import AccountPanel from '../../components/AccountPanel.svelte';
+	import GuestLinkPanel from '../../components/GuestLinkPanel.svelte';
+	import DeleteAccountPanel from '../../components/DeleteAccountPanel.svelte';
+	import { authStore } from '$lib/authStore.svelte';
 
 	let guestId = $state('');
 	let restoreInput = $state('');
@@ -29,6 +33,13 @@
 		guestId = getGuestId();
 		void localGamesStore.load();
 		void playerOpponentsStore.load();
+	});
+
+	// The claim set is only needed on this page, so it is fetched here rather than at boot. Guarded on
+	// `signed-in` because the session resolves asynchronously — the layout's `refresh()` may still be
+	// in flight when this page mounts, and asking as a guest would just 401.
+	$effect(() => {
+		if (authStore.status === 'signed-in' && !authStore.guestsLoaded) void authStore.loadGuests();
 	});
 
 	const record = $derived(buildPlayerRecord(localGamesStore.games));
@@ -73,6 +84,28 @@
 		<h2 class="text-2xl font-bold text-content">Your profile</h2>
 		<p class="text-sm text-content-muted">Your record against bots and lobby opponents.</p>
 	</div>
+
+	<AccountPanel />
+
+	{#if authStore.status === 'signed-out' && authStore.canSignIn}
+		<!-- A CTA, not a gate: everything below this works exactly the same without an account. The
+		     offer names what signing in adds, so it reads as an option rather than a nag. -->
+		<div
+			class="flex flex-col items-start gap-3 rounded-2xl border border-border bg-surface/40 p-5 sm:flex-row sm:items-center sm:justify-between"
+		>
+			<p class="text-sm text-content-muted">
+				Sign in to get a rating, keep your history across devices, and manage your own bots. Playing
+				stays free either way — no account required.
+			</p>
+			<button
+				type="button"
+				onclick={() => authStore.signIn()}
+				class="shrink-0 rounded-xl bg-primary px-5 py-2.5 font-bold text-primary-content shadow-lg shadow-primary/30 transition-colors hover:bg-primary-hover"
+			>
+				Sign in with Google
+			</button>
+		</div>
+	{/if}
 
 	<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">On this device</h3>
 
@@ -181,6 +214,8 @@
 		{/if}
 	{/if}
 
+	<GuestLinkPanel />
+
 	<div class="flex flex-col gap-3">
 		<h3 class="text-sm font-bold uppercase tracking-wider text-content-muted">Your player code</h3>
 		<p class="text-sm text-content-muted">
@@ -272,4 +307,6 @@
 			</div>
 		</div>
 	</div>
+
+	<DeleteAccountPanel />
 </section>

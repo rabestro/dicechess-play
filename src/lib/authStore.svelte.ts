@@ -18,7 +18,20 @@
 // betting UI — it is not an account balance and no server knows about it.
 
 import { getGuestUuid } from '$lib/ingest/guestIdentity';
-import { fetchMe, isAuthEnabled, loginUrl, logout, type Me } from '$lib/auth/authApi';
+import {
+	claimGuest,
+	deleteAccount,
+	fetchClaimedGuests,
+	fetchMe,
+	isAuthEnabled,
+	loginUrl,
+	logout,
+	updateNickname,
+	type ClaimResult,
+	type DeleteResult,
+	type Me,
+	type NicknameResult,
+} from '$lib/auth/authApi';
 
 export interface User {
 	id: string;
@@ -57,6 +70,10 @@ function createAuthStore() {
 	const user = $state<User>({ ...GUEST_USER });
 	let status = $state<AuthStatus>('loading');
 	let account = $state<Me | null>(null);
+	// Claimed guest ids, loaded on demand rather than at boot: only the profile page needs them, and
+	// the nav must not pay for a second request on every page load.
+	let guests = $state<string[]>([]);
+	let guestsLoaded = $state(false);
 
 	function adjustBalance(amount: number) {
 		user.balance = Math.max(0, user.balance + amount);
@@ -75,6 +92,8 @@ function createAuthStore() {
 	function clear(next: Exclude<AuthStatus, 'signed-in'>) {
 		account = null;
 		status = next;
+		guests = [];
+		guestsLoaded = false;
 		user.id = GUEST_USER.id;
 		user.name = GUEST_USER.name;
 		user.role = GUEST_USER.role;
@@ -104,6 +123,55 @@ function createAuthStore() {
 	 * End the session. Local state is cleared regardless of what the request did — a failed logout
 	 * must not leave the UI insisting the person is still signed in.
 	 */
+	/**
+	 * Rename. The updated account is adopted on success so the nav, the badge and the delete
+	 * confirmation all move together — the confirmation echoes the *current* nickname, so a stale copy
+	 * here would make deletion impossible right after a rename.
+	 *
+	 * `taken` and `invalid` are returned rather than thrown: both are things a person does by hand and
+	 * the form has to show them inline.
+	 */
+	async function rename(nickname: string): Promise<NicknameResult> {
+		const result = await updateNickname(nickname);
+		if (result.outcome === 'updated') apply(result.me);
+		else if (result.outcome === 'signed-out') clear('signed-out');
+		return result;
+	}
+
+	/** The guest ids this account has claimed. Idempotent; call it when the profile page opens. */
+	async function loadGuests(): Promise<void> {
+		const result = await fetchClaimedGuests();
+		if (result.outcome === 'ok') {
+			guests = result.guests;
+			guestsLoaded = true;
+		} else if (result.outcome === 'signed-out') clear('signed-out');
+	}
+
+	/**
+	 * Link THIS browser's guest identity to the account, so its anonymous games join the owner's own
+	 * history. Terminal and first-writer-wins: a guest id belongs to at most one account forever, so
+	 * `claimed-by-another` is final and the UI must not offer a retry.
+	 */
+	async function claimCurrentGuest(): Promise<ClaimResult> {
+		const result = await claimGuest(getGuestUuid());
+		if (result.outcome === 'linked') {
+			guests = result.guests;
+			guestsLoaded = true;
+		} else if (result.outcome === 'signed-out') clear('signed-out');
+		return result;
+	}
+
+	/**
+	 * Delete the account. On success the browser becomes a plain guest again — the guest identity is
+	 * untouched, because it was never part of the account, and past games keep their `user:` ids which
+	 * simply stop resolving to anyone.
+	 */
+	async function remove(confirm: string): Promise<DeleteResult> {
+		const result = await deleteAccount(confirm);
+		if (result.outcome === 'deleted' || result.outcome === 'signed-out') clear('signed-out');
+		return result;
+	}
+
 	async function signOut(): Promise<void> {
 		// `finally`, not a plain sequence: the transport already swallows its own failures, but the
 		// store must not depend on that. If a future change ever lets an error through, the UI still
@@ -139,6 +207,16 @@ function createAuthStore() {
 		get nickname() {
 			return account?.nickname ?? null;
 		},
+		get guests() {
+			return guests;
+		},
+		get guestsLoaded() {
+			return guestsLoaded;
+		},
+		/** Whether this browser's own guest identity is already linked to the account. */
+		get currentGuestLinked() {
+			return guests.includes(getGuestUuid());
+		},
 		get initial() {
 			return account ? initialOf(account.nickname) : null;
 		},
@@ -162,6 +240,10 @@ function createAuthStore() {
 		refresh,
 		signIn,
 		signOut,
+		rename,
+		loadGuests,
+		claimCurrentGuest,
+		remove,
 	};
 }
 

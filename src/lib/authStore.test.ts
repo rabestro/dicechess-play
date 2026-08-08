@@ -16,6 +16,10 @@ const authApi = vi.hoisted(() => ({
 	logout: vi.fn(),
 	isAuthEnabled: vi.fn(() => true),
 	loginUrl: vi.fn(() => 'http://localhost:8080/auth/login'),
+	updateNickname: vi.fn(),
+	fetchClaimedGuests: vi.fn(),
+	claimGuest: vi.fn(),
+	deleteAccount: vi.fn(),
 }));
 
 vi.mock('$lib/auth/authApi', () => authApi);
@@ -61,7 +65,19 @@ describe('authStore', () => {
 		authApi.logout.mockReset().mockResolvedValue(undefined);
 		authApi.isAuthEnabled.mockReset().mockReturnValue(true);
 		authApi.loginUrl.mockReset().mockReturnValue('http://localhost:8080/auth/login');
+		authApi.updateNickname.mockReset();
+		authApi.fetchClaimedGuests.mockReset();
+		authApi.claimGuest.mockReset();
+		authApi.deleteAccount.mockReset();
 	});
+
+	/** A store already settled on a signed-in account, which is the precondition for everything below. */
+	async function signedInStore() {
+		authApi.fetchMe.mockResolvedValue({ outcome: 'signed-in', me: ME });
+		const store = await freshStore();
+		await store.refresh();
+		return store;
+	}
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
@@ -162,6 +178,142 @@ describe('authStore', () => {
 			const store = await freshStore();
 			store.signIn();
 			expect(assign).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('rename', () => {
+		it('adopts the renamed account, so the nav and the delete confirmation move together', async () => {
+			const store = await signedInStore();
+			const renamed = { ...ME, nickname: 'QuietRook' };
+			authApi.updateNickname.mockResolvedValue({ outcome: 'updated', me: renamed });
+
+			expect(await store.rename('QuietRook')).toEqual({ outcome: 'updated', me: renamed });
+			expect(store.nickname).toBe('QuietRook');
+			// The delete guard echoes the CURRENT nickname; a stale copy here would make the account
+			// impossible to delete right after a rename.
+			expect(store.initial).toBe('Q');
+		});
+
+		it('returns "taken" without touching the account, since the old name is still ours', async () => {
+			const store = await signedInStore();
+			authApi.updateNickname.mockResolvedValue({ outcome: 'taken' });
+
+			expect(await store.rename('QuietRook')).toEqual({ outcome: 'taken' });
+			expect(store.nickname).toBe('BraveDie');
+		});
+
+		it("passes play-api's own reason through for a rejected format", async () => {
+			const store = await signedInStore();
+			authApi.updateNickname.mockResolvedValue({
+				outcome: 'invalid',
+				reason: 'that nickname is reserved',
+			});
+
+			expect(await store.rename('admin')).toEqual({
+				outcome: 'invalid',
+				reason: 'that nickname is reserved',
+			});
+			expect(store.nickname).toBe('BraveDie');
+		});
+
+		it('drops to signed-out when the session died between the check and the write', async () => {
+			const store = await signedInStore();
+			authApi.updateNickname.mockResolvedValue({ outcome: 'signed-out' });
+
+			await store.rename('QuietRook');
+			expect(store.status).toBe('signed-out');
+			expect(store.account).toBeNull();
+		});
+	});
+
+	describe('claimed guests', () => {
+		it('is empty and unloaded until asked, so the nav pays for no extra request', async () => {
+			const store = await signedInStore();
+			expect(store.guests).toEqual([]);
+			expect(store.guestsLoaded).toBe(false);
+			expect(authApi.fetchClaimedGuests).not.toHaveBeenCalled();
+		});
+
+		it('loads the claim set on demand', async () => {
+			const store = await signedInStore();
+			authApi.fetchClaimedGuests.mockResolvedValue({ outcome: 'ok', guests: ['other-uuid'] });
+
+			await store.loadGuests();
+			expect(store.guests).toEqual(['other-uuid']);
+			expect(store.guestsLoaded).toBe(true);
+		});
+
+		it('knows whether THIS browser is among the linked identities', async () => {
+			const store = await signedInStore();
+			authApi.fetchClaimedGuests.mockResolvedValue({ outcome: 'ok', guests: ['other-uuid'] });
+			await store.loadGuests();
+			expect(store.currentGuestLinked).toBe(false);
+
+			authApi.fetchClaimedGuests.mockResolvedValue({
+				outcome: 'ok',
+				guests: ['other-uuid', 'guest-uuid'],
+			});
+			await store.loadGuests();
+			expect(store.currentGuestLinked).toBe(true);
+		});
+
+		it('claims with the BARE uuid and adopts the returned set', async () => {
+			const store = await signedInStore();
+			authApi.claimGuest.mockResolvedValue({ outcome: 'linked', guests: ['guest-uuid'] });
+
+			expect(await store.claimCurrentGuest()).toEqual({
+				outcome: 'linked',
+				guests: ['guest-uuid'],
+			});
+			expect(authApi.claimGuest).toHaveBeenCalledWith('guest-uuid');
+			expect(store.currentGuestLinked).toBe(true);
+		});
+
+		it('reports a guest owned elsewhere as terminal, leaving the set untouched', async () => {
+			const store = await signedInStore();
+			authApi.fetchClaimedGuests.mockResolvedValue({ outcome: 'ok', guests: [] });
+			await store.loadGuests();
+			authApi.claimGuest.mockResolvedValue({ outcome: 'claimed-by-another' });
+
+			expect(await store.claimCurrentGuest()).toEqual({ outcome: 'claimed-by-another' });
+			expect(store.guests).toEqual([]);
+			expect(store.currentGuestLinked).toBe(false);
+		});
+
+		it('forgets the claim set on sign-out, so the next account never sees the previous one', async () => {
+			const store = await signedInStore();
+			authApi.fetchClaimedGuests.mockResolvedValue({ outcome: 'ok', guests: ['guest-uuid'] });
+			await store.loadGuests();
+			expect(store.guests).toHaveLength(1);
+
+			await store.signOut();
+			expect(store.guests).toEqual([]);
+			expect(store.guestsLoaded).toBe(false);
+		});
+	});
+
+	describe('remove', () => {
+		it('turns the browser back into a plain guest, keeping the guest identity', async () => {
+			const store = await signedInStore();
+			authApi.deleteAccount.mockResolvedValue({ outcome: 'deleted' });
+
+			expect(await store.remove('BraveDie')).toEqual({ outcome: 'deleted' });
+			expect(store.status).toBe('signed-out');
+			expect(store.account).toBeNull();
+			// The guest identity was never part of the account, so it survives deletion.
+			expect(store.externalId).toBe('guest:guest-uuid');
+		});
+
+		it('keeps the account when the confirmation did not match', async () => {
+			const store = await signedInStore();
+			authApi.deleteAccount.mockResolvedValue({
+				outcome: 'invalid',
+				reason: 'confirm must be your current nickname',
+			});
+
+			await store.remove('wrong');
+			expect(store.status).toBe('signed-in');
+			expect(store.account).toEqual(ME);
 		});
 	});
 
