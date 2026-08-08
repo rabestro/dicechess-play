@@ -25,6 +25,11 @@
 		if (open) cancelButton?.focus();
 	});
 
+	// Case-INSENSITIVE on purpose, and it must stay that way: play-api compares with
+	// `equalsIgnoreCase` (`AuthRoutes.scala`, pinned by a test that creates "DelNick" and deletes with
+	// "delnick"). Display casing belongs to the player, so an exact echo would fail a deliberate action
+	// for a reason nobody can see. Tightening this to `===` would make the button refuse input the
+	// server accepts — stricter is not safer here, it is just a dead end.
 	const matches = $derived(confirmInput.trim().toLowerCase() === authStore.nickname?.toLowerCase());
 
 	function close() {
