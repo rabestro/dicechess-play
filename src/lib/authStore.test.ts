@@ -26,6 +26,35 @@ async function freshStore() {
 	return (await import('./authStore.svelte')).authStore;
 }
 
+describe('initialOf', () => {
+	it('uppercases the first character, since the badge is a single glyph', async () => {
+		const { initialOf } = await import('./authStore.svelte');
+		expect(initialOf('bravedie')).toBe('B');
+	});
+
+	it('ignores surrounding whitespace rather than rendering a blank badge', async () => {
+		const { initialOf } = await import('./authStore.svelte');
+		expect(initialOf('  quietRook ')).toBe('Q');
+	});
+
+	it('falls back to "?" for a name with nothing in it', async () => {
+		const { initialOf } = await import('./authStore.svelte');
+		expect(initialOf('   ')).toBe('?');
+		expect(initialOf('')).toBe('?');
+	});
+
+	it('takes whole characters, so an astral glyph is not split into half a surrogate pair', async () => {
+		const { initialOf } = await import('./authStore.svelte');
+		// Naive `nickname[0]` would return a lone surrogate here and render as a replacement box.
+		expect(initialOf('🎲roller')).toBe('🎲');
+	});
+
+	it('leaves a caseless script alone instead of mangling it', async () => {
+		const { initialOf } = await import('./authStore.svelte');
+		expect(initialOf('日本語')).toBe('日');
+	});
+});
+
 describe('authStore', () => {
 	beforeEach(() => {
 		authApi.fetchMe.mockReset();

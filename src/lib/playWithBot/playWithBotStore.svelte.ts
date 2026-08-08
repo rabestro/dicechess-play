@@ -91,6 +91,12 @@ export class PlayWithBotStore {
 
 	// Time Control States
 	timeLimit = $state<number | null>(null);
+	// The human seat's external id, snapshotted when the game starts and deliberately NOT reactive.
+	// `authStore.externalId` can change mid-game — the boot `refresh()` resolves asynchronously, so a
+	// game begun while the session is still `loading` starts as `guest:<uuid>` and would silently
+	// become `user:<uuid>` once the account arrives. Re-reading it per snapshot would leave one
+	// persisted record carrying timer maps keyed by two different identities.
+	private humanExternalId = '';
 	timeBonus = $state<number | null>(0);
 	whiteTimeLeft = $state<number>(0);
 	blackTimeLeft = $state<number>(0);
@@ -264,6 +270,8 @@ export class PlayWithBotStore {
 		// Setup Time Limits
 		this.timeLimit = preferencesStore.timeLimit;
 		this.timeBonus = preferencesStore.timeBonus;
+		// Fix the human identity for the whole game — see the field's declaration for why.
+		this.humanExternalId = authStore.externalId;
 		// For now in dicechess-play, games are played without stakes (always 0 bet).
 		// In the future, stakes might be introduced for registered users.
 		this.bet = 0;
@@ -1314,10 +1322,13 @@ export class PlayWithBotStore {
 
 	private getLeftTimeMap(): { [playerId: string]: number } {
 		if (this.timeLimit === null) return {};
-		// `authStore.externalId` speaks play-api's vocabulary — `guest:<uuid>` or `user:<uuid>`. This
-		// used to build `user:${authStore.user.id}`, which produced `user:guest` for every anonymous
-		// game because the store was a stub whose id was the literal string "guest".
-		const humanId = authStore.externalId;
+		// The identity fixed at game start, in play-api's vocabulary — `guest:<uuid>` or `user:<uuid>`.
+		// This used to build `user:${authStore.user.id}`, which produced `user:guest` for every
+		// anonymous game because the store was a stub whose id was the literal string "guest". The
+		// fallback covers a timer map requested before any game started; it cannot happen today
+		// (`timeLimit === null` returns above) but leaves nothing keyed by an empty string if it ever
+		// does.
+		const humanId = this.humanExternalId || authStore.externalId;
 		const whiteId = this.playerColor === 'w' ? humanId : `bot:${this.botAlgorithm}`;
 		const blackId = this.playerColor === 'b' ? humanId : `bot:${this.botAlgorithm}`;
 		return {
