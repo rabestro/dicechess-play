@@ -11,8 +11,9 @@
 	// in front of us. Someone who signs in, plays as their account, and only later finds /me may have
 	// no idea their earlier games can still be adopted.
 	//
-	// The claim step is skipped entirely when there is nothing to adopt — an offer to link zero games is
-	// noise, and it would teach people to dismiss this dialog without reading it.
+	// The claim step is skipped when there is demonstrably nothing to adopt — an offer to link zero games
+	// is noise, and it would teach people to dismiss this dialog without reading it. "Demonstrably" is
+	// load-bearing: an unread count means offer, never skip (see hasSomethingToClaim).
 	import { authStore } from '$lib/authStore.svelte';
 	import { toastStore } from '$lib/toastStore.svelte';
 	import { isOnboarded, markOnboarded } from '$lib/auth/onboarding';
@@ -28,6 +29,7 @@
 	let error = $state<string | null>(null);
 	let busy = $state(false);
 	let primaryButton = $state<HTMLButtonElement | null>(null);
+	let panel = $state<HTMLDivElement | null>(null);
 	// The account this dialog opened for. Kept so the guard is written for the right id even if the
 	// session changes while the dialog is up.
 	let openedFor = $state<string | null>(null);
@@ -62,12 +64,38 @@
 		error = null;
 	}
 
-	/** Whether there is anonymous history worth offering to adopt. */
-	function hasSomethingToClaim(): boolean {
-		return !authStore.currentGuestLinked && guestGames > 0;
+	/**
+	 * Wait until the lobby aggregate has settled — loaded, or failed trying.
+	 *
+	 * Awaiting `load()` alone is NOT enough: it no-ops while a request is already in flight, so it can
+	 * resolve instantly with `opponents` still empty. Hence the poll on `loading`, which covers both
+	 * our own call and one another page started first.
+	 */
+	async function opponentsSettled(): Promise<void> {
+		await playerOpponentsStore.load();
+		while (playerOpponentsStore.loading) {
+			await new Promise((resolve) => setTimeout(resolve, 25));
+		}
 	}
 
-	function afterNickname() {
+	/**
+	 * Whether there is anonymous history worth offering to adopt.
+	 *
+	 * Note the direction of the unknown case: a count we could not read means OFFER, not skip. Skipping
+	 * writes the "already dealt with" flag and burns the single prompt this browser gets — the very
+	 * loss this component exists to prevent. An offer that turns out to cover nothing is recoverable;
+	 * a prompt never shown is not.
+	 */
+	function hasSomethingToClaim(): boolean {
+		if (authStore.currentGuestLinked) return false;
+		if (!playerOpponentsStore.loaded) return true;
+		return guestGames > 0;
+	}
+
+	async function afterNickname() {
+		// Settle the count BEFORE deciding. Without this, someone who confirms the nickname faster than
+		// the request resolves is told there is nothing to adopt, and the dialog closes for good.
+		await opponentsSettled();
 		if (hasSomethingToClaim()) {
 			step = 'claim';
 			error = null;
@@ -77,7 +105,7 @@
 	async function saveNickname() {
 		const next = draft.trim();
 		if (next === '' || next === authStore.nickname) {
-			afterNickname();
+			await afterNickname();
 			return;
 		}
 		busy = true;
@@ -86,7 +114,7 @@
 		busy = false;
 		switch (result.outcome) {
 			case 'updated':
-				afterNickname();
+				await afterNickname();
 				break;
 			case 'taken':
 				error = 'That nickname is already taken.';
@@ -134,9 +162,31 @@
 	}
 
 	function onKeydown(event: KeyboardEvent) {
+		if (!open) return;
 		// Escape dismisses, and dismissing counts as done — a prompt that returns after being waved away
 		// is worse than one that never appears.
-		if (open && event.key === 'Escape') finish();
+		if (event.key === 'Escape') {
+			finish();
+			return;
+		}
+		// `aria-modal="true"` tells assistive tech the rest of the page is inert; without trapping Tab
+		// that is a lie for keyboard users, who can walk into the nav behind the overlay.
+		if (event.key !== 'Tab' || !panel) return;
+		const focusable = [...panel.querySelectorAll<HTMLElement>('button, input, [href]')].filter(
+			(el) => !el.hasAttribute('disabled'),
+		);
+		if (focusable.length === 0) return;
+		const first = focusable[0];
+		const last = focusable[focusable.length - 1];
+		const active = document.activeElement;
+		// Wrap at both edges, and pull focus back in if it has already escaped the panel.
+		if (event.shiftKey && (active === first || !panel.contains(active))) {
+			event.preventDefault();
+			last.focus();
+		} else if (!event.shiftKey && (active === last || !panel.contains(active))) {
+			event.preventDefault();
+			first.focus();
+		}
 	}
 </script>
 
@@ -150,6 +200,7 @@
 		aria-labelledby="onboarding-headline"
 	>
 		<div
+			bind:this={panel}
 			class="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border bg-surface p-6"
 		>
 			{#if step === 'nickname'}
@@ -204,9 +255,16 @@
 					Bring your earlier games?
 				</h2>
 				<p class="text-sm text-content-muted">
-					This browser has {guestGames}
-					{guestGames === 1 ? 'online game' : 'online games'} played anonymously. Adding them to your
-					account puts them in your own history. They stay private either way, and this cannot be undone.
+					{#if playerOpponentsStore.loaded}
+						This browser has {guestGames}
+						{guestGames === 1 ? 'online game' : 'online games'} played anonymously.
+					{:else}
+						<!-- The count could not be read. Offering without it is deliberate — see
+						     hasSomethingToClaim — but claiming a number we do not have would not be. -->
+						This browser may have online games played anonymously.
+					{/if}
+					Adding them to your account puts them in your own history. They stay private either way, and
+					this cannot be undone.
 				</p>
 				{#if error}
 					<p class="text-xs text-danger" role="alert">{error}</p>

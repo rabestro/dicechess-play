@@ -20,7 +20,13 @@ const auth = vi.hoisted(() => ({
 vi.mock('$lib/authStore.svelte', () => auth);
 
 const opponents = vi.hoisted(() => ({
-	playerOpponentsStore: { opponents: [] as unknown[], load: vi.fn() },
+	playerOpponentsStore: {
+		opponents: [] as unknown[],
+		loading: false,
+		loaded: true,
+		error: null as string | null,
+		load: vi.fn(),
+	},
 }));
 vi.mock('$lib/stores/playerOpponentsStore.svelte', () => opponents);
 
@@ -57,7 +63,10 @@ describe('FirstLoginOnboarding', () => {
 		auth.authStore.rename.mockReset();
 		auth.authStore.claimCurrentGuest.mockReset();
 		opponents.playerOpponentsStore.opponents = [];
-		opponents.playerOpponentsStore.load.mockReset();
+		opponents.playerOpponentsStore.loading = false;
+		opponents.playerOpponentsStore.loaded = true;
+		opponents.playerOpponentsStore.error = null;
+		opponents.playerOpponentsStore.load.mockReset().mockResolvedValue(undefined);
 		toasts.toastStore.success.mockReset();
 		toasts.toastStore.error.mockReset();
 	});
@@ -204,6 +213,154 @@ describe('FirstLoginOnboarding', () => {
 			await waitFor(() => expect(queryByRole('dialog')).toBeNull());
 			expect(isOnboarded(ACCOUNT.id)).toBe(true);
 			expect(auth.authStore.claimCurrentGuest).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('the anonymous-history count race', () => {
+		it('does not skip the claim step while the count is still in flight', async () => {
+			// The regression this guards: `load()` is async, so confirming the nickname faster than the
+			// request resolves used to read zero games, close the dialog and burn the one prompt.
+			let release: () => void = () => {};
+			opponents.playerOpponentsStore.loaded = false;
+			opponents.playerOpponentsStore.loading = true;
+			opponents.playerOpponentsStore.load.mockImplementation(
+				() => new Promise<void>((resolve) => (release = resolve)),
+			);
+			signIn();
+			const { getByRole, getByText } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+
+			await fireEvent.click(getByRole('button', { name: /keep this name/i }));
+			// Resolve the request the way a real load would: data, then flags.
+			opponents.playerOpponentsStore.opponents = [opponentWith(2)];
+			opponents.playerOpponentsStore.loaded = true;
+			opponents.playerOpponentsStore.loading = false;
+			release();
+
+			await waitFor(() => expect(getByText(/bring your earlier games/i)).toBeTruthy());
+			expect(getByText(/2 online games/i)).toBeTruthy();
+			expect(isOnboarded(ACCOUNT.id)).toBe(false);
+		});
+
+		it('offers the claim without a number when the count could not be read', async () => {
+			// Unknown means offer: skipping would write the flag and lose history the person cannot get
+			// back. But the copy must not invent a count it does not have.
+			opponents.playerOpponentsStore.loaded = false;
+			opponents.playerOpponentsStore.error = "Your lobby record isn't available right now.";
+			signIn();
+			const { getByRole, getByText, queryByText } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+
+			await fireEvent.click(getByRole('button', { name: /keep this name/i }));
+			await waitFor(() => expect(getByText(/may have online games/i)).toBeTruthy());
+			expect(queryByText(/0 online games/i)).toBeNull();
+		});
+	});
+
+	describe('keyboard focus', () => {
+		it('wraps Tab at the last control instead of leaving the modal', async () => {
+			signIn();
+			const { getByRole } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+			const later = getByRole('button', { name: /later/i }) as HTMLButtonElement;
+			later.focus();
+
+			await fireEvent.keyDown(window, { key: 'Tab' });
+			// aria-modal="true" claims the page behind is inert; for keyboard users that has to be true.
+			expect(document.activeElement).not.toBe(later);
+			expect(getByRole('dialog').contains(document.activeElement)).toBe(true);
+		});
+
+		it('wraps Shift+Tab backwards from the first control', async () => {
+			signIn();
+			const { getByRole } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+			const field = getByRole('textbox', { name: /nickname/i }) as HTMLInputElement;
+			const later = getByRole('button', { name: /later/i }) as HTMLButtonElement;
+			field.focus();
+
+			// From the FIRST control, Shift+Tab must land on the LAST one. Asserting the exact element
+			// matters: "still somewhere inside the dialog" passes even with no trap at all, because that
+			// is where focus already was.
+			await fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+			expect(document.activeElement).toBe(later);
+		});
+	});
+
+	describe('outcomes that are not success', () => {
+		it('shows the server reason for a rejected nickname and stays open', async () => {
+			signIn();
+			auth.authStore.rename.mockResolvedValue({
+				outcome: 'invalid',
+				reason: 'that nickname is reserved',
+			});
+			const { getByRole, getByText } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+			await fireEvent.input(getByRole('textbox', { name: /nickname/i }), {
+				target: { value: 'admin' },
+			});
+			await fireEvent.click(getByRole('button', { name: /save name/i }));
+
+			await waitFor(() => expect(getByText('that nickname is reserved')).toBeTruthy());
+			expect(isOnboarded(ACCOUNT.id)).toBe(false);
+		});
+
+		it('stays open and offers a retry when the rename could not reach the server', async () => {
+			signIn();
+			auth.authStore.rename.mockResolvedValue({ outcome: 'unavailable' });
+			const { getByRole, getByText } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+			await fireEvent.input(getByRole('textbox', { name: /nickname/i }), {
+				target: { value: 'QuietRook' },
+			});
+			await fireEvent.click(getByRole('button', { name: /save name/i }));
+
+			await waitFor(() => expect(getByText(/could not reach the server/i)).toBeTruthy());
+			expect(getByRole('dialog')).toBeTruthy();
+			expect(isOnboarded(ACCOUNT.id)).toBe(false);
+		});
+
+		it('closes and says so when the session died during the rename', async () => {
+			signIn();
+			auth.authStore.rename.mockResolvedValue({ outcome: 'signed-out' });
+			const { getByRole, queryByRole } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+			await fireEvent.input(getByRole('textbox', { name: /nickname/i }), {
+				target: { value: 'QuietRook' },
+			});
+			await fireEvent.click(getByRole('button', { name: /save name/i }));
+
+			await waitFor(() => expect(queryByRole('dialog')).toBeNull());
+			expect(toasts.toastStore.error).toHaveBeenCalled();
+		});
+
+		it('keeps the claim step open when linking could not reach the server', async () => {
+			opponents.playerOpponentsStore.opponents = [opponentWith(3)];
+			signIn();
+			auth.authStore.claimCurrentGuest.mockResolvedValue({ outcome: 'unavailable' });
+			const { getByRole, getByText } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+			await fireEvent.click(getByRole('button', { name: /keep this name/i }));
+			await waitFor(() => getByRole('button', { name: /yes, add them/i }));
+
+			await fireEvent.click(getByRole('button', { name: /yes, add them/i }));
+			await waitFor(() => expect(getByText(/could not reach the server/i)).toBeTruthy());
+			// Not marked: the offer must survive a failed attempt, or the history is lost to a blip.
+			expect(isOnboarded(ACCOUNT.id)).toBe(false);
+		});
+
+		it('closes and says so when the session died during the claim', async () => {
+			opponents.playerOpponentsStore.opponents = [opponentWith(3)];
+			signIn();
+			auth.authStore.claimCurrentGuest.mockResolvedValue({ outcome: 'signed-out' });
+			const { getByRole, queryByRole } = render(FirstLoginOnboarding);
+			await waitFor(() => getByRole('dialog'));
+			await fireEvent.click(getByRole('button', { name: /keep this name/i }));
+			await waitFor(() => getByRole('button', { name: /yes, add them/i }));
+
+			await fireEvent.click(getByRole('button', { name: /yes, add them/i }));
+			await waitFor(() => expect(queryByRole('dialog')).toBeNull());
+			expect(toasts.toastStore.error).toHaveBeenCalled();
 		});
 	});
 
