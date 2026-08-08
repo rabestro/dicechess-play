@@ -4,6 +4,7 @@
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
 	import { authStore } from '$lib/authStore.svelte';
 	import AuthMenu from '../components/AuthMenu.svelte';
+	import FirstLoginOnboarding from '../components/FirstLoginOnboarding.svelte';
 	import ThemeMenu from '../components/ThemeMenu.svelte';
 	import ToastContainer from '../components/ToastContainer.svelte';
 	import { resolve } from '$app/paths';
@@ -184,4 +185,8 @@
 	{/if}
 
 	<ToastContainer />
+	<!-- In the layout, not on a page: play-api redirects back to PLAY_FRONTEND_URL after Google, which
+	     is the site root today but need not stay that way. Mounting it here means onboarding finds the
+	     person wherever they land. -->
+	<FirstLoginOnboarding />
 </div>
