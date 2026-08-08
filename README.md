@@ -86,10 +86,16 @@ src/
 │   ├── GameHistoryCard · LiveGameHistoryCard · BotProfileGameCard · WdlBar · WdlCounts
 │   │                     WdlSummaryCard · MiniBoard · TimeControlPicker · ThemeMenu
 │   │                     ToastContainer
+│   ├── AuthMenu               header identity slot — Sign in / nickname badge; renders nothing
+│   │                          while loading or when play-api is unreachable (anonymous-first)
 │   ├── GamesFilterBar         /games's source/result pills + opponent search+chip (#151)
 │   └── BotCatalogCard · BotTimeControlPicker · BotChallengePanel — the /bots page's card
 │                              (click → wake → config → start)
 ├── lib/
+│   ├── auth/                  authApi — play-api /auth/* client (ADR-0017): session is an HttpOnly
+│   │                          cookie, so the SPA holds no token; login is a full-page navigation
+│   ├── authStore.svelte.ts    identity: guest by default, account once signed in (status/nickname/
+│   │                          externalId; `user:<uuid>` signed in, `guest:<uuid>` otherwise)
 │   ├── playWithBot/           bot-play core: store, engine worker, dice/history, opening book
 │   ├── live/                  live-play client: liveGameStore, liveClient (WS + reconnect),
 │   │                          liveApi/lobbyApi/historyApi (REST), liveTypes (play-api wire mirror),

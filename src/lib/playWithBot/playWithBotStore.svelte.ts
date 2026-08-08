@@ -1314,10 +1314,12 @@ export class PlayWithBotStore {
 
 	private getLeftTimeMap(): { [playerId: string]: number } {
 		if (this.timeLimit === null) return {};
-		const whiteId =
-			this.playerColor === 'w' ? `user:${authStore.user?.id || '0'}` : `bot:${this.botAlgorithm}`;
-		const blackId =
-			this.playerColor === 'b' ? `user:${authStore.user?.id || '0'}` : `bot:${this.botAlgorithm}`;
+		// `authStore.externalId` speaks play-api's vocabulary — `guest:<uuid>` or `user:<uuid>`. This
+		// used to build `user:${authStore.user.id}`, which produced `user:guest` for every anonymous
+		// game because the store was a stub whose id was the literal string "guest".
+		const humanId = authStore.externalId;
+		const whiteId = this.playerColor === 'w' ? humanId : `bot:${this.botAlgorithm}`;
+		const blackId = this.playerColor === 'b' ? humanId : `bot:${this.botAlgorithm}`;
 		return {
 			[whiteId]: this.whiteTimeLeft,
 			[blackId]: this.blackTimeLeft,

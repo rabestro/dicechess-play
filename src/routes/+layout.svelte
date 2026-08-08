@@ -2,6 +2,8 @@
 	import '../app.css';
 	import type { Snippet } from 'svelte';
 	import { chromeStore } from '$lib/stores/chromeStore.svelte';
+	import { authStore } from '$lib/authStore.svelte';
+	import AuthMenu from '../components/AuthMenu.svelte';
 	import ThemeMenu from '../components/ThemeMenu.svelte';
 	import ToastContainer from '../components/ToastContainer.svelte';
 	import { resolve } from '$app/paths';
@@ -12,6 +14,14 @@
 	// registerType: 'autoUpdate' (vite.config.ts) — registering is enough, the
 	// service worker reloads the page itself once a new version activates.
 	useRegisterSW();
+
+	// Ask play-api who we are, once per page load. There is no local shortcut: the session is an
+	// HttpOnly cookie on play-api's host, so the SPA cannot inspect it and a stale local flag would
+	// survive an expired or revoked session. `fetchMe` short-circuits without a request when no
+	// play-api base URL is configured, so this costs nothing on a build without live play.
+	$effect(() => {
+		void authStore.refresh();
+	});
 
 	let { children }: { children: Snippet } = $props();
 
@@ -110,7 +120,10 @@
 					</nav>
 				</div>
 
-				<ThemeMenu />
+				<div class="flex items-center gap-1">
+					<AuthMenu />
+					<ThemeMenu />
+				</div>
 			</div>
 		</header>
 	{/if}
